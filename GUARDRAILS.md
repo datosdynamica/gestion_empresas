@@ -5,6 +5,7 @@
 - `Clientes.IdEmpresa = 397` se usa como empresa master operativa para el alta inicial en `Clientes`.
 - El alta genera datos en `Empresas` y en `Clientes`, pero primero pasa por tablas temporales.
 - El archivo [panel_de_gesti_n_de_clientes.html](C:\DYNAMICA_PLUGINS\gestion_empresas\panel_de_gesti_n_de_clientes.html) es solo referencia visual. No debe tomarse como implementacion funcional.
+- La apariencia objetivo del modulo debe seguir ese HTML de referencia tanto en listado como en formularios y ficha detalle.
 
 ## Zonas sensibles
 - Produccion MySQL: nunca hacer `UPDATE`, `DELETE`, `DROP`, `ALTER` fuera de cambios aprobados y acotados.
@@ -17,6 +18,7 @@
 - No borrar nada existente en el servidor.
 - Todo cambio nuevo debe agregarse en carpetas/archivos nuevos o mediante SQL idempotente cuando aplique.
 - Antes de tocar produccion:
+  - leer `RUNBOOK-OPERATIVO.md`
   - revisar `git status`
   - crear commit local de restauracion
   - documentar el cambio
@@ -29,6 +31,7 @@
 - Rehacer la UI funcional desde cero.
 - Mantener un layout guest dedicado para pantallas publicas/iniciales.
 - Mantener una checklist visual de zonas sensibles para no reutilizar por error layouts o componentes del flujo administrativo.
+- Antes de rehacer una vista, abrir primero el HTML de referencia local y reutilizar su estructura visual.
 
 ## Checklist previa a cambios
 - Confirmar si el cambio es local o de produccion.
@@ -36,6 +39,14 @@
 - Confirmar si crea o modifica archivos en disco.
 - Confirmar si toca flujo de aprobacion.
 - Confirmar si necesita nuevo commit de restauracion.
+- Confirmar si ya existe documentacion operativa del paso; si no existe, crearla al resolver el problema.
+
+## Errores ya resueltos y no repetir
+- `plink.exe` y `puttygen.exe` ya existen dentro de esta carpeta del proyecto. No asumir que estan en el PATH global.
+- SSH a `www.datosdynamica.net` no acepta password interactivo para despliegue operativo; usar la clave `.ppk` documentada en el runbook.
+- No subir PHP con `Get-Content -Raw ... | plink "cat > archivo"` porque puede introducir basura de codificacion y romper `declare(strict_types=1)`.
+- El metodo seguro de despliegue de archivos de texto es enviar bytes binarios por `stdin` con Python + `plink`, tal como queda documentado en `RUNBOOK-OPERATIVO.md`.
+- Cuando aparezca un problema repetible de PowerShell, quoting, SSH o despliegue, debe quedar documentado de inmediato en el proyecto antes de seguir.
 
 ## Pendientes marcados
 - Confirmar si la ruta de adjuntos queda fija o luego sera dinamica.
