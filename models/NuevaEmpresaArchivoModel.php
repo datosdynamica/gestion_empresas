@@ -25,4 +25,10 @@ class NuevaEmpresaArchivoModel extends BaseModel
     {
         return $this->fetchAll('SELECT * FROM nuevas_empresas_archivos WHERE nueva_empresa_id = ? ORDER BY id ASC', [$id]);
     }
+
+    public function deleteByNuevaEmpresaId(int $id): void
+    {
+        $stmt = $this->db->prepare('DELETE FROM nuevas_empresas_archivos WHERE nueva_empresa_id = ?');
+        $stmt->execute([$id]);
+    }
 }

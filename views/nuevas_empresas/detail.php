@@ -4,7 +4,7 @@
     <div>
         <div class="eyebrow">Detalle del registro</div>
         <h2><?= htmlspecialchars((string) $item['razon_social'], ENT_QUOTES, 'UTF-8') ?></h2>
-        <p>RUT <?= htmlspecialchars((string) $item['rut'], ENT_QUOTES, 'UTF-8') ?> · Licencia <?= htmlspecialchars((string) ($item['licencia'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+        <p>RUT <?= htmlspecialchars((string) $item['rut'], ENT_QUOTES, 'UTF-8') ?> / Licencia <?= htmlspecialchars((string) ($item['licencia'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
     </div>
     <div class="detail-top-actions">
         <span class="status-badge status-<?= strtolower((string) $item['estado']) ?>"><?= htmlspecialchars((string) $item['estado'], ENT_QUOTES, 'UTF-8') ?></span>

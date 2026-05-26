@@ -307,6 +307,7 @@ class NuevasEmpresasController
 
         try {
             FileStorage::deleteFolder($id);
+            $this->archivoModel->deleteByNuevaEmpresaId($id);
             $this->model->markDeleted($id, $usuario, $motivo);
             $this->historialModel->create([
                 'nueva_empresa_id' => $id,
