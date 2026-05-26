@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión y Onboarding de Clientes</title>
+    <!-- Tailwind CSS para el diseño visual fluido -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter para máxima legibilidad corporativa -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons para una iconografía limpia y consistente -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- CONTENEDOR PRINCIPAL INTERNO -->
+    <div class="p-6 max-w-7xl mx-auto space-y-6">
+        
+        <!-- CABECERA DE CONTEXTO DE LA PANTALLA -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Altas y Automatizaciones</h1>
+                <p class="text-sm text-slate-500">Aprovisionamiento y seguimiento técnico de nuevos clientes.</p>
+            </div>
+            
+            <!-- Botones de Acción Principal -->
+            <div class="flex gap-2">
+                <button id="btn-toggle-view" onclick="toggleMainView()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Nueva Empresa Cliente</span>
+                </button>
+                <button id="btn-back-list" onclick="showListView()" class="hidden inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <span>Volver al Listado</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Alerta de notificación temporal (Toast simulado para la demo) -->
+        <div id="toast-notificacion" class="hidden transform translate-y-2 opacity-0 transition-all duration-300 fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3">
+            <div class="bg-emerald-500 p-1 rounded-full text-white" id="toast-icon-container">
+                <i data-lucide="check" class="w-4 h-4"></i>
+            </div>
+            <div>
+                <p class="text-xs text-slate-400 font-semibold" id="toast-title">Notificación</p>
+                <p class="text-sm font-medium" id="toast-msg">Operación completada con éxito.</p>
+            </div>
+        </div>
+
+        <!-- ==================== VISTA 1: LISTADO DE CLIENTES ==================== -->
+        <div id="vista-listado" class="space-y-4">
+            
+            <!-- SECCIÓN DE BÚSQUEDA Y FILTROS -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
+                
+                <!-- Barra de búsqueda -->
+                <div class="relative w-full lg:w-96">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                        <i data-lucide="search" class="w-5 h-5"></i>
+                    </span>
+                    <input type="text" id="filtro-busqueda" oninput="filtrarTabla()" placeholder="Buscar por Razón Social o RUT..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                </div>
+
+                <!-- Selectores de filtros -->
+                <div class="flex flex-wrap gap-3 w-full lg:w-auto">
+                    <!-- Filtro por Estado General -->
+                    <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
+                        <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Estado:</span>
+                        <select id="filtro-estado" onchange="filtrarTabla()" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
+                            <option value="todos">Todos</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Frenado">Frenado</option>
+                            <option value="Completado">Completado</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Hito con los nuevos nombres -->
+                    <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
+                        <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Hito Actual:</span>
+                        <select id="filtro-hito" onchange="filtrarTabla()" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
+                            <option value="todos">Todos los hitos</option>
+                            <option value="Aprobación pendiente">1. Aprobación pendiente</option>
+                            <option value="Hito Carpeta">2. Hito Carpeta</option>
+                            <option value="Migrate">3. Migrate</option>
+                            <option value="Dynamica">4. Dynamica</option>
+                            <option value="Certificado Digital">5. Certificado Digital</option>
+                            <option value="Homologación DGI">6. Homologación DGI</option>
+                            <option value="Envio de Factura">7. Envio de Factura</option>
+                            <option value="Envío de Credenciales">8. Envío de Credenciales</option>
+                            <option value="Alta Final">9. Alta Final</option>
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- TABLA DE DATOS -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse" id="tabla-clientes">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold tracking-wider uppercase">
+                                <th class="py-4 px-5 w-12 text-center">Info</th>
+                                <th class="py-4 px-4">Fecha Reg.</th>
+                                <th class="py-4 px-4">Razón Social</th>
+                                <th class="py-4 px-4">Estado General</th>
+                                <th class="py-4 px-4">Licencia</th>
+                                <th class="py-4 px-4 text-center">Es Emisor</th>
+                                <th class="py-4 px-4">Hito / Acción Requerida</th>
+                                <th class="py-4 px-6 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
+                            
+                            <!-- FILA DE EMPRESA 1 (Hito Automático Fallido -> Migrate) -->
+                            <tr class="hover:bg-slate-50/70 transition cursor-pointer" data-id="1" data-estado="Frenado" data-hito="Migrate" onclick="toggleFilaExpandida(1, event)">
+                                <td class="py-4 px-5 text-center">
+                                    <button class="text-slate-400 hover:text-indigo-600 transition" id="arrow-1">
+                                        <i data-lucide="chevron-right" class="w-4 h-4 transform transition-transform duration-200"></i>
+                                    </button>
+                                </td>
+                                <td class="py-4 px-4 text-slate-500 whitespace-nowrap">20/05/2026</td>
+                                <td class="py-4 px-4">
+                                    <div class="font-bold text-slate-900">Alimentos del Sur S.A.</div>
+                                    <span class="text-xs text-slate-400">RUT: 219988440012</span>
+                                </td>
+                                <td class="py-4 px-4">
+                                    <span id="badge-estado-1" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                        Frenado
+                                    </span>
+                                </td>
+                                <td class="py-4 px-4 font-medium">Enterprise Cloud</td>
+                                <td class="py-4 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">SÍ</span>
+                                </td>
+                                <td class="py-4 px-4" onclick="event.stopPropagation();">
+                                    <!-- Botón Reintentar en Hito Automático Fallido -->
+                                    <button id="btn-hito-1" onclick="reintentarHitoAutomatico(1, 'Migrate')" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 hover:text-rose-800 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm" title="Hito automático fallido. Clic para reintentar">
+                                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-rose-500"></i>
+                                        <span>Migrate (Reintentar)</span>
+                                    </button>
+                                </td>
+                                <td class="py-4 px-6 text-right whitespace-nowrap" onclick="event.stopPropagation();">
+                                    <div class="flex justify-end gap-1">
+                                        <button onclick="editarRegistro(1)" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Editar datos del cliente">
+                                            <i data-lucide="edit-3" class="w-4.5 h-4.5"></i>
+                                        </button>
+                                        <button id="btn-cancelar-1" onclick="cancelarProceso(1)" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Cancelar Proceso">
+                                            <i data-lucide="x-circle" class="w-4.5 h-4.5"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <!-- DETALLE EXPANDIBLE EMPRESA 1 -->
+                            <tr id="detalle-1" class="hidden bg-slate-50/50">
+                                <td colspan="8" class="p-6 border-t border-slate-100">
+                                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        <!-- 1) Historial y Pipeline de 9 Hitos -->
+                                        <div class="lg:col-span-2 space-y-4">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i>
+                                                Hoja de Ruta de Onboarding (9 Hitos)
+                                            </h4>
+                                            
+                                            <!-- Línea de tiempo visual compacta -->
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
+                                                <!-- Hito 1: Aprobación Pendiente (Manual) -->
+                                                <div class="flex items-start gap-3 p-2 rounded-lg bg-slate-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><i data-lucide="check" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-700">1. Aprobación pendiente <span class="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.2 rounded font-normal">Manual</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Completado por Admin</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 2: Hito Carpeta (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 rounded-lg bg-slate-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><i data-lucide="check" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-700">2. Hito Carpeta <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Directorio de archivos creado</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 3: Migrate (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 rounded-lg bg-rose-50 border border-rose-100" id="timeline-step-1-3">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600" id="timeline-step-icon-1-3"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-rose-900" id="timeline-step-title-1-3">3. Migrate <span class="text-[9px] bg-rose-200 text-rose-700 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-rose-600" id="timeline-step-desc-1-3">Frenado: Error de timeout al sincronizar sucursal.</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 4: Dynamica (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">4. Dynamica <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">En espera de paso anterior</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 5: Certificado Digital (Manual) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">5. Certificado Digital <span class="text-[9px] bg-slate-150 text-slate-500 px-1 py-0.2 rounded font-normal">Manual</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Instalación manual</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 6: Homologación DGI (Manual) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">6. Homologación DGI <span class="text-[9px] bg-slate-150 text-slate-500 px-1 py-0.2 rounded font-normal">Manual</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Tramitación gubernamental</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 7: Envio de Factura (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">7. Envio de Factura <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Primera factura de servicio</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 8: Envío de Credenciales (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">8. Envío de Credenciales <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Envío de credenciales seguras</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 9: Alta Final (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50 md:col-span-2">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">9. Alta Final <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Activación en servidores de producción</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 2) Datos Técnicos Clave a Simple Vista -->
+                                        <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+                                                Credenciales de Conexión Fiscal
+                                            </h4>
+                                            
+                                            <div class="space-y-3">
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">RUT</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="rut-val-1">219988440012</code>
+                                                        <button onclick="copiarAlPortapapeles('rut-val-1')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Usuario</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="usr-val-1">usr_alimentos_dgi</code>
+                                                        <button onclick="copiarAlPortapapeles('usr-val-1')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Clave</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <input type="password" value="SuperSecurePass_2026_#" disabled class="font-mono text-slate-800 bg-transparent border-none w-full focus:outline-none text-xs font-semibold" id="pass-val-1">
+                                                        <button onclick="revelarClave('pass-val-1', this)" class="text-slate-400 hover:text-indigo-600 transition mr-2" title="Revelar"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+                                                        <button onclick="copiarAlPortapapeles('pass-val-1', true)" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- FILA DE EMPRESA 2 (Hito Manual -> Aprobación Pendiente) -->
+                            <tr class="hover:bg-slate-50/70 transition cursor-pointer" data-id="2" data-estado="En Proceso" data-hito="Aprobación pendiente" onclick="toggleFilaExpandida(2, event)">
+                                <td class="py-4 px-5 text-center">
+                                    <button class="text-slate-400 hover:text-indigo-600 transition" id="arrow-2">
+                                        <i data-lucide="chevron-right" class="w-4 h-4 transform transition-transform duration-200"></i>
+                                    </button>
+                                </td>
+                                <td class="py-4 px-4 text-slate-500 whitespace-nowrap">21/05/2026</td>
+                                <td class="py-4 px-4">
+                                    <div class="font-bold text-slate-900">Logística Global S.A.</div>
+                                    <span class="text-xs text-slate-400">RUT: 214455880018</span>
+                                </td>
+                                <td class="py-4 px-4">
+                                    <span id="badge-estado-2" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                        En Proceso
+                                    </span>
+                                </td>
+                                <td class="py-4 px-4 font-medium">SaaS Standard</td>
+                                <td class="py-4 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center bg-slate-100 text-slate-500 text-xs font-bold px-2.5 py-0.5 rounded-full">NO</span>
+                                </td>
+                                <td class="py-4 px-4" onclick="event.stopPropagation();">
+                                    <!-- Botón de avance manual en hito manual -->
+                                    <button id="btn-hito-2" onclick="avanzarHitoManual(2, 'Aprobación pendiente')" class="inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm" title="Hito manual pendiente. Clic para registrar aprobación">
+                                        <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                                        <span>Aprobación pendiente (Aprobar)</span>
+                                    </button>
+                                </td>
+                                <td class="py-4 px-6 text-right whitespace-nowrap" onclick="event.stopPropagation();">
+                                    <div class="flex justify-end gap-1">
+                                        <button onclick="editarRegistro(2)" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Editar datos">
+                                            <i data-lucide="edit-3" class="w-4.5 h-4.5"></i>
+                                        </button>
+                                        <button id="btn-cancelar-2" onclick="cancelarProceso(2)" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Cancelar Proceso">
+                                            <i data-lucide="x-circle" class="w-4.5 h-4.5"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <!-- DETALLE EXPANDIBLE EMPRESA 2 -->
+                            <tr id="detalle-2" class="hidden bg-slate-50/50">
+                                <td colspan="8" class="p-6 border-t border-slate-100">
+                                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        <!-- 1) Historial y Pipeline de 9 Hitos -->
+                                        <div class="lg:col-span-2 space-y-4">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i>
+                                                Hoja de Ruta de Onboarding (9 Hitos)
+                                            </h4>
+                                            
+                                            <!-- Línea de tiempo compacta -->
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
+                                                <!-- Hito 1: Aprobación Pendiente (Manual) -->
+                                                <div class="flex items-start gap-3 p-2 rounded-lg bg-indigo-50 border border-indigo-100" id="timeline-step-2-1">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 animate-pulse" id="timeline-step-icon-2-1"><i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-indigo-900" id="timeline-step-title-2-1">1. Aprobación pendiente <span class="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.2 rounded font-normal">Manual</span></h5>
+                                                        <p class="text-[10px] text-indigo-600" id="timeline-step-desc-2-1">Esperando aprobación de Administración para proceder.</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 2: Hito Carpeta (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">2. Hito Carpeta <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Pendiente de autorización</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 3: Migrate (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">3. Migrate <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Sincronización de base de datos</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 4: Dynamica (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">4. Dynamica <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Instancia en Cloud</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 5: Certificado Digital (Manual) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">5. Certificado Digital <span class="text-[9px] bg-slate-150 text-slate-500 px-1 py-0.2 rounded font-normal">Manual</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Carga de firma digital</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 6: Homologación DGI (Manual) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">6. Homologación DGI <span class="text-[9px] bg-slate-150 text-slate-500 px-1 py-0.2 rounded font-normal">Manual</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Pruebas en ambiente DGI</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 7: Envio de Factura (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">7. Envio de Factura <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Facturación inicial</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 8: Envío de Credenciales (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">8. Envío de Credenciales <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Credenciales de acceso</p>
+                                                    </div>
+                                                </div>
+                                                <!-- Hito 9: Alta Final (Automático) -->
+                                                <div class="flex items-start gap-3 p-2 opacity-50 md:col-span-2">
+                                                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-150 text-slate-400"><i data-lucide="circle" class="w-3.5 h-3.5"></i></span>
+                                                    <div>
+                                                        <h5 class="text-xs font-bold text-slate-500">9. Alta Final <span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">Auto</span></h5>
+                                                        <p class="text-[10px] text-slate-400">Fase final</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 2) Datos Técnicos Clave -->
+                                        <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+                                                Credenciales de Conexión Fiscal
+                                            </h4>
+                                            
+                                            <div class="space-y-3">
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">RUT</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="rut-val-2">214455880018</code>
+                                                        <button onclick="copiarAlPortapapeles('rut-val-2')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Usuario</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="usr-val-2">usr_logist_glob</code>
+                                                        <button onclick="copiarAlPortapapeles('usr-val-2')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Clave</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <input type="password" value="ClaveProvisoria123_!" disabled class="font-mono text-slate-800 bg-transparent border-none w-full focus:outline-none text-xs font-semibold" id="pass-val-2">
+                                                        <button onclick="revelarClave('pass-val-2', this)" class="text-slate-400 hover:text-indigo-600 transition mr-2" title="Revelar"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+                                                        <button onclick="copiarAlPortapapeles('pass-val-2', true)" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- FILA DE EMPRESA 3 (Hito Automático Completado -> Alta Final) -->
+                            <tr class="hover:bg-slate-50/70 transition cursor-pointer" data-id="3" data-estado="Completado" data-hito="Alta Final" onclick="toggleFilaExpandida(3, event)">
+                                <td class="py-4 px-5 text-center">
+                                    <button class="text-slate-400 hover:text-indigo-600 transition" id="arrow-3">
+                                        <i data-lucide="chevron-right" class="w-4 h-4 transform transition-transform duration-200"></i>
+                                    </button>
+                                </td>
+                                <td class="py-4 px-4 text-slate-500 whitespace-nowrap">15/05/2026</td>
+                                <td class="py-4 px-4">
+                                    <div class="font-bold text-slate-900">Sistemas del Norte S.R.L.</div>
+                                    <span class="text-xs text-slate-400">RUT: 218877660022</span>
+                                </td>
+                                <td class="py-4 px-4">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        Completado
+                                    </span>
+                                </td>
+                                <td class="py-4 px-4 font-medium">SaaS Professional</td>
+                                <td class="py-4 px-4 text-center">
+                                    <span class="inline-flex items-center justify-center bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">SÍ</span>
+                                </td>
+                                <td class="py-4 px-4">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                        <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-500"></i>
+                                        Alta Final (Completado)
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6 text-right whitespace-nowrap" onclick="event.stopPropagation();">
+                                    <div class="flex justify-end gap-1">
+                                        <button onclick="editarRegistro(3)" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Editar datos">
+                                            <i data-lucide="edit-3" class="w-4.5 h-4.5"></i>
+                                        </button>
+                                        <button disabled class="p-1.5 text-slate-200 cursor-not-allowed" title="Proceso completado - No se puede cancelar">
+                                            <i data-lucide="x-circle" class="w-4.5 h-4.5"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- DETALLE EXPANDIBLE EMPRESA 3 -->
+                            <tr id="detalle-3" class="hidden bg-slate-50/50">
+                                <td colspan="8" class="p-6 border-t border-slate-100">
+                                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        <div class="lg:col-span-2 space-y-4">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="git-commit" class="w-4 h-4 text-emerald-500"></i>
+                                                Hoja de Ruta de Onboarding (9/9 Completados)
+                                            </h4>
+                                            
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-4 rounded-xl border border-slate-200">
+                                                <!-- Loop simplificado visualmente para un proceso 100% completado -->
+                                                <div class="flex items-center gap-2 p-1.5 bg-emerald-50/50 rounded-lg border border-emerald-100/50">
+                                                    <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+                                                    <span class="text-xs font-semibold text-slate-700">Todos los hitos completados con éxito</span>
+                                                </div>
+                                                <p class="text-xs text-slate-500 md:col-span-2">Este cliente ha culminado con éxito todas las integraciones automáticas con <strong>Migrate</strong>, <strong>Dynamica</strong>, y la homologación formal de certificados DGI.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+                                                Credenciales de Conexión Fiscal
+                                            </h4>
+                                            <div class="space-y-2">
+                                                <div><span class="text-[10px] text-slate-400 uppercase font-bold">RUT</span><code class="block font-mono bg-slate-50 p-1.5 rounded text-xs mt-1">218877660022</code></div>
+                                                <div><span class="text-[10px] text-slate-400 uppercase font-bold">eFactura Usuario</span><code class="block font-mono bg-slate-50 p-1.5 rounded text-xs mt-1">usr_norte_dgi</code></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer del listado -->
+                <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+                    <p>Mostrando <span id="num-registros-mostrados" class="text-slate-700 font-bold">3</span> de <span class="text-slate-700 font-bold">3</span> registros de clientes</p>
+                    <div class="flex gap-1.5">
+                        <button class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Anterior</button>
+                        <button class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Siguiente</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State para búsquedas sin resultados -->
+            <div id="empty-state" class="hidden bg-white rounded-xl border border-slate-200 p-12 text-center max-w-md mx-auto">
+                <div class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto text-slate-400 mb-4">
+                    <i data-lucide="folder-open" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-900">No se encontraron clientes</h3>
+                <p class="text-sm text-slate-500 mt-1">Prueba a ajustar tus filtros de búsqueda.</p>
+            </div>
+        </div>
+
+        <!-- ==================== VISTA 2: FORMULARIO DE ALTA (34 Campos) ==================== -->
+        <div id="vista-formulario" class="hidden space-y-6">
+            
+            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-indigo-800 flex items-start gap-3">
+                <i data-lucide="info" class="w-5 h-5 text-indigo-500 shrink-0 mt-0.5"></i>
+                <div>
+                    <h4 class="font-bold text-sm">Información del Onboarding</h4>
+                    <p class="text-xs text-indigo-700 mt-0.5">La correcta recopilación de estos campos inicia automáticamente el proceso de automatización en cascada (Aprobación, Hito Carpeta, Migrate, Dynamica, etc.).</p>
+                </div>
+            </div>
+
+            <form id="form-alta-cliente" onsubmit="procesarNuevoCliente(event)" class="space-y-6">
+                
+                <!-- SECCIÓN 1: IDENTIFICACIÓN Y MARCA -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                        <span class="bg-indigo-100 text-indigo-800 font-bold text-xs px-2.5 py-1 rounded-full">1</span>
+                        <h3 class="font-bold text-slate-800 text-sm">Datos Identificativos e Imagen Corporativa</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <!-- Razón Social -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Razón Social <span class="text-rose-500">*</span></label>
+                            <input type="text" id="form-razon" required placeholder="Ej. Alimentos del Sur S.A." class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- Nombre Comercial (No requerido) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Nombre Comercial</label>
+                            <input type="text" placeholder="Ej. Alisur" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- Rubro (Select predefinido) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Rubro / Sector <span class="text-rose-500">*</span></label>
+                            <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="" disabled selected>Selecciona Rubro</option>
+                                <option value="Alimentos">Alimentos y Bebidas</option>
+                                <option value="Logística">Logística y Transporte</option>
+                                <option value="Tecnología">Tecnología y Software</option>
+                                <option value="Construcción">Construcción</option>
+                                <option value="Salud">Salud y Farmacia</option>
+                                <option value="Educación">Educación</option>
+                                <option value="Servicios Profesionales">Servicios Profesionales</option>
+                                <option value="Retail">Retail / Comercio</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                        <!-- Domicilio Fiscal -->
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Domicilio Fiscal <span class="text-rose-500">*</span></label>
+                            <input type="text" required placeholder="Ej. Av. Uruguay 1234, Oficina 5" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- Ciudad (Select predefinido) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Ciudad <span class="text-rose-500">*</span></label>
+                            <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="" disabled selected>Selecciona Ciudad</option>
+                                <option value="Montevideo">Montevideo</option>
+                                <option value="Canelones">Canelones</option>
+                                <option value="Las Piedras">Las Piedras</option>
+                                <option value="Ciudad de la Costa">Ciudad de la Costa</option>
+                                <option value="Salto">Salto</option>
+                                <option value="Paysandú">Paysandú</option>
+                                <option value="Maldonado">Maldonado</option>
+                                <option value="Punta del Este">Punta del Este</option>
+                                <option value="Rivera">Rivera</option>
+                                <option value="Tacuarembó">Tacuarembó</option>
+                                <option value="Colonia del Sacramento">Colonia del Sacramento</option>
+                                <option value="Otras">Otras</option>
+                            </select>
+                        </div>
+                        <!-- Departamento -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Departamento <span class="text-rose-500">*</span></label>
+                            <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="" disabled selected>Selecciona Departamento</option>
+                                <option value="Montevideo">Montevideo</option>
+                                <option value="Artigas">Artigas</option>
+                                <option value="Canelones">Canelones</option>
+                                <option value="Cerro Largo">Cerro Largo</option>
+                                <option value="Colonia">Colonia</option>
+                                <option value="Durazno">Durazno</option>
+                                <option value="Flores">Flores</option>
+                                <option value="Florida">Florida</option>
+                                <option value="Lavalleja">Lavalleja</option>
+                                <option value="Maldonado">Maldonado</option>
+                                <option value="Paysandú">Paysandú</option>
+                                <option value="Río Negro">Río Negro</option>
+                                <option value="Rivera">Rivera</option>
+                                <option value="Rocha">Rocha</option>
+                                <option value="Salto">Salto</option>
+                                <option value="San José">San José</option>
+                                <option value="Soriano">Soriano</option>
+                                <option value="Tacuarembó">Tacuarembó</option>
+                                <option value="Treinta y Tres">Treinta y Tres</option>
+                            </select>
+                        </div>
+                        <!-- Email Principal -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Email Principal <span class="text-rose-500">*</span></label>
+                            <input type="email" required placeholder="admin@empresa.com" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- Teléfono (No requerido) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Teléfono</label>
+                            <input type="tel" placeholder="Ej. +598 99 123 456" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: CONFIGURACIÓN FISCAL Y CREDENCIALES DGI -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                        <span class="bg-indigo-100 text-indigo-800 font-bold text-xs px-2.5 py-1 rounded-full">2</span>
+                        <h3 class="font-bold text-slate-800 text-sm">Configuración de Conexión Impositiva / DGI</h3>
+                    </div>
+                    <div class="p-6 space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <!-- RUT -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">RUT (12 dígitos) <span class="text-rose-500">*</span></label>
+                                <input type="text" required placeholder="Ej. 219998880011" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <!-- ¿Es ya emisor? -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">¿Es ya emisor electrónico? <span class="text-rose-500">*</span></label>
+                                <div class="flex gap-4 mt-2">
+                                    <label class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
+                                        <input type="radio" name="is_emisor" value="si" class="text-indigo-600 focus:ring-indigo-500">
+                                        Sí, ya emite
+                                    </label>
+                                    <label class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
+                                        <input type="radio" name="is_emisor" value="no" checked class="text-indigo-600 focus:ring-indigo-500">
+                                        No, alta nueva
+                                    </label>
+                                </div>
+                            </div>
+                            <!-- Emails Facturas -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Emails Envío de Facturas</label>
+                                <input type="text" placeholder="facturas@empresa.com, estudio@estudio.com" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                            </div>
+                        </div>
+
+                        <!-- Credenciales eFactura DGI -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                                    <i data-lucide="shield" class="w-4 h-4 text-slate-400"></i>
+                                    eFactura Usuario (DGI) <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="text" required placeholder="Ej. usr_dgi_empresa" class="bg-white w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                                    <i data-lucide="key" class="w-4 h-4 text-slate-400"></i>
+                                    eFactura Clave (DGI) <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="password" required placeholder="••••••••••••" class="bg-white w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                            <!-- Código de Sucursal -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Código de Sucursal</label>
+                                <input type="text" placeholder="Ej. 0001" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <!-- Fecha del Código -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Fecha del Código</label>
+                                <input type="date" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                            </div>
+                            <!-- Especial (DGI) (Select con opciones fijas) -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Especial (DGI) <span class="text-rose-500">*</span></label>
+                                <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                    <option value="NO" selected>NO</option>
+                                    <option value="IVA MINIMO">IVA MINIMO</option>
+                                    <option value="MONOTRIBUTO">MONOTRIBUTO</option>
+                                    <option value="MONOTRIBUTO MIDES">MONOTRIBUTO MIDES</option>
+                                    <option value="EXONERADO">EXONERADO</option>
+                                </select>
+                            </div>
+                            <!-- Norma Exoneración -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Norma de Exoneración</label>
+                                <input type="text" placeholder="Ej. Ley Nro 16.906" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                            </div>
+                        </div>
+
+                        <div>
+                            <!-- Crédito Fiscal (Select con opciones fijas) -->
+                            <div class="w-full md:w-1/3">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Crédito Fiscal <span class="text-rose-500">*</span></label>
+                                <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                    <option value="NO">NO</option>
+                                    <option value="LITERAL E">LITERAL E</option>
+                                    <option value="RESGUARDO">RESGUARDO</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: LICENCIAS, LÍMITES Y CONDICIONES COMERCIALES -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                        <span class="bg-indigo-100 text-indigo-800 font-bold text-xs px-2.5 py-1 rounded-full">3</span>
+                        <h3 class="font-bold text-slate-800 text-sm">Licencia, Tarifas y Operador Asignado</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <!-- Licencia -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Licencia / Plan <span class="text-rose-500">*</span></label>
+                            <select id="form-licencia" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="" disabled selected>Selecciona Licencia</option>
+                                <option value="SaaS Standard">SaaS Standard</option>
+                                <option value="SaaS Professional">SaaS Professional</option>
+                                <option value="Enterprise Cloud">Enterprise Cloud</option>
+                                <option value="Custom Plan">Plan Personalizado</option>
+                            </select>
+                        </div>
+                        <!-- Nro Usuarios -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Nro Usuarios <span class="text-rose-500">*</span></label>
+                            <input type="number" required placeholder="Ej. 10" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- CFE mensuales -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">CFE mensuales <span class="text-rose-500">*</span></label>
+                            <input type="number" required placeholder="Ej. 1500" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- Operador -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Operador Responsable <span class="text-rose-500">*</span></label>
+                            <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="" disabled selected>Seleccionar Operador</option>
+                                <option value="martin">Martín Rodríguez</option>
+                                <option value="lucia">Lucía Fernández</option>
+                                <option value="sofia">Sofía Tech</option>
+                            </select>
+                        </div>
+                        <!-- Monto -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Monto <span class="text-rose-500">*</span></label>
+                            <input type="number" required step="0.01" placeholder="Ej. 120" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- Moneda -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Moneda <span class="text-rose-500">*</span></label>
+                            <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="UYU">Pesos Uruguayos ($)</option>
+                                <option value="USD">Dólares Estadounidenses (US$)</option>
+                            </select>
+                        </div>
+                        <!-- Período de Pago (Solo Mensual y Anual) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Período de Pago <span class="text-rose-500">*</span></label>
+                            <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="Mensual">Mensual</option>
+                                <option value="Anual">Anual</option>
+                            </select>
+                        </div>
+                        <!-- Descuento (Monto sin IVA) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Descuento (Monto sin IVA)</label>
+                            <input type="number" step="0.01" placeholder="Ej. 1500" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- Origen / Canal del Prospecto (Lista fija de opciones) -->
+                        <div class="lg:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Origen / Canal del Prospecto <span class="text-rose-500">*</span></label>
+                            <select required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                                <option value="" disabled selected>Seleccionar Origen</option>
+                                <option value="Campaña Inbound">Campaña Inbound</option>
+                                <option value="Estudio Asociado">Estudio Asociado</option>
+                                <option value="Tráfico Orgánico">Tráfico Orgánico</option>
+                                <option value="Recomendación de Cliente">Recomendación de Cliente</option>
+                                <option value="Evento / Feria">Evento / Feria</option>
+                                <option value="Venta Directa">Venta Directa</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 4: FIRMANTE LEGAL -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                        <span class="bg-indigo-100 text-indigo-800 font-bold text-xs px-2.5 py-1 rounded-full">4</span>
+                        <h3 class="font-bold text-slate-800 text-sm">Representante Legal Firmante</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <!-- Nombre Completo firmante -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Nombre Completo firmante <span class="text-rose-500">*</span></label>
+                            <input type="text" required placeholder="Ej. Juan Andrés Pérez" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                        <!-- CI firmante -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">CI firmante <span class="text-rose-500">*</span></label>
+                            <input type="text" required placeholder="Ej. 1.234.567-8" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 5: DOCUMENTOS Y ARCHIVOS DE RESPALDO -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                        <span class="bg-indigo-100 text-indigo-800 font-bold text-xs px-2.5 py-1 rounded-full">5</span>
+                        <h3 class="font-bold text-slate-800 text-sm">Carga de Documentación de Respaldo Obligatoria</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
+                        <!-- Archivo PFX -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
+                                Archivo PFX (Certificado) <span class="text-rose-500">*</span>
+                                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400" title="Llave criptográfica .pfx o .p12 emitida por Abitab/Correo"></i>
+                            </label>
+                            <input type="file" required accept=".pfx,.p12" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition">
+                        </div>
+                        <!-- Archivo Crédito Fiscal -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Archivo Crédito Fiscal</label>
+                            <input type="file" accept=".pdf,.doc,.docx" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition">
+                        </div>
+                        <!-- Archivo Contrato -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Archivo Contrato Firmado <span class="text-rose-500">*</span></label>
+                            <input type="file" required accept=".pdf" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition">
+                        </div>
+                        <!-- Archivo 6906 -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
+                                Archivo Formulario 6906 <span class="text-rose-500">*</span>
+                                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400" title="Formulario oficial DGI firmado para postulación."></i>
+                            </label>
+                            <input type="file" required accept=".pdf" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition">
+                        </div>
+                        <!-- Logo de la Empresa (Movilizado desde la sección 1) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Archivo Logo (PNG/JPG)</label>
+                            <input type="file" accept="image/*" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ACCIONES DEL FORMULARIO -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                    <button type="button" onclick="showListView()" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition text-sm">
+                        Cancelar Registro
+                    </button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg transition text-sm shadow-md flex items-center gap-2">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>Guardar e Iniciar Automatización</span>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+
+    </div>
+
+    <!-- MODAL DE CANCELACIÓN DE PROCESO (Confirmación con Motivo) -->
+    <div id="modal-cancelacion" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden transform transition-all duration-300 scale-95 border border-slate-100">
+            <div class="p-6">
+                <div class="bg-rose-100 w-12 h-12 rounded-full flex items-center justify-center text-rose-600 mb-4">
+                    <i data-lucide="alert-octagon" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900">¿Confirmas la cancelación del proceso?</h3>
+                <p class="text-sm text-slate-500 mt-2">
+                    Estás por suspender y archivar el proceso de alta para la empresa <strong id="modal-empresa-nombre" class="text-slate-800"></strong>. Esta acción frena todas las automatizaciones de servidores pendientes de ejecución.
+                </p>
+                <div class="mt-4">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Motivo de cancelación (Requerido)</label>
+                    <textarea id="cancel-reason" rows="3" placeholder="Ej. El cliente solicita postergar el alta..." class="w-full p-2.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"></textarea>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                <button onclick="cerrarModalCancelacion()" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                    Mantener Activo
+                </button>
+                <button onclick="confirmarCancelacion()" class="bg-rose-600 text-white hover:bg-rose-700 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md">
+                    Sí, Cancelar Onboarding
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE INTERACTIVIDAD & UX -->
+    <script>
+        // Inicializar iconos de Lucide
+        lucide.createIcons();
+
+        // Variables de estado del modal de cancelación
+        let filaSeleccionadaParaCancelar = null;
+
+        // Toggle entre vista de Listado y Formulario de Alta
+        function toggleMainView() {
+            const listado = document.getElementById('vista-listado');
+            const formulario = document.getElementById('vista-formulario');
+            const btnToggle = document.getElementById('btn-toggle-view');
+            const btnBack = document.getElementById('btn-back-list');
+
+            if (listado.classList.contains('hidden')) {
+                showListView();
+            } else {
+                listado.classList.add('hidden');
+                formulario.classList.remove('hidden');
+                btnToggle.classList.add('hidden');
+                btnBack.classList.remove('hidden');
+            }
+        }
+
+        function showListView() {
+            document.getElementById('vista-listado').classList.remove('hidden');
+            document.getElementById('vista-formulario').classList.add('hidden');
+            document.getElementById('btn-toggle-view').classList.remove('hidden');
+            document.getElementById('btn-back-list').classList.add('hidden');
+        }
+
+        // Expandir / colapsar el detalle de la empresa seleccionada
+        function toggleFilaExpandida(id, event) {
+            if (event.target.closest('button') || event.target.closest('select') || event.target.closest('input')) {
+                return;
+            }
+
+            const filaDetalle = document.getElementById(`detalle-${id}`);
+            const chevron = document.querySelector(`#arrow-${id} svg`);
+
+            if (filaDetalle.classList.contains('hidden')) {
+                filaDetalle.classList.remove('hidden');
+                chevron.classList.add('rotate-90');
+            } else {
+                filaDetalle.classList.add('hidden');
+                chevron.classList.remove('rotate-90');
+            }
+        }
+
+        // Copiar texto genérico al portapapeles
+        function copiarAlPortapapeles(idElemento, esPassword = false) {
+            const elemento = document.getElementById(idElemento);
+            let texto = esPassword ? elemento.value : elemento.innerText;
+
+            const tempInput = document.createElement("input");
+            tempInput.value = texto;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+
+            mostrarToast("Copiado", "Dato copiado con éxito al portapapeles.", "emerald");
+        }
+
+        // Revelar contraseña oculta
+        function revelarClave(idInput, boton) {
+            const input = document.getElementById(idInput);
+            if (input.type === "password") {
+                input.type = "text";
+                boton.innerHTML = '<i data-lucide="eye-off" class="w-3.5 h-3.5"></i>';
+            } else {
+                input.type = "password";
+                boton.innerHTML = '<i data-lucide="eye" class="w-3.5 h-3.5"></i>';
+            }
+            lucide.createIcons();
+        }
+
+        // Mostrar notificación tipo Toast flotante
+        function mostrarToast(titulo, mensaje, color = 'indigo') {
+            const toast = document.getElementById('toast-notificacion');
+            const toastTitle = document.getElementById('toast-title');
+            const toastMsg = document.getElementById('toast-msg');
+            const iconContainer = document.getElementById('toast-icon-container');
+
+            toastTitle.innerText = titulo;
+            toastMsg.innerText = mensaje;
+
+            iconContainer.className = "p-1 rounded-full text-white";
+            if (color === 'emerald') {
+                iconContainer.classList.add('bg-emerald-500');
+            } else if (color === 'rose') {
+                iconContainer.classList.add('bg-rose-500');
+            } else {
+                iconContainer.classList.add('bg-indigo-500');
+            }
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
+                toast.classList.add('opacity-100', 'translate-y-0');
+            }, 50);
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 300);
+            }, 3500);
+        }
+
+        // Reintentar hito automático (ID 1 - Migrate)
+        function reintentarHitoAutomatico(id, hitoNombre) {
+            const btn = document.getElementById(`btn-hito-${id}`);
+            btn.disabled = true;
+            btn.className = "inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm";
+            btn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 mr-1" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Reintentando Migrate...`;
+            
+            setTimeout(() => {
+                // Modificar el botón a exitoso
+                btn.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200";
+                btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i> Migrate (Completado)`;
+                
+                // Actualizar estado general visual a En Proceso
+                const badgeEstado = document.getElementById(`badge-estado-${id}`);
+                badgeEstado.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200";
+                badgeEstado.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>En Proceso`;
+
+                // Actualizar el dataset del hito para que los filtros funcionen con el cambio
+                const fila = document.querySelector(`tr[data-id="${id}"]`);
+                fila.setAttribute('data-estado', 'En Proceso');
+
+                // Actualizar paso de la línea de tiempo
+                const timelineStep = document.getElementById(`timeline-step-1-3`);
+                const timelineIcon = document.getElementById(`timeline-step-icon-1-3`);
+                const timelineTitle = document.getElementById(`timeline-step-title-1-3`);
+                const timelineDesc = document.getElementById(`timeline-step-desc-1-3`);
+
+                timelineStep.className = "flex items-start gap-3 p-2 rounded-lg bg-emerald-50 border border-emerald-100";
+                timelineIcon.className = "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600";
+                timelineIcon.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i>`;
+                timelineTitle.className = "text-xs font-bold text-slate-700";
+                timelineTitle.innerHTML = `3. Migrate <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 py-0.2 rounded font-normal">Auto</span>`;
+                timelineDesc.className = "text-[10px] text-slate-400";
+                timelineDesc.innerText = "Completado automáticamente mediante script.";
+
+                lucide.createIcons();
+                mostrarToast("Alta de Sistema", `Hito 'Migrate' completado de forma satisfactoria para el cliente ID ${id}.`, "emerald");
+            }, 2000);
+        }
+
+        // Avanzar hito manual (ID 2 - Aprobación Pendiente)
+        function avanzarHitoManual(id, hitoNombre) {
+            const btn = document.getElementById(`btn-hito-${id}`);
+            btn.disabled = true;
+            btn.className = "inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm";
+            btn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 mr-1" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Aprobando registro...`;
+
+            setTimeout(() => {
+                // Registrar visualmente la aprobación en el botón
+                btn.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200";
+                btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i> Aprobado (Siguiente hito)`;
+
+                // Actualizar paso de la línea de tiempo interactiva
+                const step = document.getElementById(`timeline-step-2-1`);
+                const icon = document.getElementById(`timeline-step-icon-2-1`);
+                const title = document.getElementById(`timeline-step-title-2-1`);
+                const desc = document.getElementById(`timeline-step-desc-2-1`);
+
+                step.className = "flex items-start gap-3 p-2 rounded-lg bg-emerald-50 border border-emerald-100";
+                icon.className = "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600";
+                icon.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i>`;
+                title.className = "text-xs font-bold text-slate-700";
+                title.innerHTML = `1. Aprobación pendiente <span class="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.2 rounded font-normal">Manual</span>`;
+                desc.className = "text-[10px] text-slate-400";
+                desc.innerText = "Aprobado por el Administrador de Onboarding.";
+
+                lucide.createIcons();
+                mostrarToast("Aprobación Registrada", `La aprobación de la empresa ID ${id} se guardó con éxito. Continúa el hito 'Hito Carpeta'.`, "emerald");
+            }, 1200);
+        }
+
+        // Cancelación de Proceso
+        function cancelarProceso(id) {
+            filaSeleccionadaParaCancelar = id;
+            const fila = document.querySelector(`tr[data-id="${id}"]`);
+            const razonSocial = fila.querySelector('.text-slate-900').innerText;
+            
+            document.getElementById('modal-empresa-nombre').innerText = razonSocial;
+            document.getElementById('cancel-reason').value = "";
+            
+            const modal = document.getElementById('modal-cancelacion');
+            modal.classList.remove('hidden');
+        }
+
+        function cerrarModalCancelacion() {
+            document.getElementById('modal-cancelacion').classList.add('hidden');
+            filaSeleccionadaParaCancelar = null;
+        }
+
+        function confirmarCancelacion() {
+            const razon = document.getElementById('cancel-reason').value;
+            if (!razon.trim()) {
+                mostrarToast("Atención", "Por favor ingresa un motivo para proceder con la cancelación.", "rose");
+                return;
+            }
+
+            if (filaSeleccionadaParaCancelar) {
+                const fila = document.querySelector(`tr[data-id="${filaSeleccionadaParaCancelar}"]`);
+                
+                // Modificar el Estado General a Cancelado visualmente
+                const badge = document.getElementById(`badge-estado-${filaSeleccionadaParaCancelar}`);
+                badge.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300";
+                badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Cancelado`;
+                
+                // Cambiar el dataset para el filtro
+                fila.setAttribute('data-estado', 'Cancelado');
+
+                // Deshabilitar y opacar el botón de hito
+                const btnHito = document.getElementById(`btn-hito-${filaSeleccionadaParaCancelar}`);
+                if (btnHito) {
+                    btnHito.disabled = true;
+                    btnHito.className = "inline-flex items-center gap-1 bg-slate-100 text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed";
+                    btnHito.innerHTML = `<i data-lucide="x-circle" class="w-3.5 h-3.5"></i><span>Onboarding Cancelado</span>`;
+                }
+
+                cerrarModalCancelacion();
+                lucide.createIcons();
+                mostrarToast("Alta Cancelada", "El proceso se ha suspendido y archivado.", "rose");
+                filtrarTabla();
+            }
+        }
+
+        // Simulación de guardar formulario (con datos de prueba)
+        function procesarNuevoCliente(event) {
+            event.preventDefault();
+            
+            const razon = document.getElementById('form-razon').value;
+            const licencia = document.getElementById('form-licencia').value;
+
+            mostrarToast("Registro Creado", `Empresa '${razon}' guardada correctamente. Pipeline de 9 hitos inicializado.`, "emerald");
+            
+            // Redirigir de vuelta al listado tras una pausa
+            setTimeout(() => {
+                showListView();
+            }, 1000);
+        }
+
+        // Simulación de editar un registro
+        function editarRegistro(id) {
+            mostrarToast("Edición de Datos", `Cargando el formulario con los datos de la empresa ID ${id}.`, "indigo");
+            toggleMainView();
+        }
+
+        // Filtros y Buscador Dinámicos
+        function filtrarTabla() {
+            const busqueda = document.getElementById('filtro-busqueda').value.toLowerCase();
+            const estado = document.getElementById('filtro-estado').value;
+            const hito = document.getElementById('filtro-hito').value;
+            const filas = document.querySelectorAll('#tabla-clientes tbody > tr:not([id^="detalle-"])');
+            
+            let mostrados = 0;
+
+            filas.forEach(fila => {
+                const razonSocial = fila.querySelector('.text-slate-900').innerText.toLowerCase();
+                const rutElement = fila.querySelector('.text-slate-400');
+                const rutText = rutElement ? rutElement.innerText.toLowerCase() : "";
+                
+                const dataEstado = fila.getAttribute('data-estado');
+                const dataHito = fila.getAttribute('data-hito');
+
+                const coincideBusqueda = razonSocial.includes(busqueda) || rutText.includes(busqueda);
+                const coincideEstado = (estado === 'todos' || dataEstado === estado);
+                const coincideHito = (hito === 'todos' || dataHito === hito);
+
+                const id = fila.getAttribute('data-id');
+                const detalleFila = document.getElementById(`detalle-${id}`);
+
+                if (coincideBusqueda && coincideEstado && coincideHito) {
+                    fila.classList.remove('hidden');
+                    mostrados++;
+                } else {
+                    fila.classList.add('hidden');
+                    if (detalleFila) {
+                        detalleFila.classList.add('hidden');
+                        const chevron = document.querySelector(`#arrow-${id} svg`);
+                        if (chevron) chevron.classList.remove('rotate-90');
+                    }
+                }
+            });
+
+            document.getElementById('num-registros-mostrados').innerText = mostrados;
+
+            const emptyState = document.getElementById('empty-state');
+            if (mostrados === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

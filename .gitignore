@@ -1,0 +1,5 @@
+/uploads/
+/logs/
+*.log
+Thumbs.db
+Desktop.ini
