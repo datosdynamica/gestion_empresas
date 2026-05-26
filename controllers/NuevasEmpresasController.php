@@ -18,13 +18,13 @@ class NuevasEmpresasController
     public function index(): void
     {
         $items = $this->model->listAll();
-        $pageTitle = 'Listado de altas temporales';
+        $pageTitle = 'Altas y Automatizaciones';
         require __DIR__ . '/../views/nuevas_empresas/list.php';
     }
 
     public function create(): void
     {
-        $pageTitle = 'Nueva alta temporal';
+        $pageTitle = 'Altas y Automatizaciones';
         require __DIR__ . '/../views/nuevas_empresas/form.php';
     }
 
@@ -154,7 +154,7 @@ class NuevasEmpresasController
         }
 
         $archivos = $this->archivoModel->listByNuevaEmpresaId($id);
-        $pageTitle = 'Detalle de alta temporal';
+        $pageTitle = 'Altas y Automatizaciones';
         require __DIR__ . '/../views/nuevas_empresas/detail.php';
     }
 
