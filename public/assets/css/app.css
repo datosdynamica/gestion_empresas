@@ -1,0 +1,86 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: #f5f7fb;
+    color: #1f2937;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.actions a {
+    margin-left: 12px;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    padding: 10px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.form-grid input,
+.form-grid textarea {
+    padding: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+}
+
+.full {
+    grid-column: 1 / -1;
+}
+
+.flash {
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.flash-success {
+    background: #dcfce7;
+}
+
+.flash-error {
+    background: #fee2e2;
+}
+
+.actions-block {
+    display: flex;
+    gap: 16px;
+}
