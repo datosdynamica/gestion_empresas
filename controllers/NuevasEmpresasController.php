@@ -158,6 +158,75 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/detail.php';
     }
 
+    public function downloadFile(int $id): void
+    {
+        $archivo = $this->archivoModel->findById($id);
+        if (!$archivo) {
+            Response::flash('error', 'Adjunto no encontrado.');
+            Response::redirect('index.php');
+        }
+
+        $absolutePath = FileStorage::absoluteFromRelative((string) $archivo['ruta_archivo']);
+        if (!is_file($absolutePath)) {
+            Response::flash('error', 'El archivo no existe en disco.');
+            Response::redirect('index.php?action=show&id=' . (int) $archivo['nueva_empresa_id']);
+        }
+
+        header('Content-Description: File Transfer');
+        header('Content-Type: ' . ((string) ($archivo['mime_type'] ?: 'application/octet-stream')));
+        header('Content-Disposition: attachment; filename="' . basename((string) $archivo['nombre_original']) . '"');
+        header('Content-Length: ' . (string) filesize($absolutePath));
+        readfile($absolutePath);
+        exit;
+    }
+
+    public function replaceFile(int $id): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $id <= 0) {
+            Response::redirect('index.php');
+        }
+
+        $archivo = $this->archivoModel->findById($id);
+        if (!$archivo) {
+            Response::flash('error', 'Adjunto no encontrado.');
+            Response::redirect('index.php');
+        }
+
+        $errors = Validator::validateReplacementUpload($_FILES['archivo_reemplazo'] ?? [], (string) $archivo['tipo_archivo']);
+        if (!empty($errors)) {
+            $_SESSION['errors'] = $errors;
+            Response::flash('error', (string) reset($errors));
+            Response::redirect('index.php?action=show&id=' . (int) $archivo['nueva_empresa_id']);
+        }
+
+        try {
+            FileStorage::deleteRelativeFile((string) $archivo['ruta_archivo']);
+            $stored = FileStorage::storeUploadedFile($_FILES['archivo_reemplazo'], (string) $archivo['tipo_archivo'], (int) $archivo['nueva_empresa_id']);
+            $this->archivoModel->updateFile($id, [
+                'nombre_original' => $stored['original_name'],
+                'nombre_guardado' => $stored['stored_name'],
+                'ruta_archivo' => $stored['relative_path'],
+                'extension' => $stored['extension'],
+                'mime_type' => $stored['mime_type'],
+                'tamano_bytes' => $stored['size'],
+                'usuario_subida' => $_SESSION['usuario'] ?? 'admin',
+            ]);
+            $this->historialModel->create([
+                'nueva_empresa_id' => (int) $archivo['nueva_empresa_id'],
+                'evento' => 'REEMPLAZO_ARCHIVO',
+                'estado_anterior' => null,
+                'estado_nuevo' => null,
+                'descripcion' => 'Se reemplazo el adjunto tipo ' . (string) $archivo['tipo_archivo'],
+                'usuario_evento' => $_SESSION['usuario'] ?? 'admin',
+            ]);
+            Response::flash('success', 'Adjunto reemplazado correctamente.');
+        } catch (Throwable $e) {
+            Response::flash('error', 'No fue posible reemplazar el adjunto.');
+        }
+
+        Response::redirect('index.php?action=show&id=' . (int) $archivo['nueva_empresa_id']);
+    }
+
     public function update(int $id): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $id <= 0) {

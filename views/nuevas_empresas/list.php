@@ -6,7 +6,7 @@
         <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
             <i data-lucide="search" class="w-5 h-5"></i>
         </span>
-        <input type="text" id="filtro-busqueda" placeholder="Buscar por Razon Social o RUT..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+        <input type="text" id="filtro-busqueda" placeholder="Buscar por Raz&oacute;n Social o RUT..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
     </div>
     <div class="flex flex-wrap gap-3 w-full lg:w-auto">
         <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
@@ -20,12 +20,12 @@
             </select>
         </div>
         <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
-            <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Hito:</span>
+            <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Hito actual:</span>
             <select id="filtro-hito" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
                 <option value="todos">Todos los hitos</option>
-                <option value="Aprobacion pendiente">1. Aprobacion pendiente</option>
-                <option value="Creacion base">2. Creacion base</option>
-                <option value="Error de aprobacion">Error de aprobacion</option>
+                <option value="Aprobacion pendiente">1. Aprobaci&oacute;n pendiente</option>
+                <option value="Creacion base">2. Creaci&oacute;n base</option>
+                <option value="Error de aprobacion">Error de aprobaci&oacute;n</option>
                 <option value="Registro eliminado">Registro eliminado</option>
             </select>
         </div>
@@ -39,11 +39,11 @@
                 <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-semibold tracking-wider uppercase">
                     <th class="py-4 px-5 w-12 text-center">Info</th>
                     <th class="py-4 px-4">Fecha Reg.</th>
-                    <th class="py-4 px-4">Razon Social</th>
+                    <th class="py-4 px-4">Raz&oacute;n Social</th>
                     <th class="py-4 px-4">Estado General</th>
                     <th class="py-4 px-4">Licencia</th>
                     <th class="py-4 px-4 text-center">Es Emisor</th>
-                    <th class="py-4 px-4">Hito / Accion Requerida</th>
+                    <th class="py-4 px-4">Hito / Acci&oacute;n Requerida</th>
                     <th class="py-4 px-6 text-right">Acciones</th>
                 </tr>
             </thead>
@@ -57,7 +57,7 @@
                         $badgeClass = 'bg-slate-100 text-slate-700 border-slate-300';
                         $estadoTexto = $estado;
                         $accionClass = 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700';
-                        $accionTexto = 'Aprobacion pendiente (Aprobar)';
+                        $accionTexto = 'Aprobaci&oacute;n pendiente (Aprobar)';
                         $hitoActual = 'Aprobacion pendiente';
                         if ($estado === 'ELIMINADO') {
                             $badgeClass = 'bg-slate-100 text-slate-700 border-slate-300';
@@ -134,8 +134,8 @@
                                                     <i data-lucide="<?= $estado === 'PENDIENTE_APROBACION' ? 'shield' : 'check' ?>" class="w-3.5 h-3.5"></i>
                                                 </span>
                                                 <div>
-                                                    <h5 class="text-xs font-bold text-slate-700">1. Aprobacion pendiente <span class="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded font-normal">Manual</span></h5>
-                                                    <p class="text-[10px] text-slate-400"><?= $estado === 'PENDIENTE_APROBACION' ? 'Esperando revision de admin' : 'Revisado por admin' ?></p>
+                                                    <h5 class="text-xs font-bold text-slate-700">1. Aprobaci&oacute;n pendiente <span class="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded font-normal">Manual</span></h5>
+                                                    <p class="text-[10px] text-slate-400"><?= $estado === 'PENDIENTE_APROBACION' ? 'Esperando revisi&oacute;n de admin' : 'Revisado por admin' ?></p>
                                                 </div>
                                             </div>
                                             <div class="flex items-start gap-3 p-2 rounded-lg <?= $estado === 'APROBADO' ? 'bg-emerald-50 border border-emerald-100' : 'opacity-60' ?>">
@@ -143,7 +143,7 @@
                                                     <i data-lucide="<?= $estado === 'APROBADO' ? 'check' : 'circle' ?>" class="w-3.5 h-3.5"></i>
                                                 </span>
                                                 <div>
-                                                    <h5 class="text-xs font-bold <?= $estado === 'APROBADO' ? 'text-slate-700' : 'text-slate-500' ?>">2. Creacion base <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded font-normal">Auto</span></h5>
+                                                    <h5 class="text-xs font-bold <?= $estado === 'APROBADO' ? 'text-slate-700' : 'text-slate-500' ?>">2. Creaci&oacute;n base <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded font-normal">Auto</span></h5>
                                                     <p class="text-[10px] <?= $estado === 'APROBADO' ? 'text-slate-400' : 'text-slate-400' ?>">
                                                         <?= $estado === 'APROBADO' ? 'Creado en Empresas y Clientes' : 'Se ejecuta al aprobar el alta' ?>
                                                     </p>
@@ -154,7 +154,7 @@
                                     <div class="space-y-4">
                                         <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                                             <i data-lucide="folder-kanban" class="w-4 h-4 text-indigo-500"></i>
-                                            Datos rapidos
+                                            Datos r&aacute;pidos
                                         </h4>
                                         <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-3 text-sm">
                                             <div><span class="text-slate-400">Email:</span> <span class="font-medium text-slate-700"><?= htmlspecialchars((string) $item['email_principal'], ENT_QUOTES, 'UTF-8') ?></span></div>
@@ -192,15 +192,15 @@
         <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-indigo-800 flex items-start gap-3 mb-6">
             <i data-lucide="info" class="w-5 h-5 text-indigo-500 shrink-0 mt-0.5"></i>
             <div>
-                <h4 class="font-bold text-sm">Informacion del Onboarding</h4>
-                <p class="text-xs text-indigo-700 mt-0.5">La correcta recopilacion de estos campos deja el registro listo para aprobacion y posterior automatizacion.</p>
+                <h4 class="font-bold text-sm">Informaci&oacute;n del Onboarding</h4>
+                <p class="text-xs text-indigo-700 mt-0.5">La correcta recopilaci&oacute;n de estos campos deja el registro listo para aprobaci&oacute;n y posterior automatizaci&oacute;n.</p>
             </div>
         </div>
         <form method="post" action="index.php?action=store" enctype="multipart/form-data" class="space-y-6">
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
                     <span class="bg-indigo-100 text-indigo-800 font-bold text-xs px-2.5 py-1 rounded-full">1</span>
-                    <h3 class="font-bold text-slate-800 text-sm">Datos Identificativos e Imagen Corporativa</h3>
+                    <h3 class="font-bold text-slate-800 text-sm">Datos identificativos e imagen corporativa</h3>
                 </div>
                 <div class="p-6">
                     <div class="form-grid">
@@ -209,10 +209,10 @@
                 </div>
             </div>
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <button type="button" data-close-modal="modal-create" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition text-sm">Cancelar Registro</button>
+                <button type="button" data-close-modal="modal-create" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition text-sm">Cancelar registro</button>
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg transition text-sm shadow-md flex items-center gap-2">
                     <i data-lucide="save" class="w-4 h-4"></i>
-                    <span>Guardar e Iniciar Automatizacion</span>
+                    <span>Guardar e iniciar automatizaci&oacute;n</span>
                 </button>
             </div>
         </form>

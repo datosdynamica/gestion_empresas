@@ -21,6 +21,12 @@ switch ($action) {
     case 'show':
         $controller->show($id);
         break;
+    case 'download-file':
+        $controller->downloadFile($id);
+        break;
+    case 'replace-file':
+        $controller->replaceFile($id);
+        break;
     case 'approve':
         $controller->approve($id);
         break;

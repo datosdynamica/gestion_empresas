@@ -9,6 +9,7 @@ define('ID_VENDEDOR_DEFAULT', 'admin');
 
 define('UPLOAD_BASE_DIR', '/var/www/plugin/gestion_empresas/uploads/nuevas_empresas');
 define('UPLOAD_BASE_RELATIVE', 'uploads/nuevas_empresas');
+define('MAX_UPLOAD_BYTES', 10485760);
 
 define('ESTADO_PENDIENTE_APROBACION', 'PENDIENTE_APROBACION');
 define('ESTADO_APROBADO', 'APROBADO');

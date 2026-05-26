@@ -13,7 +13,7 @@ $checked = static function (string $key, string $value, $default = '') use ($val
 };
 ?>
 <div class="md:col-span-2 lg:col-span-2">
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>razon_social">Razon Social <span class="text-rose-500">*</span></label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>razon_social">Raz&oacute;n Social <span class="text-rose-500">*</span></label>
     <input id="<?= $prefix ?>razon_social" type="text" name="razon_social" value="<?= $field('razon_social') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 <div>
@@ -35,7 +35,7 @@ $checked = static function (string $key, string $value, $default = '') use ($val
     <input id="<?= $prefix ?>domicilio" type="text" name="domicilio" value="<?= $field('domicilio') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>telefono">Telefono</label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>telefono">Tel&eacute;fono</label>
     <input id="<?= $prefix ?>telefono" type="text" name="telefono" value="<?= $field('telefono') ?>" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 
@@ -57,12 +57,12 @@ $checked = static function (string $key, string $value, $default = '') use ($val
     </select>
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>usuarios">Nro Usuarios <span class="text-rose-500">*</span></label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>usuarios">Nro. Usuarios <span class="text-rose-500">*</span></label>
     <input id="<?= $prefix ?>usuarios" type="number" min="1" name="usuarios" value="<?= $field('usuarios', '1') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>licencia_texto">Descripcion licencia</label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>licencia_texto">Descripci&oacute;n licencia</label>
     <input id="<?= $prefix ?>licencia_texto" type="text" name="licencia_texto" value="<?= $field('licencia_texto') ?>" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 <div>
@@ -79,11 +79,11 @@ $checked = static function (string $key, string $value, $default = '') use ($val
     <input id="<?= $prefix ?>email_envio_fe" type="text" name="email_envio_fe" value="<?= $field('email_envio_fe') ?>" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>suc_cod_sucursal">Codigo de Sucursal <span class="text-rose-500">*</span></label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>suc_cod_sucursal">C&oacute;digo de Sucursal <span class="text-rose-500">*</span></label>
     <input id="<?= $prefix ?>suc_cod_sucursal" type="text" name="suc_cod_sucursal" value="<?= $field('suc_cod_sucursal') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>suc_cod_fecha_vigencia">Fecha del Codigo <span class="text-rose-500">*</span></label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>suc_cod_fecha_vigencia">Fecha del C&oacute;digo <span class="text-rose-500">*</span></label>
     <input id="<?= $prefix ?>suc_cod_fecha_vigencia" type="date" name="suc_cod_fecha_vigencia" value="<?= $field('suc_cod_fecha_vigencia') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 
@@ -98,24 +98,33 @@ $checked = static function (string $key, string $value, $default = '') use ($val
     </select>
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>alta_especial_norma">Norma de Exoneracion</label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>alta_especial_norma">Norma de Exoneraci&oacute;n</label>
     <input id="<?= $prefix ?>alta_especial_norma" type="text" name="alta_especial_norma" value="<?= $field('alta_especial_norma') ?>" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Credito Fiscal <span class="text-rose-500">*</span></label>
-    <select name="alta_credito_fiscal" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
-        <option value="NO" <?= $field('alta_credito_fiscal', 'NO') === 'NO' ? 'selected' : '' ?>>NO</option>
-        <option value="LITERAL E" <?= $field('alta_credito_fiscal') === 'LITERAL E' ? 'selected' : '' ?>>LITERAL E</option>
-        <option value="RESGUARDO" <?= $field('alta_credito_fiscal') === 'RESGUARDO' ? 'selected' : '' ?>>RESGUARDO</option>
-    </select>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Cr&eacute;dito Fiscal <span class="text-rose-500">*</span></label>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+        <label class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer">
+            <input type="radio" name="alta_credito_fiscal" value="NO" <?= $checked('alta_credito_fiscal', 'NO', 'NO') ?>>
+            <span>No</span>
+        </label>
+        <label class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer">
+            <input type="radio" name="alta_credito_fiscal" value="LITERAL E" <?= $checked('alta_credito_fiscal', 'LITERAL E') ?>>
+            <span>Literal E</span>
+        </label>
+        <label class="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 cursor-pointer">
+            <input type="radio" name="alta_credito_fiscal" value="RESGUARDO" <?= $checked('alta_credito_fiscal', 'RESGUARDO') ?>>
+            <span>Resguardo</span>
+        </label>
+    </div>
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Es Emisor Electronico <span class="text-rose-500">*</span></label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Es Emisor Electr&oacute;nico <span class="text-rose-500">*</span></label>
     <div class="flex gap-4 mt-2">
         <label class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
             <input type="radio" name="alta_es_emisor" value="SI" <?= $checked('alta_es_emisor', 'SI') ?>>
-            SI
+            S&iacute;
         </label>
         <label class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
             <input type="radio" name="alta_es_emisor" value="NO" <?= $checked('alta_es_emisor', 'NO', 'NO') ?>>
@@ -142,7 +151,7 @@ $checked = static function (string $key, string $value, $default = '') use ($val
     </select>
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>cliente_abonado_periodo">Periodo de Pago</label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>cliente_abonado_periodo">Per&iacute;odo de Pago</label>
     <select id="<?= $prefix ?>cliente_abonado_periodo" name="cliente_abonado_periodo" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
         <option value="MENSUAL" <?= $field('cliente_abonado_periodo', 'MENSUAL') === 'MENSUAL' ? 'selected' : '' ?>>Mensual</option>
         <option value="ANUAL" <?= $field('cliente_abonado_periodo') === 'ANUAL' ? 'selected' : '' ?>>Anual</option>
@@ -163,11 +172,11 @@ $checked = static function (string $key, string $value, $default = '') use ($val
 </div>
 
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>nombre_completo_firmante">Nombre Completo firmante <span class="text-rose-500">*</span></label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>nombre_completo_firmante">Nombre Completo Firmante <span class="text-rose-500">*</span></label>
     <input id="<?= $prefix ?>nombre_completo_firmante" type="text" name="nombre_completo_firmante" value="<?= $field('nombre_completo_firmante') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 <div>
-    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>ci_firmante">CI firmante <span class="text-rose-500">*</span></label>
+    <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>ci_firmante">CI Firmante <span class="text-rose-500">*</span></label>
     <input id="<?= $prefix ?>ci_firmante" type="text" name="ci_firmante" value="<?= $field('ci_firmante') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
 </div>
 
@@ -177,7 +186,7 @@ $checked = static function (string $key, string $value, $default = '') use ($val
         <input id="<?= $prefix ?>archivo_pfx" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_pfx" required>
     </div>
     <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>archivo_credito_fiscal">Archivo Credito Fiscal</label>
+        <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>archivo_credito_fiscal">Archivo Cr&eacute;dito Fiscal</label>
         <input id="<?= $prefix ?>archivo_credito_fiscal" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_credito_fiscal">
     </div>
     <div>

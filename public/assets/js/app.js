@@ -49,6 +49,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('[data-open-modal]').forEach(function (trigger) {
         trigger.addEventListener('click', function () {
+            if (trigger.hasAttribute('data-replace-file')) {
+                var fileId = trigger.getAttribute('data-file-id') || '0';
+                var fileType = trigger.getAttribute('data-file-type') || '-';
+                var fileName = trigger.getAttribute('data-file-name') || '-';
+                var form = document.getElementById('replace-file-form');
+                var fileIdInput = document.getElementById('replace-file-id');
+                var fileTypeLabel = document.getElementById('replace-file-type');
+                var fileNameLabel = document.getElementById('replace-file-name');
+                if (form) {
+                    form.setAttribute('action', 'index.php?action=replace-file&id=' + fileId);
+                }
+                if (fileIdInput) {
+                    fileIdInput.value = fileId;
+                }
+                if (fileTypeLabel) {
+                    fileTypeLabel.textContent = fileType;
+                }
+                if (fileNameLabel) {
+                    fileNameLabel.textContent = fileName;
+                }
+            }
             openModal(trigger.getAttribute('data-open-modal'));
         });
     });

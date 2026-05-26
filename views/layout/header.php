@@ -39,3 +39,14 @@
         <div class="rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3 text-sm font-medium"><?= htmlspecialchars((string) $_SESSION['error'], ENT_QUOTES, 'UTF-8') ?></div>
         <?php unset($_SESSION['error']); ?>
     <?php endif; ?>
+    <?php if (!empty($_SESSION['errors']) && is_array($_SESSION['errors'])): ?>
+        <div class="rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3 text-sm">
+            <p class="font-semibold mb-2">Revise los siguientes puntos:</p>
+            <ul class="list-disc pl-5 space-y-1">
+                <?php foreach ($_SESSION['errors'] as $errorMessage): ?>
+                    <li><?= htmlspecialchars((string) $errorMessage, ENT_QUOTES, 'UTF-8') ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <?php unset($_SESSION['errors']); ?>
+    <?php endif; ?>

@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 class FileStorage
 {
+    public static function absoluteBaseFolder(int $nuevaEmpresaId): string
+    {
+        return rtrim((string) BASE_PATH, '\\/') . '/uploads/nuevas_empresas/' . $nuevaEmpresaId;
+    }
+
     public static function createFolder(int $nuevaEmpresaId): array
     {
         $relative = UPLOAD_BASE_RELATIVE . '/' . $nuevaEmpresaId;
-        $absolute = rtrim((string) BASE_PATH, '\\/') . '/uploads/nuevas_empresas/' . $nuevaEmpresaId;
+        $absolute = self::absoluteBaseFolder($nuevaEmpresaId);
 
         if (!is_dir($absolute) && !mkdir($absolute, 0775, true) && !is_dir($absolute)) {
             throw new RuntimeException('No fue posible crear la carpeta de adjuntos.');
@@ -28,7 +33,7 @@ class FileStorage
         $ext = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
         $storedName = $tipo . '_' . uniqid('', true) . '.' . $ext;
         $relativePath = UPLOAD_BASE_RELATIVE . '/' . $nuevaEmpresaId . '/' . $storedName;
-        $absolutePath = rtrim((string) BASE_PATH, '\\/') . '/uploads/nuevas_empresas/' . $nuevaEmpresaId . '/' . $storedName;
+        $absolutePath = self::absoluteBaseFolder($nuevaEmpresaId) . '/' . $storedName;
 
         if (!move_uploaded_file((string) $file['tmp_name'], $absolutePath)) {
             throw new RuntimeException("No fue posible guardar archivo {$tipo}.");
@@ -46,7 +51,7 @@ class FileStorage
 
     public static function deleteFolder(int $nuevaEmpresaId): void
     {
-        $absolute = rtrim((string) BASE_PATH, '\\/') . '/uploads/nuevas_empresas/' . $nuevaEmpresaId;
+        $absolute = self::absoluteBaseFolder($nuevaEmpresaId);
         if (!is_dir($absolute)) {
             return;
         }
@@ -65,5 +70,18 @@ class FileStorage
         }
 
         rmdir($absolute);
+    }
+
+    public static function deleteRelativeFile(string $relativePath): void
+    {
+        $absolute = rtrim((string) BASE_PATH, '\\/') . '/' . ltrim($relativePath, '\\/');
+        if (is_file($absolute)) {
+            unlink($absolute);
+        }
+    }
+
+    public static function absoluteFromRelative(string $relativePath): string
+    {
+        return rtrim((string) BASE_PATH, '\\/') . '/' . ltrim($relativePath, '\\/');
     }
 }

@@ -70,8 +70,8 @@ if ($estado === ESTADO_APROBADO) {
     <div class="grid grid-cols-1 xl:grid-cols-[1.25fr,0.75fr] gap-6">
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                <h3 class="font-bold text-slate-900 text-sm">Hoja de ruta del onboarding</h3>
-                <p class="text-sm text-slate-500 mt-1">Resumen operativo del tramo inicial hasta la aprobacion manual.</p>
+                    <h3 class="font-bold text-slate-900 text-sm">Hoja de ruta del onboarding</h3>
+                    <p class="text-sm text-slate-500 mt-1">Resumen operativo del tramo inicial hasta la aprobaci&oacute;n manual.</p>
             </div>
             <div class="p-6 space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -80,8 +80,8 @@ if ($estado === ESTADO_APROBADO) {
                             <i data-lucide="<?= $estado === ESTADO_PENDIENTE_APROBACION ? 'shield' : 'check' ?>" class="w-4 h-4"></i>
                         </span>
                         <div>
-                            <h4 class="text-sm font-bold text-slate-800">1. Aprobacion pendiente</h4>
-                            <p class="text-xs text-slate-500 mt-1">Validacion manual del registro y sus adjuntos.</p>
+                            <h4 class="text-sm font-bold text-slate-800">1. Aprobaci&oacute;n pendiente</h4>
+                            <p class="text-xs text-slate-500 mt-1">Validaci&oacute;n manual del registro y sus adjuntos.</p>
                         </div>
                     </div>
                     <div class="flex items-start gap-3 p-3 rounded-xl <?= $estado === ESTADO_APROBADO ? 'bg-emerald-50 border border-emerald-100' : 'bg-slate-50 border border-slate-200 opacity-75' ?>">
@@ -89,8 +89,8 @@ if ($estado === ESTADO_APROBADO) {
                             <i data-lucide="<?= $estado === ESTADO_APROBADO ? 'check' : 'circle' ?>" class="w-4 h-4"></i>
                         </span>
                         <div>
-                            <h4 class="text-sm font-bold text-slate-800">2. Creacion base</h4>
-                            <p class="text-xs text-slate-500 mt-1">Insercion en Empresas y Clientes bajo IdEmpresa 397.</p>
+                            <h4 class="text-sm font-bold text-slate-800">2. Creaci&oacute;n base</h4>
+                            <p class="text-xs text-slate-500 mt-1">Inserci&oacute;n en Empresas y Clientes bajo IdEmpresa 397.</p>
                         </div>
                     </div>
                 </div>
@@ -105,7 +105,7 @@ if ($estado === ESTADO_APROBADO) {
                         <p class="mt-2 text-slate-800 font-medium"><?= htmlspecialchars((string) ($item['alta_certificado_digital'] ?: '-'), ENT_QUOTES, 'UTF-8') ?></p>
                     </div>
                     <div class="rounded-xl border border-slate-200 p-4">
-                        <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Codigo sucursal</p>
+                        <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">C&oacute;digo sucursal</p>
                         <p class="mt-2 text-slate-800 font-medium"><?= htmlspecialchars((string) ($item['suc_cod_sucursal'] ?: '-'), ENT_QUOTES, 'UTF-8') ?></p>
                     </div>
                     <div class="rounded-xl border border-slate-200 p-4">
@@ -149,12 +149,34 @@ if ($estado === ESTADO_APROBADO) {
                         <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500 text-center">Sin adjuntos registrados.</div>
                     <?php else: ?>
                         <?php foreach ($archivos as $archivo): ?>
-                            <div class="rounded-xl border border-slate-200 p-4 flex items-center justify-between gap-3">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900"><?= htmlspecialchars((string) $archivo['tipo_archivo'], ENT_QUOTES, 'UTF-8') ?></p>
-                                    <p class="text-xs text-slate-500 mt-1"><?= htmlspecialchars((string) $archivo['nombre_original'], ENT_QUOTES, 'UTF-8') ?></p>
+                            <div class="rounded-xl border border-slate-200 p-4 space-y-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-900"><?= htmlspecialchars((string) $archivo['tipo_archivo'], ENT_QUOTES, 'UTF-8') ?></p>
+                                        <p class="text-xs text-slate-500 mt-1"><?= htmlspecialchars((string) $archivo['nombre_original'], ENT_QUOTES, 'UTF-8') ?></p>
+                                    </div>
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold"><?= htmlspecialchars((string) pathinfo((string) $archivo['ruta_archivo'], PATHINFO_EXTENSION), ENT_QUOTES, 'UTF-8') ?></span>
                                 </div>
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold"><?= htmlspecialchars((string) pathinfo((string) $archivo['ruta_archivo'], PATHINFO_EXTENSION), ENT_QUOTES, 'UTF-8') ?></span>
+                                <div class="flex flex-wrap gap-2">
+                                    <a href="index.php?action=download-file&id=<?= (int) $archivo['id'] ?>" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-3 py-2 rounded-lg text-xs transition">
+                                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                        <span>Descargar</span>
+                                    </a>
+                                    <?php if ($estado !== ESTADO_ELIMINADO): ?>
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-medium px-3 py-2 rounded-lg text-xs transition"
+                                            data-open-modal="modal-replace-file"
+                                            data-replace-file
+                                            data-file-id="<?= (int) $archivo['id'] ?>"
+                                            data-file-type="<?= htmlspecialchars((string) $archivo['tipo_archivo'], ENT_QUOTES, 'UTF-8') ?>"
+                                            data-file-name="<?= htmlspecialchars((string) $archivo['nombre_original'], ENT_QUOTES, 'UTF-8') ?>"
+                                        >
+                                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                            <span>Reemplazar</span>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -165,7 +187,7 @@ if ($estado === ESTADO_APROBADO) {
                 <section id="acciones" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="bg-slate-50 px-6 py-4 border-b border-slate-200">
                         <h3 class="font-bold text-slate-900 text-sm">Acciones administrativas</h3>
-                        <p class="text-sm text-slate-500 mt-1">Toda accion pide confirmacion antes de continuar.</p>
+                        <p class="text-sm text-slate-500 mt-1">Toda acci&oacute;n pide confirmaci&oacute;n antes de continuar.</p>
                     </div>
                     <div class="p-5 space-y-3">
                         <form method="post" action="index.php?action=approve&id=<?= (int) $item['id'] ?>" data-confirm="Esto creara registros reales en Empresas y Clientes.">
@@ -191,8 +213,8 @@ if ($estado === ESTADO_APROBADO) {
         <div class="flex items-start justify-between gap-4 mb-6">
             <div>
                 <span class="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold uppercase tracking-wider">Edicion</span>
-                <h3 class="mt-3 text-xl font-bold text-slate-900">Actualizar alta temporal</h3>
-                <p class="mt-1 text-sm text-slate-500">Ajuste los datos del onboarding antes de aprobar el registro.</p>
+                        <h3 class="mt-3 text-xl font-bold text-slate-900">Actualizar alta temporal</h3>
+                        <p class="mt-1 text-sm text-slate-500">Ajuste los datos del onboarding antes de aprobar el registro.</p>
             </div>
             <button type="button" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition" data-close-modal="modal-edit" aria-label="Cerrar">
                 <i data-lucide="x" class="w-4 h-4"></i>
@@ -221,8 +243,8 @@ if ($estado === ESTADO_APROBADO) {
         <div class="flex items-start justify-between gap-4 mb-6">
             <div>
                 <span class="inline-flex items-center px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold uppercase tracking-wider">Eliminar</span>
-                <h3 class="mt-3 text-xl font-bold text-slate-900">Confirmar eliminacion</h3>
-                <p class="mt-1 text-sm text-slate-500">Se borraran los adjuntos en disco y el registro quedara como eliminado.</p>
+                <h3 class="mt-3 text-xl font-bold text-slate-900">Confirmar eliminaci&oacute;n</h3>
+                <p class="mt-1 text-sm text-slate-500">Se borrar&aacute;n los adjuntos en disco y el registro quedar&aacute; como eliminado.</p>
             </div>
             <button type="button" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition" data-close-modal="modal-delete" aria-label="Cerrar">
                 <i data-lucide="x" class="w-4 h-4"></i>
@@ -230,12 +252,44 @@ if ($estado === ESTADO_APROBADO) {
         </div>
         <form method="post" action="index.php?action=delete&id=<?= (int) $item['id'] ?>" data-confirm="Se eliminara el registro temporal y se borraran sus archivos del disco." class="space-y-5">
             <div>
-                <label for="motivo_eliminacion" class="block text-xs font-semibold text-slate-600 mb-1.5">Motivo de eliminacion</label>
+                <label for="motivo_eliminacion" class="block text-xs font-semibold text-slate-600 mb-1.5">Motivo de eliminaci&oacute;n</label>
                 <textarea id="motivo_eliminacion" name="motivo_eliminacion" rows="4" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm transition"></textarea>
             </div>
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button type="button" data-close-modal="modal-delete" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition text-sm">Cancelar</button>
                 <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-2.5 rounded-lg transition text-sm shadow-md">Eliminar registro</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-shell" id="modal-replace-file" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="modal-replace-file"></div>
+    <div class="modal-panel modal-sm">
+        <div class="flex items-start justify-between gap-4 mb-6">
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold uppercase tracking-wider">Adjunto</span>
+                <h3 class="mt-3 text-xl font-bold text-slate-900">Reemplazar archivo</h3>
+                <p class="mt-1 text-sm text-slate-500">Actualice el adjunto manteniendo su tipo funcional dentro del onboarding.</p>
+            </div>
+            <button type="button" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition" data-close-modal="modal-replace-file" aria-label="Cerrar">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <form method="post" action="index.php?action=replace-file&id=0" enctype="multipart/form-data" class="space-y-5" id="replace-file-form">
+            <input type="hidden" name="archivo_id" id="replace-file-id" value="">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Tipo</p>
+                <p class="text-sm font-semibold text-slate-900" id="replace-file-type">-</p>
+                <p class="text-xs text-slate-500" id="replace-file-name">-</p>
+            </div>
+            <div>
+                <label for="archivo_reemplazo" class="block text-xs font-semibold text-slate-600 mb-1.5">Nuevo archivo</label>
+                <input id="archivo_reemplazo" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_reemplazo" required>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                <button type="button" data-close-modal="modal-replace-file" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition text-sm">Cancelar</button>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg transition text-sm shadow-md">Guardar reemplazo</button>
             </div>
         </form>
     </div>

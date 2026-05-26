@@ -38,16 +38,80 @@ class Validator
             $errors['email_principal'] = 'El email principal no es valido.';
         }
 
+        if (($data['rut'] ?? '') !== '' && !preg_match('/^[0-9A-Za-z.-]+$/', (string) $data['rut'])) {
+            $errors['rut'] = 'El RUT contiene caracteres no permitidos.';
+        }
+
+        if ((int) ($data['usuarios'] ?? 0) < 1) {
+            $errors['usuarios'] = 'El numero de usuarios debe ser mayor o igual a 1.';
+        }
+
+        if ((int) ($data['cfe_mensuales'] ?? -1) < 0) {
+            $errors['cfe_mensuales'] = 'El valor de CFE mensuales no puede ser negativo.';
+        }
+
         if (!empty($files)) {
-            $requiredFiles = ['archivo_pfx', 'archivo_contrato', 'archivo_6906'];
-            foreach ($requiredFiles as $fileField) {
+            $requiredFiles = ['archivo_pfx' => 'Archivo PFX', 'archivo_contrato' => 'Archivo contrato', 'archivo_6906' => 'Archivo 6906'];
+            foreach ($requiredFiles as $fileField => $label) {
                 $errorCode = $files[$fileField]['error'] ?? UPLOAD_ERR_NO_FILE;
                 if ($errorCode === UPLOAD_ERR_NO_FILE) {
-                    $errors[$fileField] = "Debe adjuntar {$fileField}.";
+                    $errors[$fileField] = "Debe adjuntar {$label}.";
                 }
             }
+
+            self::validateUploadedFiles($files, $errors);
         }
 
         return $errors;
+    }
+
+    public static function validateReplacementUpload(array $file, string $tipoArchivo): array
+    {
+        $errors = [];
+        self::validateSingleFile($file, $tipoArchivo, $errors, 'archivo_reemplazo');
+        return $errors;
+    }
+
+    private static function validateUploadedFiles(array $files, array &$errors): void
+    {
+        $map = [
+            'archivo_pfx' => 'pfx',
+            'archivo_credito_fiscal' => 'credito_fiscal',
+            'archivo_contrato' => 'contrato',
+            'archivo_6906' => 'f6906',
+            'archivo_logo' => 'logo',
+        ];
+
+        foreach ($map as $fieldName => $tipoArchivo) {
+            if (!isset($files[$fieldName])) {
+                continue;
+            }
+
+            self::validateSingleFile($files[$fieldName], $tipoArchivo, $errors, $fieldName);
+        }
+    }
+
+    private static function validateSingleFile(array $file, string $tipoArchivo, array &$errors, string $errorKey): void
+    {
+        $errorCode = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+        if ($errorCode === UPLOAD_ERR_NO_FILE) {
+            return;
+        }
+
+        if ($errorCode !== UPLOAD_ERR_OK) {
+            $errors[$errorKey] = 'No fue posible procesar el archivo cargado.';
+            return;
+        }
+
+        $ext = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        $allowed = TIPOS_ARCHIVO_PERMITIDOS[$tipoArchivo] ?? [];
+        if ($ext === '' || !in_array($ext, $allowed, true)) {
+            $errors[$errorKey] = 'La extension del archivo no esta permitida.';
+            return;
+        }
+
+        if ((int) ($file['size'] ?? 0) > MAX_UPLOAD_BYTES) {
+            $errors[$errorKey] = 'El archivo supera el tamano maximo permitido de 10 MB.';
+        }
     }
 }
