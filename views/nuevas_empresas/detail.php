@@ -19,7 +19,7 @@
             <div><dt>ID</dt><dd class="mono">#<?= (int) $item['id'] ?></dd></div>
             <div><dt>Email</dt><dd><?= htmlspecialchars((string) $item['email_principal'], ENT_QUOTES, 'UTF-8') ?></dd></div>
             <div><dt>Domicilio</dt><dd><?= htmlspecialchars((string) $item['domicilio'], ENT_QUOTES, 'UTF-8') ?></dd></div>
-            <div><dt>Tel&eacute;fono</dt><dd><?= htmlspecialchars((string) ($item['telefono'] ?? ''), ENT_QUOTES, 'UTF-8') ?></dd></div>
+            <div><dt>Telefono</dt><dd><?= htmlspecialchars((string) ($item['telefono'] ?? ''), ENT_QUOTES, 'UTF-8') ?></dd></div>
             <div><dt>Plan</dt><dd><?= htmlspecialchars((string) ($item['plan'] ?? ''), ENT_QUOTES, 'UTF-8') ?></dd></div>
             <div><dt>Certificado</dt><dd><?= htmlspecialchars((string) ($item['alta_certificado_digital'] ?? ''), ENT_QUOTES, 'UTF-8') ?></dd></div>
         </dl>
@@ -49,11 +49,11 @@
     <section class="card actions-surface">
         <div>
             <div class="eyebrow">Acciones</div>
-            <h3>Revisi&oacute;n administrativa</h3>
-            <p>Puede editar, aprobar o eliminar el registro. Todas las acciones solicitan confirmaci&oacute;n.</p>
+            <h3>Revision administrativa</h3>
+            <p>Puede editar, aprobar o eliminar el registro. Todas las acciones solicitan confirmacion.</p>
         </div>
         <div class="inline-actions">
-            <form method="post" action="index.php?action=approve&id=<?= (int) $item['id'] ?>" data-confirm="Esto crear&aacute; registros reales en Empresas y Clientes.">
+            <form method="post" action="index.php?action=approve&id=<?= (int) $item['id'] ?>" data-confirm="Esto creara registros reales en Empresas y Clientes.">
                 <button type="submit" class="button button-primary">Aprobar</button>
             </form>
             <button type="button" class="button button-danger" data-open-modal="modal-delete">Eliminar</button>
@@ -66,10 +66,10 @@
     <div class="modal-panel modal-xl">
         <div class="modal-head">
             <div>
-                <div class="eyebrow">Edici&oacute;n</div>
+                <div class="eyebrow">Edicion</div>
                 <h2>Actualizar alta temporal</h2>
             </div>
-            <button type="button" class="icon-button" data-close-modal="modal-edit" aria-label="Cerrar">×</button>
+            <button type="button" class="icon-button" data-close-modal="modal-edit" aria-label="Cerrar">&times;</button>
         </div>
         <form method="post" action="index.php?action=update&id=<?= (int) $item['id'] ?>" class="smart-form">
             <div class="form-grid">
@@ -89,14 +89,14 @@
         <div class="modal-head">
             <div>
                 <div class="eyebrow">Eliminar</div>
-                <h2>Confirmar eliminaci&oacute;n</h2>
+                <h2>Confirmar eliminacion</h2>
             </div>
-            <button type="button" class="icon-button" data-close-modal="modal-delete" aria-label="Cerrar">×</button>
+            <button type="button" class="icon-button" data-close-modal="modal-delete" aria-label="Cerrar">&times;</button>
         </div>
-        <form method="post" action="index.php?action=delete&id=<?= (int) $item['id'] ?>" class="smart-form" data-confirm="Se eliminar&aacute; el registro temporal y se borrar&aacute;n sus archivos del disco.">
+        <form method="post" action="index.php?action=delete&id=<?= (int) $item['id'] ?>" class="smart-form" data-confirm="Se eliminara el registro temporal y se borraran sus archivos del disco.">
             <div class="form-grid">
                 <div class="field span-12">
-                    <label for="motivo_eliminacion">Motivo de eliminaci&oacute;n</label>
+                    <label for="motivo_eliminacion">Motivo de eliminacion</label>
                     <textarea id="motivo_eliminacion" name="motivo_eliminacion" rows="4" required></textarea>
                 </div>
             </div>

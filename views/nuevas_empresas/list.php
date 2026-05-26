@@ -4,9 +4,26 @@
     <div>
         <div class="eyebrow">Panel operativo</div>
         <h2>Altas temporales</h2>
-        <p>Revise registros pendientes, abra el detalle, edite informaci&oacute;n y apruebe o elimine con confirmaci&oacute;n visual.</p>
+        <p>Revise registros pendientes, abra el detalle, edite informacion y apruebe o elimine con confirmacion visual.</p>
     </div>
     <button type="button" class="button button-primary" data-open-modal="modal-create">Nueva alta</button>
+</section>
+
+<section class="card filters-card">
+    <div class="search-box">
+        <label for="filtro-busqueda" class="sr-only">Buscar</label>
+        <input type="text" id="filtro-busqueda" placeholder="Buscar por razon social o RUT">
+    </div>
+    <div class="filter-inline">
+        <span>Estado</span>
+        <select id="filtro-estado">
+            <option value="todos">Todos</option>
+            <option value="PENDIENTE_APROBACION">Pendiente</option>
+            <option value="APROBADO">Aprobado</option>
+            <option value="ELIMINADO">Eliminado</option>
+            <option value="ERROR_APROBACION">Error</option>
+        </select>
+    </div>
 </section>
 
 <section class="card table-card">
@@ -16,10 +33,10 @@
             <tr>
                 <th>ID</th>
                 <th>Estado</th>
-                <th>Raz&oacute;n social</th>
+                <th>Razon social</th>
                 <th>RUT</th>
-                <th>Fecha de creaci&oacute;n</th>
-                <th>Acci&oacute;n</th>
+                <th>Fecha de creacion</th>
+                <th>Accion</th>
             </tr>
             </thead>
             <tbody>
@@ -27,7 +44,7 @@
                 <tr><td colspan="6">No hay registros temporales.</td></tr>
             <?php else: ?>
                 <?php foreach ($items as $item): ?>
-                    <tr>
+                    <tr data-status="<?= htmlspecialchars((string) $item['estado'], ENT_QUOTES, 'UTF-8') ?>">
                         <td><span class="mono">#<?= (int) $item['id'] ?></span></td>
                         <td><span class="status-badge status-<?= strtolower((string) $item['estado']) ?>"><?= htmlspecialchars((string) $item['estado'], ENT_QUOTES, 'UTF-8') ?></span></td>
                         <td><?= htmlspecialchars((string) $item['razon_social'], ENT_QUOTES, 'UTF-8') ?></td>
@@ -50,7 +67,7 @@
                 <div class="eyebrow">Nueva carga</div>
                 <h2>Registrar alta temporal</h2>
             </div>
-            <button type="button" class="icon-button" data-close-modal="modal-create" aria-label="Cerrar">×</button>
+            <button type="button" class="icon-button" data-close-modal="modal-create" aria-label="Cerrar">&times;</button>
         </div>
         <form method="post" action="index.php?action=store" enctype="multipart/form-data" class="smart-form">
             <div class="form-grid">
@@ -58,7 +75,7 @@
             </div>
             <div class="modal-foot">
                 <button type="button" class="button button-secondary" data-close-modal="modal-create">Cancelar</button>
-                <button type="submit" class="button button-primary">Guardar y enviar a aprobaci&oacute;n</button>
+                <button type="submit" class="button button-primary">Guardar y enviar a aprobacion</button>
             </div>
         </form>
     </div>

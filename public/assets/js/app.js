@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var confirmMessage = document.getElementById('confirm-message');
     var confirmAccept = document.getElementById('confirm-accept');
     var confirmCancel = document.getElementById('confirm-cancel');
+    var filtroBusqueda = document.getElementById('filtro-busqueda');
+    var filtroEstado = document.getElementById('filtro-estado');
     var pendingForm = null;
 
     function openModal(id) {
@@ -38,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             pendingForm = form;
-            confirmMessage.textContent = form.getAttribute('data-confirm') || 'Confirme esta acción.';
+            confirmMessage.textContent = form.getAttribute('data-confirm') || 'Confirme esta accion.';
             overlay.hidden = false;
             overlay.classList.add('is-open');
         });
@@ -59,4 +61,22 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    function filtrarTabla() {
+        var rows = document.querySelectorAll('.table tbody tr[data-status]');
+        if (!rows.length) return;
+        var term = filtroBusqueda ? filtroBusqueda.value.toLowerCase() : '';
+        var estado = filtroEstado ? filtroEstado.value : 'todos';
+
+        rows.forEach(function (row) {
+            var text = row.textContent.toLowerCase();
+            var rowEstado = row.getAttribute('data-status') || '';
+            var matchText = !term || text.indexOf(term) !== -1;
+            var matchEstado = estado === 'todos' || rowEstado === estado;
+            row.style.display = matchText && matchEstado ? '' : 'none';
+        });
+    }
+
+    if (filtroBusqueda) filtroBusqueda.addEventListener('input', filtrarTabla);
+    if (filtroEstado) filtroEstado.addEventListener('change', filtrarTabla);
 });

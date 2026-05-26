@@ -9,7 +9,7 @@ class Validator
         $errors = [];
 
         $required = [
-            'razon_social' => 'Razón social',
+            'razon_social' => 'Razon social',
             'domicilio' => 'Domicilio',
             'email_principal' => 'Email principal',
             'rut' => 'RUT',
@@ -18,11 +18,11 @@ class Validator
             'licencia' => 'Licencia',
             'usuarios' => 'Nro usuarios',
             'cfe_mensuales' => 'CFE mensuales',
-            'suc_cod_sucursal' => 'Código de sucursal',
-            'suc_cod_fecha_vigencia' => 'Fecha del código',
+            'suc_cod_sucursal' => 'Codigo de sucursal',
+            'suc_cod_fecha_vigencia' => 'Fecha del codigo',
             'alta_especial' => 'Especial',
             'alta_es_emisor' => 'Es emisor',
-            'alta_credito_fiscal' => 'Crédito fiscal',
+            'alta_credito_fiscal' => 'Credito fiscal',
             'alta_certificado_digital' => 'Certificado digital',
             'nombre_completo_firmante' => 'Nombre firmante',
             'ci_firmante' => 'CI firmante',
@@ -35,7 +35,7 @@ class Validator
         }
 
         if (($data['email_principal'] ?? '') !== '' && !filter_var($data['email_principal'], FILTER_VALIDATE_EMAIL)) {
-            $errors['email_principal'] = 'El email principal no es válido.';
+            $errors['email_principal'] = 'El email principal no es valido.';
         }
 
         if (!empty($files)) {

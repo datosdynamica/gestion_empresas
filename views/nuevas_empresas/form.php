@@ -4,7 +4,7 @@
     <div class="hero-copy">
         <span class="pill">Fase 1</span>
         <h2>Nueva alta temporal</h2>
-        <p>Este flujo registra la empresa, adjunta documentaci&oacute;n y la deja lista para revisi&oacute;n manual antes de crear registros en <strong>Empresas</strong> y <strong>Clientes</strong>.</p>
+        <p>Este flujo registra la empresa, adjunta documentacion y la deja lista para revision manual antes de crear registros en <strong>Empresas</strong> y <strong>Clientes</strong>.</p>
     </div>
     <div class="hero-actions">
         <button type="button" class="button button-primary" data-open-modal="modal-create">Abrir formulario</button>
@@ -20,7 +20,7 @@
                 <div class="eyebrow">Carga inicial</div>
                 <h2>Alta temporal de empresa</h2>
             </div>
-            <button type="button" class="icon-button" data-close-modal="modal-create" aria-label="Cerrar">×</button>
+            <button type="button" class="icon-button" data-close-modal="modal-create" aria-label="Cerrar">&times;</button>
         </div>
         <form method="post" action="index.php?action=store" enctype="multipart/form-data" class="smart-form">
             <div class="form-grid">
@@ -28,7 +28,7 @@
             </div>
             <div class="modal-foot">
                 <button type="button" class="button button-secondary" data-close-modal="modal-create">Cancelar</button>
-                <button type="submit" class="button button-primary">Guardar y enviar a aprobaci&oacute;n</button>
+                <button type="submit" class="button button-primary">Guardar y enviar a aprobacion</button>
             </div>
         </form>
     </div>

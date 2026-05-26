@@ -128,7 +128,7 @@ class NuevasEmpresasController
 
             $db->commit();
             unset($_SESSION['old'], $_SESSION['errors']);
-            Response::flash('success', 'Registro creado correctamente y enviado a aprobación.');
+            Response::flash('success', 'Registro creado correctamente y enviado a aprobacion.');
             Response::redirect('index.php?action=show&id=' . $nuevaEmpresaId);
         } catch (Throwable $e) {
             if ($db->inTransaction()) {
@@ -247,7 +247,7 @@ class NuevasEmpresasController
             }
 
             if (!WorkflowHelper::canApprove($item)) {
-                throw new RuntimeException('El registro no está pendiente de aprobación.');
+                throw new RuntimeException('El registro no esta pendiente de aprobacion.');
             }
 
             if ($empresaModel->existsByRut((string) $item['rut'])) {
