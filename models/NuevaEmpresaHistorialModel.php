@@ -6,8 +6,8 @@ class NuevaEmpresaHistorialModel extends BaseModel
 {
     public function create(array $data): int
     {
-        $sql = "INSERT INTO nuevas_empresas_historial (
-                    nueva_empresa_id, evento, estado_anterior, estado_nuevo, descripcion, usuario_evento
+        $sql = "INSERT INTO " . TABLA_EMPRESAS_NUEVAS_HISTORIAL . " (
+                    NuevaEmpresaId, Evento, EstadoAnterior, EstadoNuevo, Descripcion, UsuarioEvento
                 ) VALUES (
                     :nueva_empresa_id, :evento, :estado_anterior, :estado_nuevo, :descripcion, :usuario_evento
                 )";

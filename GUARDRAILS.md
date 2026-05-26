@@ -6,6 +6,11 @@
 - El alta genera datos en `Empresas` y en `Clientes`, pero primero pasa por tablas temporales.
 - El archivo [panel_de_gesti_n_de_clientes.html](C:\DYNAMICA_PLUGINS\gestion_empresas\panel_de_gesti_n_de_clientes.html) es solo referencia visual. No debe tomarse como implementacion funcional.
 - La apariencia objetivo del modulo debe seguir ese HTML de referencia tanto en listado como en formularios y ficha detalle.
+- Las tablas temporales del modulo deben respetar el formato de nombres usado por el cliente:
+  - `EmpresasNuevas`
+  - `EmpresasNuevasArchivos`
+  - `EmpresasNuevasHistorial`
+- Las columnas temporales nuevas deben crearse en formato PascalCase.
 
 ## Zonas sensibles
 - Produccion MySQL: nunca hacer `UPDATE`, `DELETE`, `DROP`, `ALTER` fuera de cambios aprobados y acotados.

@@ -16,6 +16,10 @@ define('ESTADO_APROBADO', 'APROBADO');
 define('ESTADO_ELIMINADO', 'ELIMINADO');
 define('ESTADO_ERROR_APROBACION', 'ERROR_APROBACION');
 
+define('TABLA_EMPRESAS_NUEVAS', 'EmpresasNuevas');
+define('TABLA_EMPRESAS_NUEVAS_ARCHIVOS', 'EmpresasNuevasArchivos');
+define('TABLA_EMPRESAS_NUEVAS_HISTORIAL', 'EmpresasNuevasHistorial');
+
 const TIPOS_ARCHIVO_PERMITIDOS = [
     'pfx' => ['pfx', 'p12'],
     'credito_fiscal' => ['pdf', 'doc', 'docx'],

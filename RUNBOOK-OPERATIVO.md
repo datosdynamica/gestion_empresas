@@ -83,6 +83,16 @@ php -l /var/www/plugin/gestion_empresas/views/nuevas_empresas/form.php
 php -l /var/www/plugin/gestion_empresas/controllers/NuevasEmpresasController.php
 ```
 
+## Tablas temporales vigentes
+- `EmpresasNuevas`
+- `EmpresasNuevasArchivos`
+- `EmpresasNuevasHistorial`
+
+## Convencion de columnas temporales
+- Formato PascalCase en base de datos real
+- El codigo puede seguir usando claves internas en `snake_case` cuando haya alias en modelos
+- Si se agrega una nueva columna temporal, debe respetar el formato PascalCase en la base
+
 ### 2. Verificar respuesta HTTP
 Comprobar que:
 - `https://www.datosdynamica.net/plugin/gestion_empresas/index.php`

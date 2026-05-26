@@ -12,9 +12,9 @@ Implementar el primer tramo del flujo de alta:
 
 ## Alcance
 Incluye:
-- `nuevas_empresas`
-- `nuevas_empresas_archivos`
-- `nuevas_empresas_historial`
+- `EmpresasNuevas`
+- `EmpresasNuevasArchivos`
+- `EmpresasNuevasHistorial`
 - flujo `PENDIENTE_APROBACION -> APROBADO` o `ELIMINADO`
 
 No incluye aun:
