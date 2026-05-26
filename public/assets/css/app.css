@@ -2,6 +2,10 @@
     box-sizing: border-box;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 body {
     margin: 0;
     font-family: 'Manrope', sans-serif;
@@ -446,10 +450,14 @@ textarea {
     position: fixed;
     inset: 0;
     z-index: 80;
-    display: grid;
+    display: none;
     place-items: center;
     background: rgba(15, 23, 42, 0.5);
     backdrop-filter: blur(6px);
+}
+
+.confirm-overlay.is-open {
+    display: grid;
 }
 
 .confirm-card {
