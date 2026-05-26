@@ -38,11 +38,13 @@ class Validator
             $errors['email_principal'] = 'El email principal no es válido.';
         }
 
-        $requiredFiles = ['archivo_pfx', 'archivo_contrato', 'archivo_6906'];
-        foreach ($requiredFiles as $fileField) {
-            $errorCode = $files[$fileField]['error'] ?? UPLOAD_ERR_NO_FILE;
-            if ($errorCode === UPLOAD_ERR_NO_FILE) {
-                $errors[$fileField] = "Debe adjuntar {$fileField}.";
+        if (!empty($files)) {
+            $requiredFiles = ['archivo_pfx', 'archivo_contrato', 'archivo_6906'];
+            foreach ($requiredFiles as $fileField) {
+                $errorCode = $files[$fileField]['error'] ?? UPLOAD_ERR_NO_FILE;
+                if ($errorCode === UPLOAD_ERR_NO_FILE) {
+                    $errors[$fileField] = "Debe adjuntar {$fileField}.";
+                }
             }
         }
 

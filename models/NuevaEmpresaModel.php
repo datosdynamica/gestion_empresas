@@ -57,6 +57,49 @@ class NuevaEmpresaModel extends BaseModel
         $stmt->execute([$relativePath, $created, $id]);
     }
 
+    public function updateTemp(int $id, array $data): void
+    {
+        $sql = "UPDATE nuevas_empresas SET
+                    razon_social = :razon_social,
+                    nombre_fantasia = :nombre_fantasia,
+                    domicilio = :domicilio,
+                    email_principal = :email_principal,
+                    rut = :rut,
+                    telefono = :telefono,
+                    ciudad = :ciudad,
+                    departamento = :departamento,
+                    usuario_ef = :usuario_ef,
+                    licencia = :licencia,
+                    licencia_texto = :licencia_texto,
+                    plan = :plan,
+                    usuarios = :usuarios,
+                    cfe_mensuales = :cfe_mensuales,
+                    cliente_id_giro = :cliente_id_giro,
+                    cliente_id_vendedor = :cliente_id_vendedor,
+                    cliente_id_fidelizacion = :cliente_id_fidelizacion,
+                    email_envio_fe = :email_envio_fe,
+                    cliente_abonado_importe = :cliente_abonado_importe,
+                    cliente_abonado_moneda = :cliente_abonado_moneda,
+                    cliente_abonado_periodo = :cliente_abonado_periodo,
+                    cliente_abonado_descuento = :cliente_abonado_descuento,
+                    suc_cod_sucursal = :suc_cod_sucursal,
+                    suc_cod_fecha_vigencia = :suc_cod_fecha_vigencia,
+                    alta_especial = :alta_especial,
+                    alta_especial_norma = :alta_especial_norma,
+                    alta_es_emisor = :alta_es_emisor,
+                    alta_credito_fiscal = :alta_credito_fiscal,
+                    alta_certificado_digital = :alta_certificado_digital,
+                    nombre_completo_firmante = :nombre_completo_firmante,
+                    ci_firmante = :ci_firmante,
+                    observaciones = :observaciones,
+                    notas_admin = :notas_admin
+                WHERE id = :id";
+
+        $stmt = $this->db->prepare($sql);
+        $data['id'] = $id;
+        $stmt->execute($data);
+    }
+
     public function markApproved(int $id, int $empresaId, int $clienteId, string $usuario): void
     {
         $stmt = $this->db->prepare("

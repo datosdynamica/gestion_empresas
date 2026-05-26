@@ -158,6 +158,75 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/detail.php';
     }
 
+    public function update(int $id): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $id <= 0) {
+            Response::redirect('index.php');
+        }
+
+        $item = $this->model->findById($id);
+        if (!$item) {
+            Response::flash('error', 'Registro no encontrado.');
+            Response::redirect('index.php');
+        }
+
+        $data = [
+            'razon_social' => trim($_POST['razon_social'] ?? ''),
+            'nombre_fantasia' => trim($_POST['nombre_fantasia'] ?? ''),
+            'domicilio' => trim($_POST['domicilio'] ?? ''),
+            'email_principal' => trim($_POST['email_principal'] ?? ''),
+            'rut' => trim($_POST['rut'] ?? ''),
+            'telefono' => trim($_POST['telefono'] ?? ''),
+            'ciudad' => trim($_POST['ciudad'] ?? ''),
+            'departamento' => trim($_POST['departamento'] ?? ''),
+            'usuario_ef' => trim($_POST['usuario_ef'] ?? ''),
+            'licencia' => (int) ($_POST['licencia'] ?? 0),
+            'licencia_texto' => trim($_POST['licencia_texto'] ?? ''),
+            'plan' => trim($_POST['plan'] ?? ''),
+            'usuarios' => (int) ($_POST['usuarios'] ?? 1),
+            'cfe_mensuales' => (int) ($_POST['cfe_mensuales'] ?? 0),
+            'cliente_id_giro' => (int) ($_POST['cliente_id_giro'] ?? 0),
+            'cliente_id_vendedor' => ID_VENDEDOR_DEFAULT,
+            'cliente_id_fidelizacion' => (int) ($_POST['cliente_id_fidelizacion'] ?? 0),
+            'email_envio_fe' => trim($_POST['email_envio_fe'] ?? ''),
+            'cliente_abonado_importe' => (float) ($_POST['cliente_abonado_importe'] ?? 0),
+            'cliente_abonado_moneda' => trim($_POST['cliente_abonado_moneda'] ?? 'UYU'),
+            'cliente_abonado_periodo' => trim($_POST['cliente_abonado_periodo'] ?? 'MENSUAL'),
+            'cliente_abonado_descuento' => (float) ($_POST['cliente_abonado_descuento'] ?? 0),
+            'suc_cod_sucursal' => trim($_POST['suc_cod_sucursal'] ?? ''),
+            'suc_cod_fecha_vigencia' => trim($_POST['suc_cod_fecha_vigencia'] ?? ''),
+            'alta_especial' => trim($_POST['alta_especial'] ?? 'NO'),
+            'alta_especial_norma' => trim($_POST['alta_especial_norma'] ?? ''),
+            'alta_es_emisor' => trim($_POST['alta_es_emisor'] ?? 'NO'),
+            'alta_credito_fiscal' => trim($_POST['alta_credito_fiscal'] ?? 'NO'),
+            'alta_certificado_digital' => trim($_POST['alta_certificado_digital'] ?? ''),
+            'nombre_completo_firmante' => trim($_POST['nombre_completo_firmante'] ?? ''),
+            'ci_firmante' => trim($_POST['ci_firmante'] ?? ''),
+            'observaciones' => trim($_POST['observaciones'] ?? ''),
+            'notas_admin' => trim($_POST['notas_admin'] ?? ''),
+        ];
+
+        $errors = Validator::validateNuevaEmpresa(array_merge($item, $data), []);
+        if (!empty($errors)) {
+            $_SESSION['errors'] = $errors;
+            Response::flash('error', 'No fue posible actualizar el registro.');
+            Response::redirect('index.php?action=show&id=' . $id);
+        }
+
+        $this->model->updateTemp($id, $data);
+        $this->historialModel->create([
+            'nueva_empresa_id' => $id,
+            'evento' => 'EDICION',
+            'estado_anterior' => $item['estado'],
+            'estado_nuevo' => $item['estado'],
+            'descripcion' => 'Registro temporal editado',
+            'usuario_evento' => $_SESSION['usuario'] ?? 'admin',
+        ]);
+
+        Response::flash('success', 'Registro actualizado correctamente.');
+        Response::redirect('index.php?action=show&id=' . $id);
+    }
+
     public function approve(int $id): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $id <= 0) {

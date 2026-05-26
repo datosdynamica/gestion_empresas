@@ -15,6 +15,9 @@ switch ($action) {
     case 'store':
         $controller->store();
         break;
+    case 'update':
+        $controller->update($id);
+        break;
     case 'show':
         $controller->show($id);
         break;
