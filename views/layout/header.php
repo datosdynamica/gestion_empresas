@@ -20,7 +20,9 @@
             <p class="text-sm text-slate-500">Aprovisionamiento y seguimiento tecnico de nuevos clientes.</p>
         </div>
         <nav class="flex gap-2">
-            <a href="index.php" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">Listado</a>
+            <?php if (($showListLink ?? true) === true): ?>
+                <a href="index.php" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">Listado</a>
+            <?php endif; ?>
             <?php if (!empty($enableCreateModal)): ?>
                 <button type="button" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm" data-open-modal="modal-create">
                     <i data-lucide="plus" class="w-4 h-4"></i>
