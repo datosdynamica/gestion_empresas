@@ -17,7 +17,7 @@ class AuthController
             Response::redirect('panel');
         }
 
-        $pageTitle = 'Acceso Seguro';
+        $pageTitle = APP_NAME;
         $rememberedLogin = Auth::rememberedLogin();
         require __DIR__ . '/../views/auth/login.php';
     }

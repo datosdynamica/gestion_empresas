@@ -8,6 +8,7 @@
     <meta name="theme-color" content="#e65b4f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="<?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,6 +19,8 @@
     <?php $manifestVersion = @filemtime(__DIR__ . '/../../manifest.webmanifest') ?: time(); ?>
     <link rel="manifest" href="manifest.webmanifest?v=<?= $manifestVersion ?>">
     <link rel="apple-touch-icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
+    <link rel="icon" type="image/png" sizes="192x192" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
+    <link rel="shortcut icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
     <link rel="stylesheet" href="public/assets/css/app.css?v=<?= $cssVersion ?>">
 </head>
 <body class="min-h-screen bg-[radial-gradient(circle_at_top,_#fff4f1_0%,_#fff8f6_28%,_#fffdfc_62%,_#ffffff_100%)] text-slate-900">
@@ -36,7 +39,7 @@
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#c35a4f]">Dynamica</p>
-                        <p class="mt-1 text-2xl font-black tracking-tight">Gesti&oacute;n de altas</p>
+                        <p class="mt-1 text-2xl font-black tracking-tight"><?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></p>
                         <p class="mt-1 text-sm text-slate-500">Ingreso del equipo que revisa, aprueba y da seguimiento.</p>
                     </div>
                 </div>
@@ -72,7 +75,7 @@
                     <div class="mt-5 flex items-center gap-3">
                         <img src="public/assets/img/logo-dynamica.jpeg?v=<?= $logoVersion ?>" alt="Logo Dynamica" class="h-14 w-14 rounded-2xl border border-[#ffe0da] bg-white p-1.5 shadow-sm object-contain">
                         <div>
-                            <h1 class="text-3xl font-black tracking-tight text-slate-900">Altas y Automatizaciones</h1>
+                            <h1 class="text-3xl font-black tracking-tight text-slate-900"><?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></h1>
                             <p class="mt-1 text-sm text-slate-500 leading-6">Ingreso del equipo que gestiona y acompa&ntilde;a el proceso.</p>
                         </div>
                     </div>

@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#e65b4f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Gestion Empresas">
+    <meta name="apple-mobile-web-app-title" content="<?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +19,8 @@
     <?php $manifestVersion = @filemtime(__DIR__ . '/../../manifest.webmanifest') ?: time(); ?>
     <link rel="manifest" href="manifest.webmanifest?v=<?= $manifestVersion ?>">
     <link rel="apple-touch-icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
+    <link rel="icon" type="image/png" sizes="192x192" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
+    <link rel="shortcut icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
     <link rel="stylesheet" href="public/assets/css/app.css?v=<?= $cssVersion ?>">
 </head>
 <?php
