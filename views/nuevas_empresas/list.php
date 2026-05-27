@@ -590,8 +590,8 @@ unset($_SESSION['old']);
                 </tbody>
             </table>
         </div>
-        <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500 font-medium">
-            <div class="space-y-1">
+        <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-3 text-xs text-slate-500 font-medium">
+            <div class="space-y-1 text-center lg:text-left">
                 <p>
                     Mostrando
                     <span id="num-registros-mostrados" class="text-slate-700 font-bold"><?= count($rows) ?></span>
@@ -605,7 +605,7 @@ unset($_SESSION['old']);
                     <p class="text-[11px] text-slate-400">Vista demo del panel de referencia</p>
                 <?php endif; ?>
             </div>
-            <div class="flex gap-1.5">
+            <div class="flex items-center justify-center gap-1.5">
                 <?php if ($isDemoFallback): ?>
                     <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Anterior</button>
                     <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Siguiente</button>
@@ -614,6 +614,7 @@ unset($_SESSION['old']);
                     <a href="<?= htmlspecialchars(app_url('index.php?page=' . (int) ($pagination['next_page'] ?? $totalPages)), ENT_QUOTES, 'UTF-8') ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_next']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Siguiente</a>
                 <?php endif; ?>
             </div>
+            <div class="hidden lg:block"></div>
         </div>
     </div>
 </div>

@@ -51,8 +51,8 @@ if (is_array($authUser)) {
                 <p class="app-sidebar__section-title">Navegaci&oacute;n</p>
                 <nav class="app-nav">
                     <a href="<?= htmlspecialchars(app_url('panel'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'panel' ? ' is-active' : '' ?>">
-                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                        <span class="app-nav__label">Lista de empresas</span>
+                        <i data-lucide="house" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Inicio</span>
                     </a>
                     <?php if (!empty($enableCreateModal)): ?>
                         <button type="button" class="app-nav__item" data-open-modal="modal-create">
