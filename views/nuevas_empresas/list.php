@@ -557,10 +557,10 @@ unset($_SESSION['old']);
                                                 <p class="text-xs text-slate-600">Estado detalle: <span class="font-semibold text-slate-800"><?= h((string) ($item['estado_detalle'] ?: '-')) ?></span></p>
                                             </div>
                                             <div class="flex flex-wrap gap-2">
-                                                <a href="index.php?action=show&id=<?= $itemId ?>" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-3 py-2 rounded-lg text-xs transition">
+                                                <button type="button" onclick="mostrarMasInfo(<?= $itemId ?>)" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-3 py-2 rounded-lg text-xs transition">
                                                     <i data-lucide="panel-right-open" class="w-3.5 h-3.5"></i>
                                                     <span>Mas info</span>
-                                                </a>
+                                                </button>
                                                 <button onclick="editarRegistro(<?= $itemId ?>)" class="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-medium px-3 py-2 rounded-lg text-xs transition">
                                                     <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                                                     <span>Editar</span>
@@ -616,6 +616,87 @@ unset($_SESSION['old']);
             <button onclick="confirmarCancelacion()" class="bg-rose-600 text-white hover:bg-rose-700 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md">
                 Si, Cancelar Onboarding
             </button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-shell" id="modal-info" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="modal-info"></div>
+    <div class="modal-panel modal-drawer">
+        <div class="flex items-start justify-between gap-4 mb-5">
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold uppercase tracking-wider">Mas Info</span>
+                <h3 id="modal-info-title" class="mt-3 text-xl font-bold text-slate-900">Detalle del cliente</h3>
+                <p id="modal-info-subtitle" class="mt-1 text-sm text-slate-500">Consulta rapida sin salir del listado.</p>
+            </div>
+            <button type="button" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition" data-close-modal="modal-info" aria-label="Cerrar">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">RUT</p>
+                    <p id="modal-info-rut" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Estado</p>
+                    <p id="modal-info-estado" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Licencia</p>
+                    <p id="modal-info-licencia" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Plan</p>
+                    <p id="modal-info-plan" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Email principal</p>
+                    <p id="modal-info-email" class="mt-1 text-sm font-semibold text-slate-900 break-all">-</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Telefono</p>
+                    <p id="modal-info-telefono" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-inner">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-3">
+                    <i data-lucide="map-pinned" class="w-4 h-4 text-slate-500"></i>
+                    Ubicacion y Operacion
+                </h4>
+                <div class="grid grid-cols-1 gap-3 text-sm">
+                    <div><span class="text-slate-400 font-semibold">Domicilio:</span> <span id="modal-info-domicilio" class="text-slate-800 font-medium">-</span></div>
+                    <div><span class="text-slate-400 font-semibold">Ciudad:</span> <span id="modal-info-ciudad" class="text-slate-800 font-medium">-</span></div>
+                    <div><span class="text-slate-400 font-semibold">Sucursal:</span> <span id="modal-info-sucursal" class="text-slate-800 font-medium">-</span></div>
+                    <div><span class="text-slate-400 font-semibold">Certificado:</span> <span id="modal-info-certificado" class="text-slate-800 font-medium">-</span></div>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-inner">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-3">
+                    <i data-lucide="file-text" class="w-4 h-4 text-slate-500"></i>
+                    Observaciones
+                </h4>
+                <p id="modal-info-observaciones" class="text-sm text-slate-700 whitespace-pre-line">-</p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 pt-2">
+                <button type="button" id="modal-info-edit" class="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-medium px-4 py-2.5 rounded-lg text-sm transition">
+                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    <span>Editar</span>
+                </button>
+                <button type="button" id="modal-info-cancel" class="inline-flex items-center gap-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-medium px-4 py-2.5 rounded-lg text-sm transition">
+                    <i data-lucide="archive-x" class="w-4 h-4"></i>
+                    <span>Cancelar proceso</span>
+                </button>
+                <a id="modal-info-full-link" href="index.php" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg text-sm transition">
+                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                    <span>Vista completa</span>
+                </a>
+            </div>
         </div>
     </div>
 </div>

@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var createModalInfoTitle = document.getElementById('modal-create-info-title');
     var createModalInfoText = document.getElementById('modal-create-info-text');
     var createModalSubmitLabel = document.getElementById('modal-create-submit-label');
+    var infoModalEdit = document.getElementById('modal-info-edit');
+    var infoModalCancel = document.getElementById('modal-info-cancel');
 
     function renderIcons() {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -178,6 +180,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (createModalSubmitLabel) {
             createModalSubmitLabel.textContent = row && row.is_demo ? 'Guardar vista demo' : 'Guardar cambios';
         }
+    }
+
+    function fillText(id, value) {
+        var node = document.getElementById(id);
+        if (!node) {
+            return;
+        }
+
+        node.textContent = value == null || value === '' ? '-' : String(value);
     }
 
     function updateDetailTabButtons(id, activeTab) {
@@ -346,6 +357,50 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         updateDetailTabButtons(id, tab);
+        renderIcons();
+    };
+
+    window.mostrarMasInfo = function (id) {
+        var row = getRowData(id);
+        if (!row) {
+            return;
+        }
+
+        fillText('modal-info-title', row.razon_social || 'Detalle del cliente');
+        fillText('modal-info-subtitle', 'RUT ' + (row.rut || '-') + ' · Licencia ' + (row.licencia_texto || row.licencia || '-'));
+        fillText('modal-info-rut', row.rut);
+        fillText('modal-info-estado', row.estado);
+        fillText('modal-info-licencia', row.licencia_texto || row.licencia);
+        fillText('modal-info-plan', row.plan);
+        fillText('modal-info-email', row.email_principal);
+        fillText('modal-info-telefono', row.telefono);
+        fillText('modal-info-domicilio', row.domicilio);
+        fillText('modal-info-ciudad', row.ciudad);
+        fillText('modal-info-sucursal', row.suc_cod_sucursal);
+        fillText('modal-info-certificado', row.alta_certificado_digital);
+        fillText('modal-info-observaciones', row.observaciones || row.estado_detalle || row.notas_admin);
+
+        if (infoModalEdit) {
+            infoModalEdit.onclick = function () {
+                closeModal('modal-info');
+                editarRegistro(id);
+            };
+        }
+
+        if (infoModalCancel) {
+            infoModalCancel.onclick = function () {
+                closeModal('modal-info');
+                cancelarProceso(id);
+            };
+            infoModalCancel.classList.toggle('hidden', row.estado === 'ELIMINADO' || row.estado === 'APROBADO');
+        }
+
+        var fullLink = document.getElementById('modal-info-full-link');
+        if (fullLink) {
+            fullLink.href = 'index.php?action=show&id=' + id;
+        }
+
+        openModal('modal-info');
         renderIcons();
     };
 

@@ -97,6 +97,12 @@ textarea {
     width: min(620px, calc(100vw - 2rem));
 }
 
+.modal-drawer {
+    width: min(760px, calc(100vw - 2rem));
+    margin-left: auto;
+    margin-right: 0;
+}
+
 .confirm-overlay {
     position: fixed;
     inset: 0;
