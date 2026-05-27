@@ -17,7 +17,7 @@
     <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
             <h1 class="text-2xl font-bold text-slate-900 tracking-tight"><?= htmlspecialchars($pageTitle ?? APP_NAME, ENT_QUOTES, 'UTF-8') ?></h1>
-            <p class="text-sm text-slate-500">Aprovisionamiento y seguimiento tecnico de nuevos clientes.</p>
+            <p class="text-sm text-slate-500">Aprovisionamiento y seguimiento técnico de nuevos clientes.</p>
         </div>
         <nav class="flex gap-2">
             <?php if (($showListLink ?? true) === true): ?>

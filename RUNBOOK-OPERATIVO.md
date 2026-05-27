@@ -121,6 +121,11 @@ Solucion:
 - no improvisar `Invoke-Expression` con quoting complejo
 - preferir Python `subprocess` para despliegues
 
+### 4. `&&` no funciona en este PowerShell
+Solucion:
+- no encadenar comandos con `&&`
+- usar `;` o ejecutar cada comando por separado
+
 ### 3. Popup de confirmacion apareciendo al recargar
 Solucion ya aplicada:
 - usar `[hidden] { display: none !important; }`
