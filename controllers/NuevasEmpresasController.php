@@ -48,6 +48,13 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/form.php';
     }
 
+    public function trace(): void
+    {
+        $events = $this->historialModel->listRecent(120);
+        $pageTitle = 'Trazabilidad';
+        require __DIR__ . '/../views/nuevas_empresas/trace.php';
+    }
+
     public function store(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

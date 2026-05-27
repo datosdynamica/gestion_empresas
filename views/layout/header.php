@@ -69,6 +69,10 @@ if (is_array($authUser)) {
                         <i data-lucide="badge-check" class="w-5 h-5"></i>
                         <span class="app-nav__label">Aprobaciones</span>
                     </button>
+                    <a href="<?= htmlspecialchars(app_url('trazabilidad'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'trazabilidad' ? ' is-active' : '' ?>">
+                        <i data-lucide="history" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Trazabilidad</span>
+                    </a>
                     <button type="button" class="app-nav__item" id="install-app-button" hidden>
                         <i data-lucide="download" class="w-5 h-5"></i>
                         <span class="app-nav__label">Instalar app</span>

@@ -9,6 +9,7 @@ RewriteRule ^ - [L]
 
 RewriteRule ^$ index.php?route=panel [QSA,L]
 RewriteRule ^panel/?$ index.php?route=panel [QSA,L]
+RewriteRule ^trazabilidad/?$ index.php?route=trazabilidad [QSA,L]
 RewriteRule ^login/?$ index.php?route=login [QSA,L]
 RewriteRule ^logout/?$ index.php?route=logout [QSA,L]
 RewriteRule ^registro/([0-9]+)/?$ index.php?route=show&id=$1 [QSA,L]

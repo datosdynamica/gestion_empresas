@@ -21,6 +21,9 @@ if ($route !== '') {
         case 'panel':
             $action = 'index';
             break;
+        case 'trazabilidad':
+            $action = 'trace';
+            break;
         case 'show':
             $action = 'show';
             break;
@@ -49,6 +52,9 @@ switch ($action) {
         break;
     case 'create':
         $controller->create();
+        break;
+    case 'trace':
+        $controller->trace();
         break;
     case 'store':
         $controller->store();
