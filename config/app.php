@@ -19,6 +19,9 @@ define('ESTADO_ERROR_APROBACION', 'ERROR_APROBACION');
 define('TABLA_EMPRESAS_NUEVAS', 'EmpresasNuevas');
 define('TABLA_EMPRESAS_NUEVAS_ARCHIVOS', 'EmpresasNuevasArchivos');
 define('TABLA_EMPRESAS_NUEVAS_HISTORIAL', 'EmpresasNuevasHistorial');
+define('TABLA_SEC_USERS', 'sec_users');
+define('AUTH_SESSION_KEY', 'gestion_empresas_auth');
+define('AUTH_REMEMBER_LOGIN_COOKIE', 'gestion_empresas_login');
 
 const TIPOS_ARCHIVO_PERMITIDOS = [
     'pfx' => ['pfx', 'p12'],

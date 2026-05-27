@@ -21,6 +21,13 @@
             <p class="text-sm text-slate-500">Aprovisionamiento y seguimiento técnico de nuevos clientes.</p>
         </div>
         <nav class="flex gap-2">
+            <?php if (Auth::check()): ?>
+                <?php $authUser = Auth::user(); ?>
+                <span class="hidden lg:inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-600 font-medium px-4 py-2.5 rounded-lg shadow-sm text-sm">
+                    <i data-lucide="user-round" class="w-4 h-4"></i>
+                    <span><?= htmlspecialchars((string) (($authUser['name'] ?? '') !== '' ? $authUser['name'] : ($authUser['login'] ?? 'Usuario')), ENT_QUOTES, 'UTF-8') ?></span>
+                </span>
+            <?php endif; ?>
             <?php if (($showListLink ?? true) === true): ?>
                 <a href="index.php" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">Listado</a>
             <?php endif; ?>
@@ -31,6 +38,12 @@
                 </button>
             <?php else: ?>
                 <a href="index.php?action=create" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">Nueva Empresa Cliente</a>
+            <?php endif; ?>
+            <?php if (Auth::check()): ?>
+                <a href="logout" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span>Salir</span>
+                </a>
             <?php endif; ?>
         </nav>
     </header>

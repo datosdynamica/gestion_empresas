@@ -4,11 +4,49 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+$route = trim((string) ($_GET['route'] ?? ''), '/');
+$authController = new AuthController();
 $controller = new NuevasEmpresasController();
-$action = $_GET['action'] ?? 'index';
+$action = (string) ($_GET['action'] ?? 'index');
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
+if ($route !== '') {
+    switch ($route) {
+        case 'login':
+            $action = 'login';
+            break;
+        case 'logout':
+            $action = 'logout';
+            break;
+        case 'panel':
+            $action = 'index';
+            break;
+        case 'show':
+            $action = 'show';
+            break;
+    }
+}
+
+$publicActions = ['login', 'authenticate', 'logout'];
+
+if (!in_array($action, $publicActions, true)) {
+    Auth::requireLogin();
+}
+
+if (Auth::check() && in_array($action, ['login', 'authenticate'], true)) {
+    Response::redirect('panel');
+}
+
 switch ($action) {
+    case 'login':
+        $authController->login();
+        break;
+    case 'authenticate':
+        $authController->authenticate();
+        break;
+    case 'logout':
+        $authController->logout();
+        break;
     case 'create':
         $controller->create();
         break;
