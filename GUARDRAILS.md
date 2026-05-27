@@ -50,9 +50,11 @@
 - Permitir solo usuarios con `active = 'Y'`.
 - La recordacion implementada es solo del usuario, no una sesion persistente automatica.
 - Rutas limpias definidas dentro del proyecto:
-  - `/plugin/gestion_empresas/login`
-  - `/plugin/gestion_empresas/panel`
-  - `/plugin/gestion_empresas/logout`
+  - `/administrativo/login`
+  - `/administrativo/panel`
+  - `/administrativo/logout`
+- La opcion de instalacion no debe ocultarse solo porque el navegador no emita `beforeinstallprompt`.
+- Si no hay instalacion directa disponible, mostrar ayuda operativa para Android y Windows.
 
 ## Checklist previa a cambios
 - Confirmar si el cambio es local o de produccion.
@@ -67,6 +69,7 @@
 - SSH a `www.datosdynamica.net` no acepta password interactivo para despliegue operativo; usar la clave `.ppk` documentada en el runbook.
 - No subir PHP con `Get-Content -Raw ... | plink "cat > archivo"` porque puede introducir basura de codificacion y romper `declare(strict_types=1)`.
 - El metodo seguro de despliegue de archivos de texto es enviar bytes binarios por `stdin` con Python + `plink`, tal como queda documentado en `RUNBOOK-OPERATIVO.md`.
+- En este PowerShell no usar `&&`; usar `;` o comandos separados.
 - Cuando aparezca un problema repetible de PowerShell, quoting, SSH o despliegue, debe quedar documentado de inmediato en el proyecto antes de seguir.
 
 ## Pendientes marcados

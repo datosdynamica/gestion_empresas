@@ -73,7 +73,7 @@ if (is_array($authUser)) {
                         <i data-lucide="history" class="w-5 h-5"></i>
                         <span class="app-nav__label">Trazabilidad</span>
                     </a>
-                    <button type="button" class="app-nav__item" id="install-app-button" hidden>
+                    <button type="button" class="app-nav__item" id="install-app-button">
                         <i data-lucide="download" class="w-5 h-5"></i>
                         <span class="app-nav__label">Instalar app</span>
                     </button>
@@ -145,7 +145,7 @@ if (is_array($authUser)) {
                                 <p class="text-xs text-slate-500">Acceso interno del modulo</p>
                             </div>
                             <div class="app-user-menu__links">
-                                <button type="button" class="app-user-menu__item" id="install-app-button-menu" hidden>
+                                <button type="button" class="app-user-menu__item" id="install-app-button-menu">
                                     <i data-lucide="download" class="w-4 h-4"></i>
                                     <span>Instalar aplicacion</span>
                                 </button>

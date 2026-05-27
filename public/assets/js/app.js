@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var userMenuToggle = document.querySelector('[data-user-menu-toggle]');
     var installButton = document.getElementById('install-app-button');
     var installButtonMenu = document.getElementById('install-app-button-menu');
+    var installButtonModal = document.getElementById('install-app-button-modal');
     var deferredInstallPrompt = null;
     var overlay = document.getElementById('confirm-overlay');
     var confirmMessage = document.getElementById('confirm-message');
@@ -89,26 +90,28 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function showInstallButtons(show) {
-        [installButton, installButtonMenu].forEach(function (button) {
+    function updateInstallCtas() {
+        [installButton, installButtonMenu, installButtonModal].forEach(function (button) {
             if (!button) {
                 return;
             }
-
-            button.hidden = !show;
+            button.dataset.installReady = deferredInstallPrompt ? '1' : '0';
+            if (button.id === 'install-app-button-modal') {
+                button.textContent = deferredInstallPrompt ? 'Instalar ahora' : 'Entendido';
+            }
         });
     }
 
     function triggerInstallPrompt() {
         if (!deferredInstallPrompt) {
-            mostrarToast('Instalacion', 'El navegador todavia no habilita la instalacion de esta aplicacion.', 'indigo');
+            openModal('modal-install-help');
             return;
         }
 
         deferredInstallPrompt.prompt();
         deferredInstallPrompt.userChoice.finally(function () {
             deferredInstallPrompt = null;
-            showInstallButtons(false);
+            updateInstallCtas();
         });
     }
 
@@ -463,15 +466,27 @@ document.addEventListener('DOMContentLoaded', function () {
         button.addEventListener('click', triggerInstallPrompt);
     });
 
+    if (installButtonModal) {
+        installButtonModal.addEventListener('click', function () {
+            if (!deferredInstallPrompt) {
+                closeModal('modal-install-help');
+                return;
+            }
+
+            triggerInstallPrompt();
+        });
+    }
+
     window.addEventListener('beforeinstallprompt', function (event) {
         event.preventDefault();
         deferredInstallPrompt = event;
-        showInstallButtons(true);
+        updateInstallCtas();
     });
 
     window.addEventListener('appinstalled', function () {
         deferredInstallPrompt = null;
-        showInstallButtons(false);
+        closeModal('modal-install-help');
+        updateInstallCtas();
         mostrarToast('Aplicacion instalada', 'La app quedo disponible en este dispositivo.', 'emerald');
     });
 
@@ -864,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     restoreSidebarState();
-    showInstallButtons(false);
+    updateInstallCtas();
     renderIcons();
     filtrarTabla();
 });

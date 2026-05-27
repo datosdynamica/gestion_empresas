@@ -30,7 +30,9 @@ Este archivo existe para que otro chat o una sesion futura no tenga que redescub
   - `public/assets/pwa/icon-192.png`
   - `public/assets/pwa/icon-512.png`
 - La ruta de entrada recomendada para instalacion es:
-  - `https://www.datosdynamica.net/plugin/gestion_empresas/login`
+  - `https://www.datosdynamica.net/administrativo/login`
+- La opcion de instalacion debe quedar visible en el menu lateral y en el menu de usuario.
+- Si `beforeinstallprompt` no esta disponible, el modulo debe mostrar ayuda manual para Android y Windows en vez de esconder la opcion.
 
 ## Conexion al servidor
 - Host: `www.datosdynamica.net`
@@ -124,7 +126,7 @@ php -l /var/www/plugin/gestion_empresas/controllers/NuevasEmpresasController.php
 
 ### 2. Verificar respuesta HTTP
 Comprobar que:
-- `https://www.datosdynamica.net/plugin/gestion_empresas/index.php`
+- `https://www.datosdynamica.net/administrativo/login`
 - devuelva `200 OK`
 
 ### 3. Si hay error de pagina
@@ -136,7 +138,7 @@ Revisar:
 ## Metodo minimo de conexion probado
 Este comando ya respondio correctamente:
 ```powershell
-& 'C:\DYNAMICA_PLUGINS\gestion_empresas\plink.exe' -batch -i 'C:\DYNAMICA_PLUGINS\gestion_empresas\key-dynamica.ppk' ubuntu@www.datosdynamica.net "whoami && pwd"
+& 'C:\DYNAMICA_PLUGINS\gestion_empresas\plink.exe' -batch -i 'C:\DYNAMICA_PLUGINS\gestion_empresas\key-dynamica.ppk' ubuntu@www.datosdynamica.net "whoami; pwd"
 ```
 
 ## Problemas ya conocidos
