@@ -218,10 +218,21 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        Array.prototype.forEach.call(field.options, function (option) {
-            option.selected = option.value === normalizedValue;
+        var matchIndex = -1;
+        Array.prototype.forEach.call(field.options, function (option, index) {
+            var isMatch = option.value === normalizedValue;
+            option.selected = isMatch;
+            if (isMatch) {
+                matchIndex = index;
+            }
         });
+
+        if (matchIndex >= 0) {
+            field.selectedIndex = matchIndex;
+        }
+
         field.value = normalizedValue;
+        field.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     function populateCreateForm(id) {

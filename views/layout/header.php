@@ -10,7 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="public/assets/css/app.css">
+    <?php $cssVersion = @filemtime(__DIR__ . '/../../public/assets/css/app.css') ?: time(); ?>
+    <link rel="stylesheet" href="public/assets/css/app.css?v=<?= $cssVersion ?>">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 <main class="p-6 max-w-7xl mx-auto space-y-6">

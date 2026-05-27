@@ -15,7 +15,8 @@
         </div>
     </div>
 </div>
-<script src="public/assets/js/app.js"></script>
+<?php $jsVersion = @filemtime(__DIR__ . '/../../public/assets/js/app.js') ?: time(); ?>
+<script src="public/assets/js/app.js?v=<?= $jsVersion ?>"></script>
 <script>lucide.createIcons();</script>
 </body>
 </html>
