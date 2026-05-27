@@ -17,7 +17,27 @@ class NuevasEmpresasController
 
     public function index(): void
     {
-        $items = $this->model->listAll();
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPage = 10;
+        $totalItems = $this->model->countAll();
+        $totalPages = max(1, (int) ceil($totalItems / $perPage));
+
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+
+        $offset = ($page - 1) * $perPage;
+        $items = $this->model->listPage($perPage, $offset);
+        $pagination = [
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_items' => $totalItems,
+            'total_pages' => $totalPages,
+            'has_prev' => $page > 1,
+            'has_next' => $page < $totalPages,
+            'prev_page' => $page > 1 ? $page - 1 : 1,
+            'next_page' => $page < $totalPages ? $page + 1 : $totalPages,
+        ];
         $pageTitle = 'Altas y Automatizaciones';
         require __DIR__ . '/../views/nuevas_empresas/list.php';
     }

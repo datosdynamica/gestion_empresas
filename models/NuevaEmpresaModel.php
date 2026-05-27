@@ -74,6 +74,24 @@ class NuevaEmpresaModel extends BaseModel
         return $this->fetchAll('SELECT ' . self::SELECT_ALIASES . ' FROM ' . TABLA_EMPRESAS_NUEVAS . ' ORDER BY FechaCreacion DESC');
     }
 
+    public function countAll(): int
+    {
+        $row = $this->fetchOne('SELECT COUNT(*) AS total FROM ' . TABLA_EMPRESAS_NUEVAS);
+        return (int) ($row['total'] ?? 0);
+    }
+
+    public function listPage(int $limit, int $offset): array
+    {
+        $limit = max(1, $limit);
+        $offset = max(0, $offset);
+
+        $sql = 'SELECT ' . self::SELECT_ALIASES
+            . ' FROM ' . TABLA_EMPRESAS_NUEVAS
+            . ' ORDER BY FechaCreacion DESC LIMIT ' . $limit . ' OFFSET ' . $offset;
+
+        return $this->fetchAll($sql);
+    }
+
     public function findById(int $id): ?array
     {
         return $this->fetchOne('SELECT ' . self::SELECT_ALIASES . ' FROM ' . TABLA_EMPRESAS_NUEVAS . ' WHERE Id = ?', [$id]);

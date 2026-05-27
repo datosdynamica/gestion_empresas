@@ -1,5 +1,7 @@
 <?php declare(strict_types=1); ?>
-</main>
+        </main>
+    </div>
+</div>
 <div class="confirm-overlay" id="confirm-overlay" hidden>
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden border border-slate-100">
         <div class="p-6">

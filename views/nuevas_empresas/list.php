@@ -304,13 +304,19 @@ function timelineClasses(string $state): array
 
 $enableCreateModal = true;
 $showListLink = false;
+$activeNav = 'panel';
 $pageTitle = $pageTitle ?? 'Altas y Automatizaciones';
+$pageSubtitle = 'Aprovisionamiento, aprobaciones y seguimiento de nuevas empresas.';
 $values = $_SESSION['old'] ?? [];
 $hasActiveRealRows = count(array_filter($items ?? [], static function (array $item): bool {
     return (string) ($item['estado'] ?? '') !== ESTADO_ELIMINADO;
 })) > 0;
 $rows = $hasActiveRealRows ? ($items ?? []) : demoEmpresasNuevasRows();
 $modalValues = $values;
+$isDemoFallback = !$hasActiveRealRows;
+$currentPage = (int) ($pagination['page'] ?? 1);
+$totalPages = (int) ($pagination['total_pages'] ?? 1);
+$totalItems = (int) ($pagination['total_items'] ?? count($rows));
 require __DIR__ . '/../layout/header.php';
 unset($_SESSION['old']);
 ?>
@@ -584,11 +590,29 @@ unset($_SESSION['old']);
                 </tbody>
             </table>
         </div>
-        <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <p>Mostrando <span id="num-registros-mostrados" class="text-slate-700 font-bold"><?= count($rows) ?></span> de <?= count($rows) ?> registros de clientes</p>
+        <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+            <div class="space-y-1">
+                <p>
+                    Mostrando
+                    <span id="num-registros-mostrados" class="text-slate-700 font-bold"><?= count($rows) ?></span>
+                    de
+                    <?= $isDemoFallback ? count($rows) : $totalItems ?>
+                    registros de clientes
+                </p>
+                <?php if (!$isDemoFallback): ?>
+                    <p class="text-[11px] text-slate-400">P&aacute;gina <?= $currentPage ?> de <?= $totalPages ?></p>
+                <?php else: ?>
+                    <p class="text-[11px] text-slate-400">Vista demo del panel de referencia</p>
+                <?php endif; ?>
+            </div>
             <div class="flex gap-1.5">
-                <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Anterior</button>
-                <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Siguiente</button>
+                <?php if ($isDemoFallback): ?>
+                    <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Anterior</button>
+                    <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Siguiente</button>
+                <?php else: ?>
+                    <a href="index.php?page=<?= (int) ($pagination['prev_page'] ?? 1) ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_prev']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Anterior</a>
+                    <a href="index.php?page=<?= (int) ($pagination['next_page'] ?? $totalPages) ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_next']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Siguiente</a>
+                <?php endif; ?>
             </div>
         </div>
     </div>

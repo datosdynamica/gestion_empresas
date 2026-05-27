@@ -1,4 +1,10 @@
-<?php declare(strict_types=1); $enableCreateModal = false; require __DIR__ . '/../layout/header.php'; ?>
+<?php
+declare(strict_types=1);
+$enableCreateModal = false;
+$activeNav = 'nuevo';
+$pageSubtitle = 'Registro inicial, documentos y preparacion para aprobacion manual.';
+require __DIR__ . '/../layout/header.php';
+?>
 <?php $values = $_SESSION['old'] ?? []; unset($_SESSION['old']); ?>
 
 <section class="space-y-4">

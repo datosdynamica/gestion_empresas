@@ -1,4 +1,13 @@
 document.addEventListener('DOMContentLoaded', function () {
+    var appShell = document.querySelector('[data-app-shell]');
+    var appSidebar = document.getElementById('app-sidebar');
+    var navToggle = document.querySelector('[data-app-nav-toggle]');
+    var navCollapse = document.querySelector('[data-app-nav-collapse]');
+    var userMenu = document.querySelector('[data-user-menu]');
+    var userMenuToggle = document.querySelector('[data-user-menu-toggle]');
+    var installButton = document.getElementById('install-app-button');
+    var installButtonMenu = document.getElementById('install-app-button-menu');
+    var deferredInstallPrompt = null;
     var overlay = document.getElementById('confirm-overlay');
     var confirmMessage = document.getElementById('confirm-message');
     var confirmAccept = document.getElementById('confirm-accept');
@@ -26,7 +35,78 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function persistSidebarState(isCollapsed) {
+        if (!appShell) {
+            return;
+        }
+
+        appShell.classList.toggle('is-collapsed', isCollapsed);
+        try {
+            window.localStorage.setItem('gestion_empresas_sidebar_collapsed', isCollapsed ? '1' : '0');
+        } catch (error) {
+            // Ignorado: la UI sigue funcionando sin persistencia local.
+        }
+    }
+
+    function restoreSidebarState() {
+        if (!appShell) {
+            return;
+        }
+
+        try {
+            persistSidebarState(window.localStorage.getItem('gestion_empresas_sidebar_collapsed') === '1');
+        } catch (error) {
+            persistSidebarState(false);
+        }
+    }
+
+    function closeMobileNav() {
+        if (!appShell) {
+            return;
+        }
+
+        appShell.classList.remove('is-mobile-nav-open');
+    }
+
+    function toggleUserMenu(forceOpen) {
+        if (!userMenu) {
+            return;
+        }
+
+        var open = typeof forceOpen === 'boolean' ? forceOpen : !userMenu.classList.contains('is-open');
+        userMenu.classList.toggle('is-open', open);
+
+        var dropdown = userMenu.querySelector('.app-user-menu__dropdown');
+        if (dropdown) {
+            dropdown.hidden = !open;
+        }
+    }
+
+    function showInstallButtons(show) {
+        [installButton, installButtonMenu].forEach(function (button) {
+            if (!button) {
+                return;
+            }
+
+            button.hidden = !show;
+        });
+    }
+
+    function triggerInstallPrompt() {
+        if (!deferredInstallPrompt) {
+            mostrarToast('Instalacion', 'El navegador todavia no habilita la instalacion de esta aplicacion.', 'indigo');
+            return;
+        }
+
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.finally(function () {
+            deferredInstallPrompt = null;
+            showInstallButtons(false);
+        });
+    }
+
     function openModal(id) {
+        closeMobileNav();
         var modal = document.getElementById(id);
         if (!modal) {
             return;
@@ -322,6 +402,77 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             formToSubmit.submit();
+        });
+    }
+
+    if (navToggle && appShell) {
+        navToggle.addEventListener('click', function () {
+            appShell.classList.toggle('is-mobile-nav-open');
+        });
+    }
+
+    if (navCollapse) {
+        navCollapse.addEventListener('click', function () {
+            persistSidebarState(!appShell.classList.contains('is-collapsed'));
+        });
+    }
+
+    if (userMenuToggle) {
+        userMenuToggle.addEventListener('click', function (event) {
+            event.stopPropagation();
+            toggleUserMenu();
+        });
+    }
+
+    document.querySelectorAll('[data-nav-filter-state]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            if (filtroEstado) {
+                filtroEstado.value = button.getAttribute('data-nav-filter-state') || 'todos';
+                filtroEstado.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            var table = document.getElementById('tabla-clientes');
+            if (table) {
+                table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            closeMobileNav();
+        });
+    });
+
+    document.querySelectorAll('[data-nav-scroll-target]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var target = document.getElementById(button.getAttribute('data-nav-scroll-target') || '');
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            closeMobileNav();
+        });
+    });
+
+    [installButton, installButtonMenu].forEach(function (button) {
+        if (!button) {
+            return;
+        }
+
+        button.addEventListener('click', triggerInstallPrompt);
+    });
+
+    window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        showInstallButtons(true);
+    });
+
+    window.addEventListener('appinstalled', function () {
+        deferredInstallPrompt = null;
+        showInstallButtons(false);
+        mostrarToast('Aplicacion instalada', 'La app quedo disponible en este dispositivo.', 'emerald');
+    });
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('service-worker.js').catch(function () {
+                // Ignorado: la app sigue funcionando aunque el service worker falle.
+            });
         });
     }
 
@@ -668,6 +819,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
+            closeMobileNav();
+            toggleUserMenu(false);
             if (overlay && overlay.classList.contains('is-open')) {
                 overlay.classList.remove('is-open');
                 overlay.hidden = true;
@@ -689,6 +842,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    document.addEventListener('click', function (event) {
+        if (appShell && appShell.classList.contains('is-mobile-nav-open')) {
+            var clickedToggle = navToggle && navToggle.contains(event.target);
+            var clickedSidebar = appSidebar && appSidebar.contains(event.target);
+            if (!clickedToggle && !clickedSidebar) {
+                closeMobileNav();
+            }
+        }
+
+        if (userMenu && !userMenu.contains(event.target)) {
+            toggleUserMenu(false);
+        }
+    });
+
+    restoreSidebarState();
+    showInstallButtons(false);
     renderIcons();
     filtrarTabla();
 });

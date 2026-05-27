@@ -1,0 +1,25 @@
+{
+  "name": "Dynamica Altas y Automatizaciones",
+  "short_name": "Altas Dynamica",
+  "description": "Panel operativo para altas, aprobaciones y seguimiento de nuevas empresas.",
+  "start_url": "/plugin/gestion_empresas/login",
+  "scope": "/plugin/gestion_empresas/",
+  "display": "standalone",
+  "background_color": "#fff8f6",
+  "theme_color": "#e65b4f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/plugin/gestion_empresas/public/assets/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/plugin/gestion_empresas/public/assets/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

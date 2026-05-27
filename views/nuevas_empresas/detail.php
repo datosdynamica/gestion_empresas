@@ -1,4 +1,10 @@
-<?php declare(strict_types=1); $enableCreateModal = false; require __DIR__ . '/../layout/header.php'; ?>
+<?php
+declare(strict_types=1);
+$enableCreateModal = false;
+$activeNav = 'panel';
+$pageSubtitle = 'Consulta, documentos y acciones administrativas del registro.';
+require __DIR__ . '/../layout/header.php';
+?>
 <?php $values = $item; ?>
 <?php
 $estado = (string) ($item['estado'] ?? '');
