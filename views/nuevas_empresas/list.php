@@ -468,46 +468,85 @@ unset($_SESSION['old']);
                                         </div>
                                     </div>
 
-                                    <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
-                                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                                            <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
-                                            Credenciales de Conexion Fiscal
-                                        </h4>
-                                        <div class="space-y-3">
-                                            <div>
-                                                <span class="block text-[11px] text-slate-400 font-bold uppercase">RUT</span>
-                                                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
-                                                    <code class="font-mono text-slate-800 font-semibold" id="rut-val-<?= $itemId ?>"><?= h((string) $item['rut']) ?></code>
-                                                    <button onclick="copiarAlPortapapeles('rut-val-<?= $itemId ?>')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                    <div class="space-y-4">
+                                        <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+                                                Credenciales de Conexion Fiscal
+                                            </h4>
+                                            <div class="space-y-3">
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">RUT</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="rut-val-<?= $itemId ?>"><?= h((string) $item['rut']) ?></code>
+                                                        <button onclick="copiarAlPortapapeles('rut-val-<?= $itemId ?>')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Usuario</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="usr-val-<?= $itemId ?>"><?= h((string) ($item['usuario_ef'] ?: '-')) ?></code>
+                                                        <button onclick="copiarAlPortapapeles('usr-val-<?= $itemId ?>')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Clave</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <input type="password" value="<?= h((string) ($item['clave_usuario_ef'] ?: '')) ?>" disabled class="font-mono text-slate-800 bg-transparent border-none w-full focus:outline-none text-xs font-semibold" id="pass-val-<?= $itemId ?>">
+                                                        <button onclick="revelarClave('pass-val-<?= $itemId ?>', this)" class="text-slate-400 hover:text-indigo-600 transition mr-2" title="Revelar"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+                                                        <button onclick="copiarAlPortapapeles('pass-val-<?= $itemId ?>', true)" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Usuario</span>
-                                                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
-                                                    <code class="font-mono text-slate-800 font-semibold" id="usr-val-<?= $itemId ?>"><?= h((string) ($item['usuario_ef'] ?: '-')) ?></code>
-                                                    <button onclick="copiarAlPortapapeles('usr-val-<?= $itemId ?>')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                        </div>
+
+                                        <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="layout-dashboard" class="w-4 h-4 text-slate-500"></i>
+                                                Resumen Operativo
+                                            </h4>
+                                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                    <p class="uppercase tracking-wider text-slate-400 font-semibold">Licencia</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h($licencia) ?></p>
                                                 </div>
-                                            </div>
-                                            <div>
-                                                <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Clave</span>
-                                                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
-                                                    <input type="password" value="<?= h((string) ($item['clave_usuario_ef'] ?: '')) ?>" disabled class="font-mono text-slate-800 bg-transparent border-none w-full focus:outline-none text-xs font-semibold" id="pass-val-<?= $itemId ?>">
-                                                    <button onclick="revelarClave('pass-val-<?= $itemId ?>', this)" class="text-slate-400 hover:text-indigo-600 transition mr-2" title="Revelar"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
-                                                    <button onclick="copiarAlPortapapeles('pass-val-<?= $itemId ?>', true)" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                    <p class="uppercase tracking-wider text-slate-400 font-semibold">Plan</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h((string) ($item['plan'] ?: '-')) ?></p>
+                                                </div>
+                                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                    <p class="uppercase tracking-wider text-slate-400 font-semibold">Usuarios</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h((string) ($item['usuarios'] ?: '0')) ?></p>
+                                                </div>
+                                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                    <p class="uppercase tracking-wider text-slate-400 font-semibold">CFE Mensuales</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h((string) ($item['cfe_mensuales'] ?: '0')) ?></p>
+                                                </div>
+                                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                    <p class="uppercase tracking-wider text-slate-400 font-semibold">Ciudad</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h((string) ($item['ciudad'] ?: '-')) ?></p>
+                                                </div>
+                                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                    <p class="uppercase tracking-wider text-slate-400 font-semibold">Sucursal</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h((string) ($item['suc_cod_sucursal'] ?: '-')) ?></p>
                                                 </div>
                                             </div>
                                             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1">
                                                 <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Mas info</p>
-                                                <p class="text-xs text-slate-600">Ciudad: <span class="font-semibold text-slate-800"><?= h((string) ($item['ciudad'] ?: '-')) ?></span></p>
-                                                <p class="text-xs text-slate-600">Sucursal: <span class="font-semibold text-slate-800"><?= h((string) ($item['suc_cod_sucursal'] ?: '-')) ?></span></p>
                                                 <p class="text-xs text-slate-600">Certificado: <span class="font-semibold text-slate-800"><?= h((string) ($item['alta_certificado_digital'] ?: '-')) ?></span></p>
+                                                <p class="text-xs text-slate-600">Firmante: <span class="font-semibold text-slate-800"><?= h((string) ($item['nombre_completo_firmante'] ?: '-')) ?></span></p>
+                                                <p class="text-xs text-slate-600">Estado detalle: <span class="font-semibold text-slate-800"><?= h((string) ($item['estado_detalle'] ?: '-')) ?></span></p>
                                             </div>
-                                            <div class="flex gap-2">
+                                            <div class="flex flex-wrap gap-2">
                                                 <a href="index.php?action=show&id=<?= $itemId ?>" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-3 py-2 rounded-lg text-xs transition">
                                                     <i data-lucide="panel-right-open" class="w-3.5 h-3.5"></i>
                                                     <span>Mas info</span>
                                                 </a>
-                                                <?php if ($meta['can_cancel'] && !$hasActiveRealRows): ?>
+                                                <button onclick="editarRegistro(<?= $itemId ?>)" class="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-medium px-3 py-2 rounded-lg text-xs transition">
+                                                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                                                    <span>Editar</span>
+                                                </button>
+                                                <?php if ($meta['can_cancel']): ?>
                                                     <button onclick="cancelarProceso(<?= $itemId ?>)" class="inline-flex items-center gap-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-medium px-3 py-2 rounded-lg text-xs transition">
                                                         <i data-lucide="archive-x" class="w-3.5 h-3.5"></i>
                                                         <span>Cancelar proceso</span>
