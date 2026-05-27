@@ -4,96 +4,19 @@ document.addEventListener('DOMContentLoaded', function () {
     var confirmAccept = document.getElementById('confirm-accept');
     var confirmCancel = document.getElementById('confirm-cancel');
     var pendingForm = null;
+
     var filtroBusqueda = document.getElementById('filtro-busqueda');
     var filtroEstado = document.getElementById('filtro-estado');
     var filtroHito = document.getElementById('filtro-hito');
     var filaSeleccionadaParaCancelar = null;
-    var demoRows = {
-        1: {
-            razon_social: 'Alimentos del Sur S.A.',
-            rut: '219988440012',
-            email_principal: 'contacto@alimentosdelsur.com',
-            nombre_fantasia: 'Alimentos del Sur',
-            domicilio: 'Ruta 8 Km 41, Canelones',
-            telefono: '099123456',
-            ciudad: 'Canelones',
-            departamento: 'Canelones',
-            usuario_ef: 'usr_alim_sur',
-            clave_usuario_ef: 'ClaveTemporalSur_2026!',
-            licencia: '8',
-            licencia_texto: 'Enterprise Cloud',
-            plan: 'Enterprise Cloud',
-            usuarios: '12',
-            cfe_mensuales: '2500',
-            cliente_id_giro: '10',
-            cliente_id_fidelizacion: '3',
-            suc_cod_sucursal: 'SUR-001',
-            suc_cod_fecha_vigencia: '2026-05-20',
-            alta_especial: 'NO',
-            alta_credito_fiscal: 'NO',
-            alta_es_emisor: 'SI',
-            alta_certificado_digital: 'GESTION 1',
-            nombre_completo_firmante: 'María López',
-            ci_firmante: '45678901',
-            observaciones: 'Demo visual basada en el panel de referencia.'
-        },
-        2: {
-            razon_social: 'Logística Global S.A.',
-            rut: '214455880018',
-            email_principal: 'operaciones@logglobal.com',
-            nombre_fantasia: 'Logística Global',
-            domicilio: 'Av. Italia 4455, Montevideo',
-            telefono: '098765432',
-            ciudad: 'Montevideo',
-            departamento: 'Montevideo',
-            usuario_ef: 'usr_logist_glob',
-            clave_usuario_ef: 'ClaveProvisoria123_!',
-            licencia: '3',
-            licencia_texto: 'SaaS Standard',
-            plan: 'SaaS Standard',
-            usuarios: '5',
-            cfe_mensuales: '800',
-            cliente_id_giro: '20',
-            cliente_id_fidelizacion: '2',
-            suc_cod_sucursal: 'LG-002',
-            suc_cod_fecha_vigencia: '2026-05-21',
-            alta_especial: 'NO',
-            alta_credito_fiscal: 'RESGUARDO',
-            alta_es_emisor: 'NO',
-            alta_certificado_digital: 'SOLICITUD 1',
-            nombre_completo_firmante: 'Carlos Méndez',
-            ci_firmante: '40333444',
-            observaciones: 'Demo visual basada en el panel de referencia.'
-        },
-        3: {
-            razon_social: 'Sistemas del Norte S.R.L.',
-            rut: '218877660022',
-            email_principal: 'admin@sistemasnorte.com',
-            nombre_fantasia: 'Sistemas del Norte',
-            domicilio: 'Parque Industrial Norte 102, Salto',
-            telefono: '097000111',
-            ciudad: 'Salto',
-            departamento: 'Salto',
-            usuario_ef: 'usr_sist_norte',
-            clave_usuario_ef: 'NorthSecure_2026!',
-            licencia: '0',
-            licencia_texto: 'SaaS Professional',
-            plan: 'SaaS Professional',
-            usuarios: '8',
-            cfe_mensuales: '1400',
-            cliente_id_giro: '30',
-            cliente_id_fidelizacion: '1',
-            suc_cod_sucursal: 'SN-003',
-            suc_cod_fecha_vigencia: '2026-05-15',
-            alta_especial: 'EXONERADO',
-            alta_credito_fiscal: 'LITERAL E',
-            alta_es_emisor: 'SI',
-            alta_certificado_digital: 'ADJUNTO',
-            nombre_completo_firmante: 'Laura Pereira',
-            ci_firmante: '38999111',
-            observaciones: 'Demo visual basada en el panel de referencia.'
-        }
-    };
+
+    var createForm = document.getElementById('modal-create-form');
+    var createModalTitle = document.getElementById('modal-create-title');
+    var createModalDescription = document.getElementById('modal-create-description');
+    var createModalBadge = document.getElementById('modal-create-badge');
+    var createModalInfoTitle = document.getElementById('modal-create-info-title');
+    var createModalInfoText = document.getElementById('modal-create-info-text');
+    var createModalSubmitLabel = document.getElementById('modal-create-submit-label');
 
     function renderIcons() {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -126,8 +49,170 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function getRowElement(id) {
+        return document.querySelector('tr.row-registro[data-id="' + id + '"]');
+    }
+
+    function getRowData(id) {
+        var row = getRowElement(id);
+        if (!row || !row.dataset.record) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(row.dataset.record);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function setFieldValue(name, value) {
+        var field = document.getElementById(name) || document.querySelector('[name="' + name + '"]');
+        if (!field) {
+            return;
+        }
+
+        if (field.type === 'radio') {
+            field.checked = field.value === String(value || '');
+            return;
+        }
+
+        if (field.tagName === 'SELECT') {
+            var normalizedValue = value == null ? '' : String(value);
+            Array.prototype.forEach.call(field.options, function (option) {
+                option.selected = option.value === normalizedValue;
+            });
+            field.value = normalizedValue;
+            return;
+        }
+
+        field.value = value == null ? '' : value;
+    }
+
+    function applySelectValue(name, value) {
+        var field = document.getElementById(name) || document.querySelector('[name="' + name + '"]');
+        var normalizedValue = value == null ? '' : String(value);
+
+        if (!field || field.tagName !== 'SELECT') {
+            return;
+        }
+
+        Array.prototype.forEach.call(field.options, function (option) {
+            option.selected = option.value === normalizedValue;
+        });
+
+        field.value = normalizedValue;
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function toggleFileRequirements(required) {
+        if (!createForm) {
+            return;
+        }
+
+        createForm.querySelectorAll('input[type="file"]').forEach(function (field) {
+            if (required) {
+                field.setAttribute('required', 'required');
+            } else {
+                field.removeAttribute('required');
+            }
+        });
+    }
+
+    function resetCreateModal() {
+        if (!createForm) {
+            return;
+        }
+
+        createForm.reset();
+        createForm.action = 'index.php?action=store';
+        createForm.dataset.demoMode = '0';
+        toggleFileRequirements(true);
+
+        if (createModalBadge) {
+            createModalBadge.textContent = 'Nueva Alta';
+        }
+        if (createModalTitle) {
+            createModalTitle.textContent = 'Nueva Empresa Cliente';
+        }
+        if (createModalDescription) {
+            createModalDescription.textContent = 'La correcta recopilacion de estos campos deja el registro listo para aprobacion y posterior automatizacion.';
+        }
+        if (createModalInfoTitle) {
+            createModalInfoTitle.textContent = 'Informacion del Onboarding';
+        }
+        if (createModalInfoText) {
+            createModalInfoText.textContent = 'La correcta recopilacion de estos campos deja el registro listo para aprobacion y posterior automatizacion.';
+        }
+        if (createModalSubmitLabel) {
+            createModalSubmitLabel.textContent = 'Guardar e Iniciar Automatizacion';
+        }
+    }
+
+    function prepareEditModal(id, row) {
+        if (!createForm) {
+            return;
+        }
+
+        createForm.action = row && !row.is_demo ? 'index.php?action=update&id=' + id : '#';
+        createForm.dataset.demoMode = row && row.is_demo ? '1' : '0';
+        toggleFileRequirements(false);
+
+        if (createModalBadge) {
+            createModalBadge.textContent = 'Edicion';
+        }
+        if (createModalTitle) {
+            createModalTitle.textContent = 'Editar Empresa Cliente';
+        }
+        if (createModalDescription) {
+            createModalDescription.textContent = 'Ajuste la ficha del cliente manteniendo el layout operativo del onboarding.';
+        }
+        if (createModalInfoTitle) {
+            createModalInfoTitle.textContent = row && row.is_demo ? 'Vista demo del cliente' : 'Edicion operativa del registro';
+        }
+        if (createModalInfoText) {
+            createModalInfoText.textContent = row && row.is_demo
+                ? 'Esta fila es una referencia visual del mockup y no escribira cambios reales en la base.'
+                : 'Los cambios se guardaran sobre el registro temporal existente.';
+        }
+        if (createModalSubmitLabel) {
+            createModalSubmitLabel.textContent = row && row.is_demo ? 'Guardar vista demo' : 'Guardar cambios';
+        }
+    }
+
+    function populateCreateForm(id) {
+        var row = getRowData(id);
+        if (!row) {
+            return;
+        }
+
+        Object.keys(row).forEach(function (key) {
+            if (key === 'alta_es_emisor' || key === 'alta_credito_fiscal') {
+                document.querySelectorAll('[name="' + key + '"]').forEach(function (radio) {
+                    radio.checked = radio.value === String(row[key] || '');
+                });
+                return;
+            }
+
+            setFieldValue(key, row[key]);
+        });
+
+        applySelectValue('ciudad', row.ciudad);
+        applySelectValue('departamento', row.departamento);
+        applySelectValue('cliente_id_giro', row.cliente_id_giro);
+        applySelectValue('cliente_id_fidelizacion', row.cliente_id_fidelizacion);
+        applySelectValue('licencia', row.licencia);
+        applySelectValue('cliente_abonado_moneda', row.cliente_abonado_moneda || 'UYU');
+        applySelectValue('cliente_abonado_periodo', row.cliente_abonado_periodo || 'MENSUAL');
+        applySelectValue('alta_especial', row.alta_especial || 'NO');
+        applySelectValue('alta_certificado_digital', row.alta_certificado_digital || '');
+    }
+
     document.querySelectorAll('[data-open-modal]').forEach(function (trigger) {
         trigger.addEventListener('click', function () {
+            if (trigger.getAttribute('data-open-modal') === 'modal-create') {
+                resetCreateModal();
+            }
             openModal(trigger.getAttribute('data-open-modal'));
         });
     });
@@ -146,12 +231,35 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    document.querySelectorAll('[data-replace-file]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var form = document.getElementById('replace-file-form');
+            var fileIdField = document.getElementById('replace-file-id');
+            var typeLabel = document.getElementById('replace-file-type');
+            var nameLabel = document.getElementById('replace-file-name');
+            var fileId = button.getAttribute('data-file-id') || '0';
+
+            if (form) {
+                form.action = 'index.php?action=replace-file&id=' + fileId;
+            }
+            if (fileIdField) {
+                fileIdField.value = fileId;
+            }
+            if (typeLabel) {
+                typeLabel.textContent = button.getAttribute('data-file-type') || '-';
+            }
+            if (nameLabel) {
+                nameLabel.textContent = button.getAttribute('data-file-name') || '-';
+            }
+        });
+    });
+
     document.querySelectorAll('form[data-confirm]').forEach(function (form) {
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             pendingForm = form;
             if (confirmMessage) {
-                confirmMessage.textContent = form.getAttribute('data-confirm') || 'Confirme esta acción.';
+                confirmMessage.textContent = form.getAttribute('data-confirm') || 'Confirme esta accion.';
             }
             if (overlay) {
                 overlay.hidden = false;
@@ -159,6 +267,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    if (createForm) {
+        createForm.addEventListener('submit', function (event) {
+            if (createForm.dataset.demoMode === '1') {
+                event.preventDefault();
+                mostrarToast('Modo Demo', 'La fila visual de referencia no genera cambios reales en la base de datos.', 'indigo');
+            }
+        });
+    }
 
     if (confirmCancel) {
         confirmCancel.addEventListener('click', function () {
@@ -188,70 +305,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function setFieldValue(id, value) {
-        var field = document.getElementById(id) || document.querySelector('[name="' + id + '"]');
-        if (!field) {
-            return;
-        }
-
-        if (field.type === 'radio') {
-            field.checked = field.value === value;
-            return;
-        }
-
-        if (field.tagName === 'SELECT') {
-            var normalizedValue = value == null ? '' : String(value);
-            Array.prototype.forEach.call(field.options, function (option) {
-                option.selected = option.value === normalizedValue;
-            });
-            field.value = normalizedValue;
-            return;
-        }
-
-        field.value = value || '';
-    }
-
-    function applySelectValue(id, value) {
-        var field = document.getElementById(id) || document.querySelector('[name="' + id + '"]');
-        var normalizedValue = value == null ? '' : String(value);
-        if (!field || field.tagName !== 'SELECT') {
-            return;
-        }
-
-        var matchIndex = -1;
-        Array.prototype.forEach.call(field.options, function (option, index) {
-            var isMatch = option.value === normalizedValue;
-            option.selected = isMatch;
-            if (isMatch) {
-                matchIndex = index;
-            }
-        });
-
-        if (matchIndex >= 0) {
-            field.selectedIndex = matchIndex;
-        }
-
-        field.value = normalizedValue;
-        field.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    function populateCreateForm(id) {
-        var row = demoRows[id];
-        if (!row) {
-            return;
-        }
-
-        Object.keys(row).forEach(function (key) {
-            if (key === 'alta_es_emisor' || key === 'alta_credito_fiscal') {
-                document.querySelectorAll('[name="' + key + '"]').forEach(function (radio) {
-                    radio.checked = radio.value === row[key];
-                });
-            } else {
-                setFieldValue(key, row[key]);
-            }
-        });
-    }
-
     window.toggleFilaExpandida = function (id, event) {
         if (event && event.target && event.target.closest('button, a, input, select, textarea')) {
             return;
@@ -277,7 +330,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var texto = esPassword ? elemento.value : elemento.innerText;
         navigator.clipboard.writeText(texto).then(function () {
-            mostrarToast('Copiado', 'Dato copiado con éxito al portapapeles.', 'emerald');
+            mostrarToast('Copiado', 'Dato copiado con exito al portapapeles.', 'emerald');
         });
     };
 
@@ -329,104 +382,99 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     window.reintentarHitoAutomatico = function (id) {
-        var btn = document.getElementById('btn-hito-' + id);
-        if (!btn) {
+        var row = getRowData(id);
+        if (row && !row.is_demo) {
+            window.location.href = 'index.php?action=show&id=' + id;
             return;
         }
 
-        btn.disabled = true;
+        var btn = document.getElementById('btn-hito-' + id);
+        var badgeEstado = document.getElementById('badge-estado-' + id);
+        var fila = getRowElement(id);
+
+        if (!btn || !badgeEstado || !fila) {
+            return;
+        }
+
         btn.className = 'inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm';
         btn.innerHTML = '<svg class="animate-spin h-3.5 w-3.5 mr-1" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Reintentando Migrate...';
 
         setTimeout(function () {
-            btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
-            btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i> Migrate (Completado)';
-
-            var badgeEstado = document.getElementById('badge-estado-' + id);
-            if (badgeEstado) {
-                badgeEstado.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200';
-                badgeEstado.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>En Proceso';
-            }
-
-            var fila = document.querySelector('tr[data-id="' + id + '"]');
-            if (fila) {
-                fila.setAttribute('data-status', 'En Proceso');
-            }
-
-            var timelineStep = document.getElementById('timeline-step-1-3');
-            var timelineIcon = document.getElementById('timeline-step-icon-1-3');
-            var timelineTitle = document.getElementById('timeline-step-title-1-3');
-            var timelineDesc = document.getElementById('timeline-step-desc-1-3');
-            if (timelineStep && timelineIcon && timelineTitle && timelineDesc) {
-                timelineStep.className = 'flex items-start gap-3 p-2 rounded-lg bg-emerald-50 border border-emerald-100';
-                timelineIcon.className = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600';
-                timelineIcon.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
-                timelineTitle.className = 'text-xs font-bold text-slate-700';
-                timelineTitle.innerHTML = '3. Migrate <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 py-0.2 rounded font-normal">Auto</span>';
-                timelineDesc.className = 'text-[10px] text-slate-400';
-                timelineDesc.innerText = 'Completado automáticamente mediante script.';
-            }
-
+            badgeEstado.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200';
+            badgeEstado.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>En Proceso';
+            btn.className = 'inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm';
+            btn.innerHTML = '<i data-lucide="shield" class="w-3.5 h-3.5"></i><span>Aprobacion pendiente (Aprobar)</span>';
+            fila.setAttribute('data-status', 'En Proceso');
+            fila.setAttribute('data-hito', 'Aprobacion pendiente');
             renderIcons();
             mostrarToast('Alta de Sistema', 'Hito Migrate completado de forma satisfactoria.', 'emerald');
             filtrarTabla();
-        }, 2000);
+        }, 1400);
     };
 
     window.avanzarHitoManual = function (id) {
-        var btn = document.getElementById('btn-hito-' + id);
-        if (!btn) {
+        var row = getRowData(id);
+        if (row && !row.is_demo) {
+            window.location.href = 'index.php?action=show&id=' + id + '#acciones';
             return;
         }
 
-        btn.disabled = true;
+        var btn = document.getElementById('btn-hito-' + id);
+        var badgeEstado = document.getElementById('badge-estado-' + id);
+        var fila = getRowElement(id);
+
+        if (!btn || !badgeEstado || !fila) {
+            return;
+        }
+
         btn.className = 'inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm';
         btn.innerHTML = '<svg class="animate-spin h-3.5 w-3.5 mr-1" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Aprobando registro...';
 
         setTimeout(function () {
-            btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
-            btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i> Aprobado (Siguiente hito)';
-
-            var step = document.getElementById('timeline-step-2-1');
-            var icon = document.getElementById('timeline-step-icon-2-1');
-            var title = document.getElementById('timeline-step-title-2-1');
-            var desc = document.getElementById('timeline-step-desc-2-1');
-            if (step && icon && title && desc) {
-                step.className = 'flex items-start gap-3 p-2 rounded-lg bg-emerald-50 border border-emerald-100';
-                icon.className = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600';
-                icon.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
-                title.className = 'text-xs font-bold text-slate-700';
-                desc.className = 'text-[10px] text-slate-400';
-                desc.innerText = 'Aprobado por el Administrador de Onboarding.';
-            }
-
+            badgeEstado.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
+            badgeEstado.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Completado';
+            btn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300';
+            btn.innerHTML = '<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-500"></i><span>Alta Final (Completado)</span>';
+            fila.setAttribute('data-status', 'Completado');
+            fila.setAttribute('data-hito', 'Alta Final');
             renderIcons();
-            mostrarToast('Aprobación Registrada', 'La aprobación se guardó con éxito.', 'emerald');
+            mostrarToast('Aprobacion Registrada', 'La aprobacion se guardo en la demo visual.', 'emerald');
+            filtrarTabla();
         }, 1200);
     };
 
     window.cancelarProceso = function (id) {
         filaSeleccionadaParaCancelar = id;
-        var fila = document.querySelector('tr[data-id="' + id + '"]');
+        var fila = getRowElement(id);
         if (!fila) {
             return;
         }
 
-        var razonSocial = fila.querySelector('.text-slate-900').innerText;
-        document.getElementById('modal-empresa-nombre').innerText = razonSocial;
-        document.getElementById('cancel-reason').value = '';
+        var razonSocial = fila.querySelector('.text-slate-900');
+        var empresaNombre = document.getElementById('modal-empresa-nombre');
+        var cancelReason = document.getElementById('cancel-reason');
+        if (empresaNombre && razonSocial) {
+            empresaNombre.innerText = razonSocial.innerText;
+        }
+        if (cancelReason) {
+            cancelReason.value = '';
+        }
         document.getElementById('modal-cancelacion').classList.remove('hidden');
     };
 
     window.cerrarModalCancelacion = function () {
-        document.getElementById('modal-cancelacion').classList.add('hidden');
+        var modal = document.getElementById('modal-cancelacion');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
         filaSeleccionadaParaCancelar = null;
     };
 
     window.confirmarCancelacion = function () {
-        var razon = document.getElementById('cancel-reason').value;
+        var razonInput = document.getElementById('cancel-reason');
+        var razon = razonInput ? razonInput.value : '';
         if (!razon.trim()) {
-            mostrarToast('Atención', 'Por favor ingresa un motivo para proceder con la cancelación.', 'rose');
+            mostrarToast('Atencion', 'Por favor ingresa un motivo para proceder con la cancelacion.', 'rose');
             return;
         }
 
@@ -434,24 +482,38 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        var fila = document.querySelector('tr[data-id="' + filaSeleccionadaParaCancelar + '"]');
-        if (!fila) {
+        var row = getRowData(filaSeleccionadaParaCancelar);
+        if (row && !row.is_demo) {
+            var form = document.createElement('form');
+            var reasonField = document.createElement('input');
+
+            form.method = 'post';
+            form.action = 'index.php?action=delete&id=' + filaSeleccionadaParaCancelar;
+
+            reasonField.type = 'hidden';
+            reasonField.name = 'motivo_eliminacion';
+            reasonField.value = razon;
+
+            form.appendChild(reasonField);
+            document.body.appendChild(form);
+            form.submit();
             return;
         }
 
+        var fila = getRowElement(filaSeleccionadaParaCancelar);
         var badge = document.getElementById('badge-estado-' + filaSeleccionadaParaCancelar);
-        if (badge) {
-            badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300';
-            badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Cancelado';
+        var btnHito = document.getElementById('btn-hito-' + filaSeleccionadaParaCancelar);
+
+        if (!fila || !badge || !btnHito) {
+            return;
         }
 
+        badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Cancelado';
         fila.setAttribute('data-status', 'Cancelado');
-        var btnHito = document.getElementById('btn-hito-' + filaSeleccionadaParaCancelar);
-        if (btnHito) {
-            btnHito.disabled = true;
-            btnHito.className = 'inline-flex items-center gap-1 bg-slate-100 text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed';
-            btnHito.innerHTML = '<i data-lucide="x-circle" class="w-3.5 h-3.5"></i><span>Onboarding Cancelado</span>';
-        }
+        fila.setAttribute('data-hito', 'Cancelado');
+        btnHito.className = 'inline-flex items-center gap-1 bg-slate-100 text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed';
+        btnHito.innerHTML = '<i data-lucide="x-circle" class="w-3.5 h-3.5"></i><span>Onboarding Cancelado</span>';
 
         cerrarModalCancelacion();
         renderIcons();
@@ -460,26 +522,12 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     window.editarRegistro = function (id) {
-        var row = demoRows[id] || null;
+        var row = getRowData(id);
+        resetCreateModal();
         populateCreateForm(id);
+        prepareEditModal(id, row);
         openModal('modal-create');
-        setTimeout(function () {
-            populateCreateForm(id);
-            if (!row) {
-                return;
-            }
-
-            applySelectValue('ciudad', row.ciudad);
-            applySelectValue('departamento', row.departamento);
-            applySelectValue('cliente_id_giro', row.cliente_id_giro);
-            applySelectValue('cliente_id_fidelizacion', row.cliente_id_fidelizacion);
-            applySelectValue('licencia', row.licencia);
-            applySelectValue('cliente_abonado_moneda', row.cliente_abonado_moneda || 'UYU');
-            applySelectValue('cliente_abonado_periodo', row.cliente_abonado_periodo || 'MENSUAL');
-            applySelectValue('alta_especial', row.alta_especial || 'NO');
-            applySelectValue('alta_certificado_digital', row.alta_certificado_digital || '');
-        }, 0);
-        mostrarToast('Edición de Datos', 'Cargando el formulario con los datos de la empresa seleccionada.', 'indigo');
+        mostrarToast('Edicion de Datos', 'Cargando el formulario con los datos de la empresa seleccionada.', 'indigo');
     };
 
     function filtrarTabla() {
@@ -490,19 +538,19 @@ document.addEventListener('DOMContentLoaded', function () {
         var mostrados = 0;
 
         filas.forEach(function (fila) {
-            var razonSocial = fila.querySelector('.text-slate-900').innerText.toLowerCase();
+            var razonSocial = fila.querySelector('.text-slate-900');
             var rutElement = fila.querySelector('.text-slate-400');
-            var rutText = rutElement ? rutElement.innerText.toLowerCase() : '';
             var dataEstado = fila.getAttribute('data-status');
             var dataHito = fila.getAttribute('data-hito');
-            var coincideBusqueda = razonSocial.indexOf(busqueda) !== -1 || rutText.indexOf(busqueda) !== -1;
+            var detalleFila = document.getElementById('detalle-' + fila.getAttribute('data-id'));
+            var coincideBusqueda = !razonSocial || razonSocial.innerText.toLowerCase().indexOf(busqueda) !== -1
+                || (rutElement && rutElement.innerText.toLowerCase().indexOf(busqueda) !== -1);
             var coincideEstado = estado === 'todos' || dataEstado === estado;
             var coincideHito = hito === 'todos' || dataHito === hito;
-            var detalleFila = document.getElementById('detalle-' + fila.getAttribute('data-id'));
 
             if (coincideBusqueda && coincideEstado && coincideHito) {
                 fila.classList.remove('hidden');
-                mostrados++;
+                mostrados += 1;
             } else {
                 fila.classList.add('hidden');
                 if (detalleFila) {
@@ -549,10 +597,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 modal.classList.remove('is-open');
                 modal.setAttribute('aria-hidden', 'true');
             });
+
             var cancelModal = document.getElementById('modal-cancelacion');
             if (cancelModal) {
                 cancelModal.classList.add('hidden');
             }
+
             document.body.classList.remove('overflow-hidden');
         }
     });
