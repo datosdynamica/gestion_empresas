@@ -14,6 +14,23 @@ Este archivo existe para que otro chat o una sesion futura no tenga que redescub
 - `GUARDRAILS.md`
 - `README-fase1.md`
 - `AHORA-HACER-ESTO.md`
+- `logo dynamica.jpeg`
+
+## Branding y experiencia visual
+- El logo base del proyecto es `logo dynamica.jpeg`.
+- El asset servido por la web queda en `public/assets/img/logo-dynamica.jpeg`.
+- Los colores del modulo deben tomar como referencia el coral del logo, no la paleta azul anterior.
+
+## Shell responsive y modo instalable
+- El panel interno usa shell con sidebar, topbar, menu hamburguesa y modo colapsado.
+- El estado colapsado del sidebar se guarda en `localStorage` del navegador.
+- La instalacion tipo app se soporta con:
+  - `manifest.webmanifest`
+  - `service-worker.js`
+  - `public/assets/pwa/icon-192.png`
+  - `public/assets/pwa/icon-512.png`
+- La ruta de entrada recomendada para instalacion es:
+  - `https://www.datosdynamica.net/plugin/gestion_empresas/login`
 
 ## Conexion al servidor
 - Host: `www.datosdynamica.net`
