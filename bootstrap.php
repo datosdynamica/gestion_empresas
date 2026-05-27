@@ -14,6 +14,7 @@ require __DIR__ . '/config/database.php';
 require __DIR__ . '/helpers/Db.php';
 require __DIR__ . '/helpers/Response.php';
 require __DIR__ . '/helpers/Auth.php';
+require __DIR__ . '/helpers/Url.php';
 require __DIR__ . '/helpers/Validator.php';
 require __DIR__ . '/helpers/FileStorage.php';
 require __DIR__ . '/helpers/WorkflowHelper.php';

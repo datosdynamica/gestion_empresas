@@ -17,11 +17,11 @@
     <?php $cssVersion = @filemtime(__DIR__ . '/../../public/assets/css/app.css') ?: time(); ?>
     <?php $logoVersion = @filemtime(__DIR__ . '/../../public/assets/img/logo-dynamica.jpeg') ?: time(); ?>
     <?php $manifestVersion = @filemtime(__DIR__ . '/../../manifest.webmanifest') ?: time(); ?>
-    <link rel="manifest" href="manifest.webmanifest?v=<?= $manifestVersion ?>">
-    <link rel="apple-touch-icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
-    <link rel="icon" type="image/png" sizes="192x192" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
-    <link rel="shortcut icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
-    <link rel="stylesheet" href="public/assets/css/app.css?v=<?= $cssVersion ?>">
+    <link rel="manifest" href="<?= htmlspecialchars(asset_url('manifest.webmanifest?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="apple-touch-icon" href="<?= htmlspecialchars(asset_url('public/assets/pwa/icon-192.png?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= htmlspecialchars(asset_url('public/assets/pwa/icon-192.png?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="shortcut icon" href="<?= htmlspecialchars(asset_url('public/assets/pwa/icon-192.png?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(asset_url('public/assets/css/app.css?v=' . $cssVersion), ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <?php
 $activeNav = $activeNav ?? 'panel';
@@ -38,7 +38,7 @@ if (is_array($authUser)) {
         <div class="app-sidebar__inner">
             <div class="app-brand">
                 <div class="app-brand__mark">
-                    <img src="public/assets/img/logo-dynamica.jpeg?v=<?= $logoVersion ?>" alt="Logo Dynamica" class="h-11 w-11 object-contain rounded-2xl bg-white p-1.5 shadow-sm">
+                    <img src="<?= htmlspecialchars(asset_url('public/assets/img/logo-dynamica.jpeg?v=' . $logoVersion), ENT_QUOTES, 'UTF-8') ?>" alt="Logo Dynamica" class="h-11 w-11 object-contain rounded-2xl bg-white p-1.5 shadow-sm">
                 </div>
                 <div class="app-brand__copy">
                     <p class="app-brand__eyebrow">Dynamica</p>
@@ -50,7 +50,7 @@ if (is_array($authUser)) {
             <div class="app-sidebar__section">
                 <p class="app-sidebar__section-title">Navegaci&oacute;n</p>
                 <nav class="app-nav">
-                    <a href="panel" class="app-nav__item<?= $activeNav === 'panel' ? ' is-active' : '' ?>">
+                    <a href="<?= htmlspecialchars(app_url('panel'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'panel' ? ' is-active' : '' ?>">
                         <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                         <span class="app-nav__label">Lista de empresas</span>
                     </a>
@@ -60,7 +60,7 @@ if (is_array($authUser)) {
                             <span class="app-nav__label">Nuevo registro cliente</span>
                         </button>
                     <?php else: ?>
-                        <a href="index.php?action=create" class="app-nav__item<?= $activeNav === 'nuevo' ? ' is-active' : '' ?>">
+                        <a href="<?= htmlspecialchars(app_url('index.php?action=create'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'nuevo' ? ' is-active' : '' ?>">
                             <i data-lucide="plus-circle" class="w-5 h-5"></i>
                             <span class="app-nav__label">Nuevo registro cliente</span>
                         </a>
@@ -96,7 +96,7 @@ if (is_array($authUser)) {
                             <i data-lucide="panel-left-close" class="w-4 h-4"></i>
                             <span class="app-nav__label">Contraer</span>
                         </button>
-                        <a href="logout" class="app-sidebar__mini-btn">
+                        <a href="<?= htmlspecialchars(app_url('logout'), ENT_QUOTES, 'UTF-8') ?>" class="app-sidebar__mini-btn">
                             <i data-lucide="log-out" class="w-4 h-4"></i>
                             <span class="app-nav__label">Salir</span>
                         </a>
@@ -149,7 +149,7 @@ if (is_array($authUser)) {
                                     <i data-lucide="download" class="w-4 h-4"></i>
                                     <span>Instalar aplicacion</span>
                                 </button>
-                                <a href="logout" class="app-user-menu__item">
+                                <a href="<?= htmlspecialchars(app_url('logout'), ENT_QUOTES, 'UTF-8') ?>" class="app-user-menu__item">
                                     <i data-lucide="log-out" class="w-4 h-4"></i>
                                     <span>Cerrar sesion</span>
                                 </a>

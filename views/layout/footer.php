@@ -18,7 +18,10 @@
     </div>
 </div>
 <?php $jsVersion = @filemtime(__DIR__ . '/../../public/assets/js/app.js') ?: time(); ?>
-<script src="public/assets/js/app.js?v=<?= $jsVersion ?>"></script>
+<script>
+    window.APP_BASE_URL = <?= json_encode(rtrim(APP_BASE_URL, '/'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+</script>
+<script src="<?= htmlspecialchars(asset_url('public/assets/js/app.js?v=' . $jsVersion), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script>lucide.createIcons();</script>
 </body>
 </html>

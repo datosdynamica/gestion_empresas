@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
+    var baseUrl = window.APP_BASE_URL || '/administrativo';
     var appShell = document.querySelector('[data-app-shell]');
     var appSidebar = document.getElementById('app-sidebar');
     var navToggle = document.querySelector('[data-app-nav-toggle]');
@@ -33,6 +34,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
+    }
+
+    function appUrl(path) {
+        var cleanBase = String(baseUrl).replace(/\/+$/, '');
+        var cleanPath = String(path || '').replace(/^\/+/, '');
+        return cleanPath ? cleanBase + '/' + cleanPath : cleanBase;
     }
 
     function persistSidebarState(isCollapsed) {
@@ -207,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         createForm.reset();
-        createForm.action = 'index.php?action=store';
+        createForm.action = appUrl('index.php?action=store');
         createForm.dataset.demoMode = '0';
         toggleFileRequirements(true);
 
@@ -236,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        createForm.action = row && !row.is_demo ? 'index.php?action=update&id=' + id : '#';
+        createForm.action = row && !row.is_demo ? appUrl('index.php?action=update&id=' + id) : '#';
         createForm.dataset.demoMode = row && row.is_demo ? '1' : '0';
         toggleFileRequirements(false);
 
@@ -340,7 +347,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var fileId = button.getAttribute('data-file-id') || '0';
 
             if (form) {
-                form.action = 'index.php?action=replace-file&id=' + fileId;
+                form.action = appUrl('index.php?action=replace-file&id=' + fileId);
             }
             if (fileIdField) {
                 fileIdField.value = fileId;
@@ -470,7 +477,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-            navigator.serviceWorker.register('service-worker.js').catch(function () {
+            navigator.serviceWorker.register(appUrl('service-worker.js')).catch(function () {
                 // Ignorado: la app sigue funcionando aunque el service worker falle.
             });
         });
@@ -548,7 +555,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var fullLink = document.getElementById('modal-info-full-link');
         if (fullLink) {
-            fullLink.href = 'index.php?action=show&id=' + id;
+            fullLink.href = appUrl('registro/' + id);
         }
 
         openModal('modal-info');
@@ -617,7 +624,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.reintentarHitoAutomatico = function (id) {
         var row = getRowData(id);
         if (row && !row.is_demo) {
-            window.location.href = 'index.php?action=show&id=' + id;
+            window.location.href = appUrl('registro/' + id);
             return;
         }
 
@@ -648,7 +655,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.avanzarHitoManual = function (id) {
         var row = getRowData(id);
         if (row && !row.is_demo) {
-            window.location.href = 'index.php?action=show&id=' + id + '#acciones';
+            window.location.href = appUrl('registro/' + id) + '#acciones';
             return;
         }
 
@@ -721,7 +728,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var reasonField = document.createElement('input');
 
             form.method = 'post';
-            form.action = 'index.php?action=delete&id=' + filaSeleccionadaParaCancelar;
+            form.action = appUrl('index.php?action=delete&id=' + filaSeleccionadaParaCancelar);
 
             reasonField.type = 'hidden';
             reasonField.name = 'motivo_eliminacion';

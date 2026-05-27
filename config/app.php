@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 define('APP_NAME', 'DYNAMICA ADMINISTRATIVO');
+define('APP_BASE_URL', '/administrativo');
 define('BASE_PATH', __DIR__ . '/..');
 define('ID_EMPRESA_MASTER', 397);
 define('ID_VENDEDOR_DEFAULT', 'admin');

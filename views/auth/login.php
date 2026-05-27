@@ -17,11 +17,11 @@
     <?php $cssVersion = @filemtime(__DIR__ . '/../../public/assets/css/app.css') ?: time(); ?>
     <?php $logoVersion = @filemtime(__DIR__ . '/../../public/assets/img/logo-dynamica.jpeg') ?: time(); ?>
     <?php $manifestVersion = @filemtime(__DIR__ . '/../../manifest.webmanifest') ?: time(); ?>
-    <link rel="manifest" href="manifest.webmanifest?v=<?= $manifestVersion ?>">
-    <link rel="apple-touch-icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
-    <link rel="icon" type="image/png" sizes="192x192" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
-    <link rel="shortcut icon" href="public/assets/pwa/icon-192.png?v=<?= $manifestVersion ?>">
-    <link rel="stylesheet" href="public/assets/css/app.css?v=<?= $cssVersion ?>">
+    <link rel="manifest" href="<?= htmlspecialchars(asset_url('manifest.webmanifest?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="apple-touch-icon" href="<?= htmlspecialchars(asset_url('public/assets/pwa/icon-192.png?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= htmlspecialchars(asset_url('public/assets/pwa/icon-192.png?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="shortcut icon" href="<?= htmlspecialchars(asset_url('public/assets/pwa/icon-192.png?v=' . $manifestVersion), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(asset_url('public/assets/css/app.css?v=' . $cssVersion), ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body class="min-h-screen bg-[radial-gradient(circle_at_top,_#fff4f1_0%,_#fff8f6_28%,_#fffdfc_62%,_#ffffff_100%)] text-slate-900">
     <main class="min-h-screen grid lg:grid-cols-[1.1fr,0.9fr]">
@@ -35,7 +35,7 @@
                 </span>
                 <div class="mt-8 inline-flex items-center gap-4 rounded-[28px] border border-white/80 bg-white/85 px-5 py-4 shadow-[0_18px_60px_rgba(230,91,79,0.12)] backdrop-blur">
                     <div class="flex h-20 w-20 items-center justify-center rounded-[22px] bg-white shadow-[0_12px_30px_rgba(230,91,79,0.12)]">
-                        <img src="public/assets/img/logo-dynamica.jpeg?v=<?= $logoVersion ?>" alt="Logo Dynamica" class="h-16 w-16 object-contain">
+                        <img src="<?= htmlspecialchars(asset_url('public/assets/img/logo-dynamica.jpeg?v=' . $logoVersion), ENT_QUOTES, 'UTF-8') ?>" alt="Logo Dynamica" class="h-16 w-16 object-contain">
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#c35a4f]">Dynamica</p>
@@ -73,7 +73,7 @@
                         Panel operativo
                     </span>
                     <div class="mt-5 flex items-center gap-3">
-                        <img src="public/assets/img/logo-dynamica.jpeg?v=<?= $logoVersion ?>" alt="Logo Dynamica" class="h-14 w-14 rounded-2xl border border-[#ffe0da] bg-white p-1.5 shadow-sm object-contain">
+                        <img src="<?= htmlspecialchars(asset_url('public/assets/img/logo-dynamica.jpeg?v=' . $logoVersion), ENT_QUOTES, 'UTF-8') ?>" alt="Logo Dynamica" class="h-14 w-14 rounded-2xl border border-[#ffe0da] bg-white p-1.5 shadow-sm object-contain">
                         <div>
                             <h1 class="text-3xl font-black tracking-tight text-slate-900"><?= htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></h1>
                             <p class="mt-1 text-sm text-slate-500 leading-6">Ingreso del equipo que gestiona y acompa&ntilde;a el proceso.</p>
@@ -105,7 +105,7 @@
                             <?php unset($_SESSION['success']); ?>
                         <?php endif; ?>
 
-                        <form method="post" action="index.php?action=authenticate" class="space-y-5">
+                        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=authenticate'), ENT_QUOTES, 'UTF-8') ?>" class="space-y-5">
                             <div class="space-y-2">
                                 <label for="login" class="block text-xs font-semibold uppercase tracking-wider text-slate-500">Usuario</label>
                                 <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-[#e98073] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#e65b4f]/10 transition">
@@ -144,7 +144,7 @@
         lucide.createIcons();
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('service-worker.js').catch(function () {});
+                navigator.serviceWorker.register('<?= htmlspecialchars(app_url('service-worker.js'), ENT_QUOTES, 'UTF-8') ?>').catch(function () {});
             });
         }
     </script>

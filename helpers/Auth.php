@@ -51,12 +51,12 @@ class Auth
 
     public static function rememberLogin(string $login): void
     {
-        setcookie(AUTH_REMEMBER_LOGIN_COOKIE, $login, time() + (86400 * 30), '/');
+        setcookie(AUTH_REMEMBER_LOGIN_COOKIE, $login, time() + (86400 * 30), APP_BASE_URL);
     }
 
     public static function forgetRememberedLogin(): void
     {
-        setcookie(AUTH_REMEMBER_LOGIN_COOKIE, '', time() - 3600, '/');
+        setcookie(AUTH_REMEMBER_LOGIN_COOKIE, '', time() - 3600, APP_BASE_URL);
     }
 
     public static function rememberedLogin(): string

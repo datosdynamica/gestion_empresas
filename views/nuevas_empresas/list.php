@@ -610,8 +610,8 @@ unset($_SESSION['old']);
                     <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Anterior</button>
                     <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Siguiente</button>
                 <?php else: ?>
-                    <a href="index.php?page=<?= (int) ($pagination['prev_page'] ?? 1) ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_prev']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Anterior</a>
-                    <a href="index.php?page=<?= (int) ($pagination['next_page'] ?? $totalPages) ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_next']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Siguiente</a>
+                    <a href="<?= htmlspecialchars(app_url('index.php?page=' . (int) ($pagination['prev_page'] ?? 1)), ENT_QUOTES, 'UTF-8') ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_prev']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Anterior</a>
+                    <a href="<?= htmlspecialchars(app_url('index.php?page=' . (int) ($pagination['next_page'] ?? $totalPages)), ENT_QUOTES, 'UTF-8') ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_next']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Siguiente</a>
                 <?php endif; ?>
             </div>
         </div>

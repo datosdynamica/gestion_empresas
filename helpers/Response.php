@@ -6,6 +6,10 @@ class Response
 {
     public static function redirect(string $location): void
     {
+        if (!preg_match('/^https?:\/\//i', $location) && !str_starts_with($location, '/')) {
+            $location = app_url($location);
+        }
+
         header('Location: ' . $location);
         exit;
     }
