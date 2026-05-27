@@ -69,10 +69,6 @@ if (is_array($authUser)) {
                         <i data-lucide="badge-check" class="w-5 h-5"></i>
                         <span class="app-nav__label">Aprobaciones</span>
                     </button>
-                    <button type="button" class="app-nav__item" data-nav-scroll-target="tabla-clientes">
-                        <i data-lucide="folders" class="w-5 h-5"></i>
-                        <span class="app-nav__label">Trazabilidad</span>
-                    </button>
                     <button type="button" class="app-nav__item" id="install-app-button" hidden>
                         <i data-lucide="download" class="w-5 h-5"></i>
                         <span class="app-nav__label">Instalar app</span>
