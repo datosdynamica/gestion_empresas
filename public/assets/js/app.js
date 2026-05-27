@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', function () {
             nombre_fantasia: 'Alimentos del Sur',
             domicilio: 'Ruta 8 Km 41, Canelones',
             telefono: '099123456',
+            ciudad: 'Canelones',
+            departamento: 'Canelones',
             usuario_ef: 'usr_alim_sur',
             clave_usuario_ef: 'ClaveTemporalSur_2026!',
             licencia: '8',
@@ -23,6 +25,8 @@ document.addEventListener('DOMContentLoaded', function () {
             plan: 'Enterprise Cloud',
             usuarios: '12',
             cfe_mensuales: '2500',
+            cliente_id_giro: '10',
+            cliente_id_fidelizacion: '3',
             suc_cod_sucursal: 'SUR-001',
             suc_cod_fecha_vigencia: '2026-05-20',
             alta_especial: 'NO',
@@ -40,6 +44,8 @@ document.addEventListener('DOMContentLoaded', function () {
             nombre_fantasia: 'Logística Global',
             domicilio: 'Av. Italia 4455, Montevideo',
             telefono: '098765432',
+            ciudad: 'Montevideo',
+            departamento: 'Montevideo',
             usuario_ef: 'usr_logist_glob',
             clave_usuario_ef: 'ClaveProvisoria123_!',
             licencia: '3',
@@ -47,6 +53,8 @@ document.addEventListener('DOMContentLoaded', function () {
             plan: 'SaaS Standard',
             usuarios: '5',
             cfe_mensuales: '800',
+            cliente_id_giro: '20',
+            cliente_id_fidelizacion: '2',
             suc_cod_sucursal: 'LG-002',
             suc_cod_fecha_vigencia: '2026-05-21',
             alta_especial: 'NO',
@@ -64,6 +72,8 @@ document.addEventListener('DOMContentLoaded', function () {
             nombre_fantasia: 'Sistemas del Norte',
             domicilio: 'Parque Industrial Norte 102, Salto',
             telefono: '097000111',
+            ciudad: 'Salto',
+            departamento: 'Salto',
             usuario_ef: 'usr_sist_norte',
             clave_usuario_ef: 'NorthSecure_2026!',
             licencia: '0',
@@ -71,6 +81,8 @@ document.addEventListener('DOMContentLoaded', function () {
             plan: 'SaaS Professional',
             usuarios: '8',
             cfe_mensuales: '1400',
+            cliente_id_giro: '30',
+            cliente_id_fidelizacion: '1',
             suc_cod_sucursal: 'SN-003',
             suc_cod_fecha_vigencia: '2026-05-15',
             alta_especial: 'EXONERADO',
@@ -177,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function setFieldValue(id, value) {
-        var field = document.getElementById(id);
+        var field = document.getElementById(id) || document.querySelector('[name="' + id + '"]');
         if (!field) {
             return;
         }
@@ -187,7 +199,29 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        if (field.tagName === 'SELECT') {
+            var normalizedValue = value == null ? '' : String(value);
+            Array.prototype.forEach.call(field.options, function (option) {
+                option.selected = option.value === normalizedValue;
+            });
+            field.value = normalizedValue;
+            return;
+        }
+
         field.value = value || '';
+    }
+
+    function applySelectValue(id, value) {
+        var field = document.getElementById(id) || document.querySelector('[name="' + id + '"]');
+        var normalizedValue = value == null ? '' : String(value);
+        if (!field || field.tagName !== 'SELECT') {
+            return;
+        }
+
+        Array.prototype.forEach.call(field.options, function (option) {
+            option.selected = option.value === normalizedValue;
+        });
+        field.value = normalizedValue;
     }
 
     function populateCreateForm(id) {
@@ -415,8 +449,25 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     window.editarRegistro = function (id) {
+        var row = demoRows[id] || null;
         populateCreateForm(id);
         openModal('modal-create');
+        setTimeout(function () {
+            populateCreateForm(id);
+            if (!row) {
+                return;
+            }
+
+            applySelectValue('ciudad', row.ciudad);
+            applySelectValue('departamento', row.departamento);
+            applySelectValue('cliente_id_giro', row.cliente_id_giro);
+            applySelectValue('cliente_id_fidelizacion', row.cliente_id_fidelizacion);
+            applySelectValue('licencia', row.licencia);
+            applySelectValue('cliente_abonado_moneda', row.cliente_abonado_moneda || 'UYU');
+            applySelectValue('cliente_abonado_periodo', row.cliente_abonado_periodo || 'MENSUAL');
+            applySelectValue('alta_especial', row.alta_especial || 'NO');
+            applySelectValue('alta_certificado_digital', row.alta_certificado_digital || '');
+        }, 0);
         mostrarToast('Edición de Datos', 'Cargando el formulario con los datos de la empresa seleccionada.', 'indigo');
     };
 

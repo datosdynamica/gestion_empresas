@@ -28,55 +28,13 @@
         </div>
 
         <form method="post" action="index.php?action=store" enctype="multipart/form-data" class="space-y-6 p-6">
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div class="xl:col-span-2 bg-slate-50/70 rounded-2xl border border-slate-200 p-5">
-                    <div class="flex items-center gap-2 mb-4">
-                        <span class="bg-indigo-600 text-white font-bold text-xs px-2.5 py-1 rounded-full">1</span>
-                        <h4 class="font-bold text-slate-800 text-sm">Datos identificativos e informacion comercial</h4>
-                    </div>
-                    <div class="form-grid">
-                        <?php require __DIR__ . '/_form_fields.php'; ?>
-                    </div>
-                </div>
-
-                <aside class="space-y-4">
-                    <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
-                        <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                            <i data-lucide="shield-check" class="w-4 h-4 text-indigo-600"></i>
-                            Estado inicial
-                        </h4>
-                        <p class="text-sm text-slate-600 mt-2">Todo nuevo registro nace como <strong>PENDIENTE_APROBACION</strong>. Un administrador revisa el alta y decide si la aprueba o la elimina.</p>
-                    </div>
-
-                    <div class="bg-white border border-slate-200 rounded-2xl p-5">
-                        <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                            <i data-lucide="folder-open" class="w-4 h-4 text-indigo-600"></i>
-                            Adjuntos esperados
-                        </h4>
-                        <ul class="mt-3 space-y-2 text-sm text-slate-600">
-                            <li class="flex items-center justify-between"><span>PFX</span><span class="text-rose-600 font-semibold">Obligatorio</span></li>
-                            <li class="flex items-center justify-between"><span>Contrato</span><span class="text-rose-600 font-semibold">Obligatorio</span></li>
-                            <li class="flex items-center justify-between"><span>6906</span><span class="text-rose-600 font-semibold">Obligatorio</span></li>
-                            <li class="flex items-center justify-between"><span>Credito fiscal</span><span class="text-slate-400 font-semibold">Opcional</span></li>
-                            <li class="flex items-center justify-between"><span>Logo</span><span class="text-slate-400 font-semibold">Opcional</span></li>
-                        </ul>
-                    </div>
-
-                    <div class="bg-white border border-slate-200 rounded-2xl p-5">
-                        <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                            <i data-lucide="workflow" class="w-4 h-4 text-indigo-600"></i>
-                            Siguiente paso
-                        </h4>
-                        <p class="text-sm text-slate-600 mt-2">Al aprobar, el sistema creara la empresa en <strong>Empresas</strong> y el cliente en <strong>Clientes</strong> con <strong>IdEmpresa = 397</strong>.</p>
-                    </div>
-                </aside>
-            </div>
+            <?php require __DIR__ . '/_form_sections.php'; ?>
 
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <a href="index.php" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition text-sm">Cancelar registro</a>
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg transition text-sm shadow-md flex items-center gap-2">
                     <i data-lucide="save" class="w-4 h-4"></i>
-                    <span>Guardar e iniciar automatizacion</span>
+                    <span>Guardar e iniciar automatización</span>
                 </button>
             </div>
         </form>

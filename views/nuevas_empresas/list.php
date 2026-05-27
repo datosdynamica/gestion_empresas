@@ -427,17 +427,7 @@ unset($_SESSION['old']);
             </div>
         </div>
         <form method="post" action="index.php?action=store" enctype="multipart/form-data" class="space-y-6">
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
-                    <span class="bg-indigo-100 text-indigo-800 font-bold text-xs px-2.5 py-1 rounded-full">1</span>
-                    <h3 class="font-bold text-slate-800 text-sm">Datos Identificativos e Imagen Corporativa</h3>
-                </div>
-                <div class="p-6">
-                    <div class="form-grid">
-                        <?php require __DIR__ . '/_form_fields.php'; ?>
-                    </div>
-                </div>
-            </div>
+            <?php require __DIR__ . '/_form_sections.php'; ?>
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button type="button" data-close-modal="modal-create" class="bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-lg transition text-sm">Cancelar Registro</button>
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg transition text-sm shadow-md flex items-center gap-2">
