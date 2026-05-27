@@ -1,7 +1,7 @@
 {
-  "name": "Dynamica Altas y Automatizaciones",
-  "short_name": "Altas Dynamica",
-  "description": "Panel operativo para altas, aprobaciones y seguimiento de nuevas empresas.",
+  "name": "DYNAMICA ADMINISTRATIVO",
+  "short_name": "DYNAMICA ADMIN",
+  "description": "Panel administrativo para altas, aprobaciones y seguimiento de empresas.",
   "start_url": "/plugin/gestion_empresas/login",
   "scope": "/plugin/gestion_empresas/",
   "display": "standalone",
