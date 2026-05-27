@@ -26,6 +26,16 @@ Este archivo existe para que otro chat o una sesion futura no tenga que redescub
 - Base: `centrode_dynamica`
 - Tabla central multiempresa: `Empresas`
 - Regla confirmada del modulo: `Clientes.IdEmpresa = 397`
+- Tabla de autenticacion del modulo: `sec_users`
+- Login del modulo: validar `login` + `pswd` de `sec_users` filtrando `IdEmpresa = 397`
+- Solo deben ingresar usuarios activos: `active = 'Y'`
+
+## Rutas limpias del modulo
+- `https://www.datosdynamica.net/plugin/gestion_empresas/login`
+- `https://www.datosdynamica.net/plugin/gestion_empresas/panel`
+- `https://www.datosdynamica.net/plugin/gestion_empresas/logout`
+
+Estas rutas salen del `.htaccess` local del proyecto, no del `.htaccess` raiz de `/var/www`.
 
 ## Regla de oro antes de cualquier cambio
 1. Leer `GUARDRAILS.md`.

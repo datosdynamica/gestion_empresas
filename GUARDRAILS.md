@@ -38,6 +38,22 @@
 - Mantener una checklist visual de zonas sensibles para no reutilizar por error layouts o componentes del flujo administrativo.
 - Antes de rehacer una vista, abrir primero el HTML de referencia local y reutilizar su estructura visual.
 
+## Autenticacion del modulo
+- El modulo debe quedar protegido por login.
+- La autenticacion real se valida contra `sec_users`.
+- Columnas reales de autenticacion:
+  - `login`
+  - `pswd`
+  - `active`
+  - `IdEmpresa`
+- Filtrar siempre por `IdEmpresa = 397`.
+- Permitir solo usuarios con `active = 'Y'`.
+- La recordacion implementada es solo del usuario, no una sesion persistente automatica.
+- Rutas limpias definidas dentro del proyecto:
+  - `/plugin/gestion_empresas/login`
+  - `/plugin/gestion_empresas/panel`
+  - `/plugin/gestion_empresas/logout`
+
 ## Checklist previa a cambios
 - Confirmar si el cambio es local o de produccion.
 - Confirmar si requiere SQL.
