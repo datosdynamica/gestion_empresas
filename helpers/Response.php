@@ -6,7 +6,7 @@ class Response
 {
     public static function redirect(string $location): void
     {
-        if (!preg_match('/^https?:\/\//i', $location) && !str_starts_with($location, '/')) {
+        if (!preg_match('/^https?:\/\//i', $location) && substr($location, 0, 1) !== '/') {
             $location = app_url($location);
         }
 
