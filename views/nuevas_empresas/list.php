@@ -443,38 +443,55 @@ unset($_SESSION['old']);
                         </tr>
                         <tr id="detalle-<?= $itemId ?>" class="hidden bg-slate-50/50">
                             <td colspan="8" class="p-6 border-t border-slate-100">
-                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <div class="lg:col-span-2 space-y-4">
-                                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                                            <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i>
-                                            Hoja de Ruta de Onboarding (9 Hitos)
-                                        </h4>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
-                                            <?php foreach ($timeline as $index => $step): ?>
-                                                <?php $classes = timelineClasses($step['state']); ?>
-                                                <div class="<?= $classes['wrapper'] ?> <?= $index === 8 ? 'md:col-span-2' : '' ?>">
-                                                    <span class="<?= $classes['iconWrap'] ?>">
-                                                        <i data-lucide="<?= $classes['icon'] ?>" class="w-3.5 h-3.5"></i>
-                                                    </span>
-                                                    <div>
-                                                        <h5 class="<?= $classes['title'] ?>">
-                                                            <?= h($step['title']) ?>
-                                                            <span class="text-[9px] px-1 py-0.2 rounded font-normal <?= $classes['type'] ?>"><?= h($step['type']) ?></span>
-                                                        </h5>
-                                                        <p class="<?= $classes['desc'] ?>"><?= h($step['desc']) ?></p>
+                                <div class="space-y-4">
+                                    <div class="flex flex-wrap gap-2">
+                                        <button type="button" class="detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm" data-target="ruta" data-id="<?= $itemId ?>" onclick="setDetailTab(<?= $itemId ?>, 'ruta')">
+                                            <i data-lucide="git-commit" class="w-3.5 h-3.5"></i>
+                                            <span>Ruta</span>
+                                        </button>
+                                        <button type="button" class="detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-target="fiscal" data-id="<?= $itemId ?>" onclick="setDetailTab(<?= $itemId ?>, 'fiscal')">
+                                            <i data-lucide="database" class="w-3.5 h-3.5"></i>
+                                            <span>Fiscal</span>
+                                        </button>
+                                        <button type="button" class="detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-target="resumen" data-id="<?= $itemId ?>" onclick="setDetailTab(<?= $itemId ?>, 'resumen')">
+                                            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+                                            <span>Resumen</span>
+                                        </button>
+                                    </div>
+
+                                    <div id="detalle-pane-<?= $itemId ?>-ruta" class="detalle-pane">
+                                        <div class="space-y-4">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i>
+                                                Hoja de Ruta de Onboarding (9 Hitos)
+                                            </h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
+                                                <?php foreach ($timeline as $index => $step): ?>
+                                                    <?php $classes = timelineClasses($step['state']); ?>
+                                                    <div class="<?= $classes['wrapper'] ?> <?= $index === 8 ? 'md:col-span-2' : '' ?>">
+                                                        <span class="<?= $classes['iconWrap'] ?>">
+                                                            <i data-lucide="<?= $classes['icon'] ?>" class="w-3.5 h-3.5"></i>
+                                                        </span>
+                                                        <div>
+                                                            <h5 class="<?= $classes['title'] ?>">
+                                                                <?= h($step['title']) ?>
+                                                                <span class="text-[9px] px-1 py-0.2 rounded font-normal <?= $classes['type'] ?>"><?= h($step['type']) ?></span>
+                                                            </h5>
+                                                            <p class="<?= $classes['desc'] ?>"><?= h($step['desc']) ?></p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            <?php endforeach; ?>
+                                                <?php endforeach; ?>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div class="space-y-4">
+                                    <div id="detalle-pane-<?= $itemId ?>-fiscal" class="detalle-pane hidden">
                                         <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
                                             <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                                                 <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
                                                 Credenciales de Conexion Fiscal
                                             </h4>
-                                            <div class="space-y-3">
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
                                                     <span class="block text-[11px] text-slate-400 font-bold uppercase">RUT</span>
                                                     <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
@@ -489,7 +506,7 @@ unset($_SESSION['old']);
                                                         <button onclick="copiarAlPortapapeles('usr-val-<?= $itemId ?>')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
                                                     </div>
                                                 </div>
-                                                <div>
+                                                <div class="md:col-span-2">
                                                     <span class="block text-[11px] text-slate-400 font-bold uppercase">eFactura Clave</span>
                                                     <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
                                                         <input type="password" value="<?= h((string) ($item['clave_usuario_ef'] ?: '')) ?>" disabled class="font-mono text-slate-800 bg-transparent border-none w-full focus:outline-none text-xs font-semibold" id="pass-val-<?= $itemId ?>">
@@ -499,13 +516,15 @@ unset($_SESSION['old']);
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
+                                    <div id="detalle-pane-<?= $itemId ?>-resumen" class="detalle-pane hidden">
                                         <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
                                             <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                                                 <i data-lucide="layout-dashboard" class="w-4 h-4 text-slate-500"></i>
                                                 Resumen Operativo
                                             </h4>
-                                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                            <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                                                 <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                                     <p class="uppercase tracking-wider text-slate-400 font-semibold">Licencia</p>
                                                     <p class="mt-1 text-sm font-semibold text-slate-800"><?= h($licencia) ?></p>

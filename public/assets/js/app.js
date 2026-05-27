@@ -180,6 +180,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function updateDetailTabButtons(id, activeTab) {
+        document.querySelectorAll('.detalle-tab-btn[data-id="' + id + '"]').forEach(function (button) {
+            var isActive = button.getAttribute('data-target') === activeTab;
+            button.className = isActive
+                ? 'detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm'
+                : 'detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600';
+        });
+    }
+
     function populateCreateForm(id) {
         var row = getRowData(id);
         if (!row) {
@@ -320,6 +329,24 @@ document.addEventListener('DOMContentLoaded', function () {
         if (chevron) {
             chevron.classList.toggle('rotate-90');
         }
+
+        if (!filaDetalle.classList.contains('hidden')) {
+            window.setDetailTab(id, 'ruta');
+        }
+    };
+
+    window.setDetailTab = function (id, tab) {
+        ['ruta', 'fiscal', 'resumen'].forEach(function (pane) {
+            var paneNode = document.getElementById('detalle-pane-' + id + '-' + pane);
+            if (!paneNode) {
+                return;
+            }
+
+            paneNode.classList.toggle('hidden', pane !== tab);
+        });
+
+        updateDetailTabButtons(id, tab);
+        renderIcons();
     };
 
     window.copiarAlPortapapeles = function (idElemento, esPassword) {
