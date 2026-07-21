@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Registro temporal del onboarding
+|--------------------------------------------------------------------------
+| Esta tabla es el corazon del modulo: almacena la empresa mientras atraviesa
+| aprobacion, alta en Dynamica, alta en Migrate y cierre final del proceso.
+*/
+
+/**
+ * Modelo principal del flujo de nuevas empresas.
+ */
 class NuevaEmpresaModel extends BaseModel
 {
     private const SELECT_ALIASES = "

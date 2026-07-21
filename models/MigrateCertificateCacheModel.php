@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Cache local de certificados Migrate
+|--------------------------------------------------------------------------
+| Guarda una foto local del estado de certificados por empresa para no depender
+| siempre de una consulta directa al Web Service al mostrar el panel.
+*/
+
+/**
+ * Persistencia del cache de certificados consultados en Migrate.
+ */
 class MigrateCertificateCacheModel extends BaseModel
 {
     private const TABLE = 'MigrateCertificadosCache';

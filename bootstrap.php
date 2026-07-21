@@ -2,6 +2,16 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Bootstrap del modulo
+|--------------------------------------------------------------------------
+| Carga la configuracion base, inicializa la sesion, define la zona horaria
+| operativa del proyecto y registra manualmente helpers, modelos y
+| controladores. La idea es que cualquier entrada al modulo use siempre el
+| mismo contexto de arranque.
+*/
+
 date_default_timezone_set('America/Bogota');
 
 if (session_status() !== PHP_SESSION_ACTIVE) {

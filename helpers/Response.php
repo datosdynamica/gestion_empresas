@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Helper de respuestas HTTP
+|--------------------------------------------------------------------------
+| Reune utilidades para redirecciones, mensajes flash y respuestas JSON. La
+| intencion es mantener una salida consistente desde controladores y helpers.
+*/
+
+/**
+ * Utilidades estaticas para responder al navegador.
+ */
 class Response
 {
     public static function redirect(string $location): void

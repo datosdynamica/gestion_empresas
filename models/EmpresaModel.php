@@ -2,6 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Sincronizacion con tabla Empresas
+|--------------------------------------------------------------------------
+| Traduce el registro temporal del onboarding a la estructura real de la tabla
+| `Empresas`, aplicando defaults heredados, credenciales Migrate y campos
+| operativos que luego usa el resto del ERP.
+*/
+
+/**
+ * Modelo responsable de crear y actualizar empresas definitivas.
+ */
 class EmpresaModel extends BaseModel
 {
     private const TEMPLATE_EMPRESA_ID = 1175;

@@ -2,6 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Provisionamiento base de la empresa
+|--------------------------------------------------------------------------
+| Despues de crear la empresa, este modelo prepara la estructura minima para
+| operar: locales, depositos, caja, contadores y otras tablas heredadas desde
+| una empresa plantilla.
+*/
+
+/**
+ * Crea la estructura inicial necesaria para operar en Dynamica.
+ */
 class EmpresaProvisioningModel extends BaseModel
 {
     private const TEMPLATE_CONTADORES_EMPRESA_ID = 2;

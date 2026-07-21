@@ -2,6 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Historial operativo del panel de certificados
+|--------------------------------------------------------------------------
+| Guarda las acciones visibles en el bloque de avisos y seguimiento de cada
+| empresa: avisos manuales, recordatorios automaticos y otros eventos utiles
+| para la gestion del certificado.
+*/
+
+/**
+ * Persistencia del historial operativo de certificados.
+ */
 class CertificateActionModel extends BaseModel
 {
     public function __construct()

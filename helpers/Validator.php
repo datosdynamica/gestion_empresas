@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Validaciones puntuales del formulario
+|--------------------------------------------------------------------------
+| Agrupa validaciones reutilizables para no dejar reglas sueltas dentro del
+| controlador. Su objetivo es mantener mensajes y criterios consistentes.
+*/
+
+/**
+ * Reglas simples de validacion usadas por el onboarding.
+ */
 class Validator
 {
     public static function validateNuevaEmpresa(array $data, array $files): array

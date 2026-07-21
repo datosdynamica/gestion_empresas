@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Registro tecnico de notificaciones
+|--------------------------------------------------------------------------
+| Lleva control de los correos de recordatorio ya enviados para evitar envios
+| duplicados y dejar trazabilidad tecnica del cron de certificados.
+*/
+
+/**
+ * Modelo de control de recordatorios emitidos.
+ */
 class CertificateNotificationModel extends BaseModel
 {
     public function __construct()

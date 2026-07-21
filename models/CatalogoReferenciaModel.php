@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Catalogos de referencia
+|--------------------------------------------------------------------------
+| Expone listas maestras que alimentan selects y reglas del formulario, como
+| giros, ciudades, departamentos, vendedores, productos y formas de pago.
+*/
+
+/**
+ * Modelo de catalogos usados por el onboarding.
+ */
 class CatalogoReferenciaModel extends BaseModel
 {
     public function listGiros(int $idEmpresa): array

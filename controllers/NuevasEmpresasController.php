@@ -2,6 +2,19 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Controlador principal del modulo
+|--------------------------------------------------------------------------
+| Orquesta todo el ciclo de vida del onboarding: alta temporal, aprobacion,
+| provisionamiento interno, integracion con Migrate, panel de certificados,
+| exportaciones y cambios de hitos. Si hay que seguir el flujo completo del
+| negocio, este es el primer archivo que conviene leer.
+*/
+
+/**
+ * Controlador central del onboarding y del panel de certificados.
+ */
 class NuevasEmpresasController
 {
     private $model;
@@ -15,6 +28,9 @@ class NuevasEmpresasController
     private $secUserModel;
     private $provisioningModel;
 
+    /**
+     * Inicializa todos los modelos y servicios usados por el modulo.
+     */
     public function __construct()
     {
         $this->model = new NuevaEmpresaModel();
@@ -29,6 +45,9 @@ class NuevasEmpresasController
         $this->provisioningModel = new EmpresaProvisioningModel();
     }
 
+    /**
+     * Muestra el listado principal del panel con paginacion e historial resumido.
+     */
     public function index(): void
     {
         $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -61,6 +80,9 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/list.php';
     }
 
+    /**
+     * Abre el formulario de alta de una nueva empresa.
+     */
     public function create(): void
     {
         $pageTitle = 'Altas y Automatizaciones';
@@ -68,6 +90,9 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/form.php';
     }
 
+    /**
+     * Muestra la trazabilidad general de eventos del modulo.
+     */
     public function trace(): void
     {
         $events = $this->historialModel->listRecent(120);
@@ -75,6 +100,9 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/trace.php';
     }
 
+    /**
+     * Presenta la configuracion operativa editable del modulo.
+     */
     public function settings(): void
     {
         $pageTitle = 'Configuracion';
@@ -104,6 +132,9 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/settings/index.php';
     }
 
+    /**
+     * Resuelve la pantalla del panel de certificados, filtros y cache local.
+     */
     public function certificates(): void
     {
         @set_time_limit(0);

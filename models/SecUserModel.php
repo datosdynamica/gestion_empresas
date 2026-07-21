@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Usuarios del panel y usuarios Dynamica
+|--------------------------------------------------------------------------
+| Consulta usuarios del panel administrativo y tambien crea el usuario base de
+| la empresa cuando la licencia exige acceso a Dynamica.
+*/
+
+/**
+ * Modelo para lectura y provisionamiento de usuarios.
+ */
 class SecUserModel extends BaseModel
 {
     public function findByLoginAndEmpresa(string $login, int $idEmpresa): ?array

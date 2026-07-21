@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Archivos adjuntos del onboarding
+|--------------------------------------------------------------------------
+| Maneja la metadata de los documentos cargados al registro temporal para luego
+| descargarlos, reemplazarlos o moverlos cuando el flujo cambia de etapa.
+*/
+
+/**
+ * Modelo de adjuntos asociados a una nueva empresa.
+ */
 class NuevaEmpresaArchivoModel extends BaseModel
 {
     private const SELECT_ALIASES = "

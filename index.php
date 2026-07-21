@@ -2,6 +2,16 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Enrutador principal del modulo
+|--------------------------------------------------------------------------
+| Este archivo recibe cada solicitud del panel administrativo, valida si el
+| usuario tiene sesion iniciada y deriva la accion al controlador correcto.
+| Aqui se concentra el mapa entre las rutas visibles del modulo y los metodos
+| reales que ejecutan el flujo de altas, certificados y configuracion.
+*/
+
 require __DIR__ . '/bootstrap.php';
 
 $route = trim((string) ($_GET['route'] ?? ''), '/');

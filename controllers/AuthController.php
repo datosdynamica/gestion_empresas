@@ -2,15 +2,33 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Controlador de autenticacion
+|--------------------------------------------------------------------------
+| Administra el ingreso y la salida del panel interno. Su responsabilidad es
+| validar credenciales contra `sec_users`, crear la sesion del modulo y
+| redirigir al usuario a la pantalla adecuada segun el resultado.
+*/
+
+/**
+ * Maneja el flujo de login del modulo.
+ */
 class AuthController
 {
     private $secUserModel;
 
+    /**
+     * Prepara el acceso al modelo que consulta usuarios del panel.
+     */
     public function __construct()
     {
         $this->secUserModel = new SecUserModel();
     }
 
+    /**
+     * Muestra el formulario de acceso o redirige al panel si ya existe sesion.
+     */
     public function login(): void
     {
         if (Auth::check()) {
@@ -22,6 +40,9 @@ class AuthController
         require __DIR__ . '/../views/auth/login.php';
     }
 
+    /**
+     * Valida el usuario y la contrasena enviados por el formulario.
+     */
     public function authenticate(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -65,6 +86,9 @@ class AuthController
         Response::redirect('panel');
     }
 
+    /**
+     * Cierra la sesion actual y devuelve al formulario de ingreso.
+     */
     public function logout(): void
     {
         Auth::logout();

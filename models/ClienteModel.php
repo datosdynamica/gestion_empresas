@@ -2,6 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Sincronizacion con tabla Clientes
+|--------------------------------------------------------------------------
+| Construye o actualiza el cliente espejo que usa la empresa maestra para la
+| facturacion y el seguimiento comercial. Aqui tambien se arma la adenda con
+| informacion legible del onboarding.
+*/
+
+/**
+ * Modelo de persistencia en la tabla Clientes.
+ */
 class ClienteModel extends BaseModel
 {
     private const BILLING_MONTHS = [

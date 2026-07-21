@@ -2,6 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Conexion PDO compartida
+|--------------------------------------------------------------------------
+| Mantiene una unica conexion reutilizable a MySQL para todo el modulo. Esto
+| evita crear conexiones nuevas en cada modelo y deja centralizado el manejo
+| basico de errores de base de datos.
+*/
+
+/**
+ * Fabrica de conexion PDO usada por todos los modelos.
+ */
 class Db
 {
     private static $instance = null;

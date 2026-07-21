@@ -2,6 +2,18 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Almacenamiento de archivos del modulo
+|--------------------------------------------------------------------------
+| Maneja rutas, nombres fisicos y operaciones basicas de guardado y reemplazo
+| para los adjuntos del onboarding. Sirve para separar la logica de archivos
+| del controlador principal.
+*/
+
+/**
+ * Encapsula la persistencia fisica de archivos del modulo.
+ */
 class FileStorage
 {
     private const ONBOARDING_LOG_FILE = 'onboarding_trace.log';

@@ -2,6 +2,17 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| Inspector de certificados digitales
+|--------------------------------------------------------------------------
+| Lee el archivo del certificado y extrae datos utiles para validarlo antes de
+| enviarlo a Migrate, por ejemplo fechas de vigencia o estructura basica.
+*/
+
+/**
+ * Analiza certificados cargados por el usuario antes de instalarlos.
+ */
 class CertificateDigitalInspector
 {
     public static function extractBinary(string $absolutePath): array
