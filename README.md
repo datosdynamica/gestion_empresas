@@ -4,7 +4,15 @@
 >
 > Fecha: 2026-07-21
 
-Este repositorio deja versionado el programa del modulo administrativo de altas y automatizaciones de empresas de Dynamica.
+Este repositorio contiene el programa del modulo administrativo de altas y automatizaciones de empresas de Dynamica.
+
+Su objetivo es centralizar en una sola aplicacion:
+
+- el alta de nuevas empresas
+- el flujo de onboarding por hitos
+- la integracion con Dynamica y Migrate/InvoiCy
+- el control de certificados digitales
+- los recordatorios y correos automaticos del proceso
 
 ## Que hace el modulo
 
@@ -48,7 +56,7 @@ Este repositorio deja versionado el programa del modulo administrativo de altas 
 - `tools/`
   Scripts CLI operativos, por ejemplo cache de certificados y notificaciones.
 
-## Archivos que hoy son especialmente importantes
+## Archivos principales del programa
 
 - [controllers/NuevasEmpresasController.php](C:\DYNAMICA_PLUGINS\gestion_empresas\controllers\NuevasEmpresasController.php)
 - [helpers/MigrateInvoicyService.php](C:\DYNAMICA_PLUGINS\gestion_empresas\helpers\MigrateInvoicyService.php)
@@ -58,9 +66,9 @@ Este repositorio deja versionado el programa del modulo administrativo de altas 
 - [tools/refresh_certificate_cache.php](C:\DYNAMICA_PLUGINS\gestion_empresas\tools\refresh_certificate_cache.php)
 - [tools/send_certificate_notifications.php](C:\DYNAMICA_PLUGINS\gestion_empresas\tools\send_certificate_notifications.php)
 
-## Que no se dejo como dato real dentro del respaldo
+## Configuracion
 
-Para no subir informacion sensible real, el repositorio deja fuera o parametriza:
+Para no subir informacion sensible real, este repositorio deja fuera o parametriza:
 
 - llaves privadas
 - tokens
@@ -68,7 +76,7 @@ Para no subir informacion sensible real, el repositorio deja fuera o parametriza
 - runtime con claves reales
 - credenciales reales de base de datos
 
-Por eso el archivo de referencia para configuracion es:
+Los archivos base para configurar el entorno son:
 
 - [config/runtime.example.php](C:\DYNAMICA_PLUGINS\gestion_empresas\config\runtime.example.php)
 - [config/database.example.php](C:\DYNAMICA_PLUGINS\gestion_empresas\config\database.example.php)

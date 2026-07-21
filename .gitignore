@@ -58,3 +58,5 @@ notificaciones_alertas_recordatorios/enviar.produccion.original.php
 notificaciones_alertas_recordatorios/formatos_html.produccion.actualizado.php
 notificaciones_alertas_recordatorios/formatos_html.produccion.original.php
 notificaciones_alertas_recordatorios/test_envio_plantillas_deuda.php
+tools/tmp_*.php
+sql/backup_prod_*.sql
