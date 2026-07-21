@@ -56,6 +56,9 @@ function cert_action_label(string $value): string
     if ($normalized === 'AVISO') {
         return 'Aviso';
     }
+    if ($normalized === 'CERTIFICADO_RECORDATORIO') {
+        return 'Recordatorio por correo';
+    }
     if ($normalized === 'AVISO_CORREO') {
         return 'Aviso por correo';
     }
@@ -1050,6 +1053,9 @@ function certificateActionLabel(value) {
     var normalized = String(value || '').trim().toUpperCase();
     if (normalized === 'AVISO') {
         return 'Aviso';
+    }
+    if (normalized === 'CERTIFICADO_RECORDATORIO') {
+        return 'Recordatorio por correo';
     }
     if (normalized === 'AVISO_CORREO') {
         return 'Aviso por correo';

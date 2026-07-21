@@ -1,62 +1,10 @@
-/uploads/
-/logs/
-*.log
-Thumbs.db
-Desktop.ini
-node_modules/
-vendor/
-outputs/
+backup_20260709_onboarding_hitos/
 _backups/
-.codex/
-.agents/
-.codex-remote-attachments/
-config/runtime.php
-config/database.php
-datos github.txt
-datos de conexion al servidor.txt
-datos de conexion al servidor de desarrollo.txt
-*.ppk
-*.pem
-*.key
-~$*
-tmp_*
-_tmp_*
-*.tar
-*.tar.b64
-*.zip
-*.mp4
-*.wav
-*.bin
+*.bak
 *.bak_*
-sincronizar_recibidos_script/
-01062026 - Seguimiento y definicion por WhatsApp/
-07072026 - Pruebas Sebastian y ajustes/
-08062026 - Seguimiento e instrucciones Sebastián/
-08072026 - Seguimiento a certficados/
-11062026 - Seguimiento Sebastián/
-16072026 - Seguiento Sebastián/
-16072026 - Testing Sebastián/
-28052026 - Seguimiento Sebastián/
-29062026  - Seguimiento y mejoras Sebastian/
-bitacora/
-docs/
-AHORA-HACER-ESTO.md
-GUARDRAILS.md
-RUNBOOK-OPERATIVO.md
-README-fase1.md
-WORKFLOW - ALTA DE EMPRESAS.xlsx
-workflow.png
-PREGUNTAS PARA CONTINUAR.docx
-Manual_de_Integracion_XML_InvoiCy_v.1.97.0.0.pdf
-panel_de_gesti_n_de_clientes.html
-logo dynamica.jpeg
-migrate_pruebas_directas.php
-plink.exe
-puttygen.exe
-notificaciones_alertas_recordatorios/build_formatos_html_deuda.ps1
-notificaciones_alertas_recordatorios/enviar.produccion.original.php
-notificaciones_alertas_recordatorios/formatos_html.produccion.actualizado.php
-notificaciones_alertas_recordatorios/formatos_html.produccion.original.php
-notificaciones_alertas_recordatorios/test_envio_plantillas_deuda.php
-tools/tmp_*.php
-sql/backup_prod_*.sql
+tmp_*
+*.log
+*.zip
+config/runtime.php
+Thumbs.db
+desktop.ini

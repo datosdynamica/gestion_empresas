@@ -2,17 +2,6 @@
 
 declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| Historial del workflow
-|--------------------------------------------------------------------------
-| Registra el camino del onboarding paso a paso para reconstruir que paso, quien
-| lo ejecuto y en que momento quedo cada evento del flujo.
-*/
-
-/**
- * Modelo del historial visible y tecnico del onboarding.
- */
 class NuevaEmpresaHistorialModel extends BaseModel
 {
     public function listWorkflowEventsByNuevaEmpresaIds(array $ids): array

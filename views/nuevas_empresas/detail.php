@@ -52,11 +52,8 @@ function detailMigrateSummary(array $item): array
         'errors' => [],
         'empresa_invoicy' => '',
         'suc_clave_acceso' => '',
-        'base_success' => false,
         'lic_msg_retorno' => '',
         'lic_rejected' => false,
-        'lic_errors' => [],
-        'user_errors' => [],
     ];
 
     if ($responseXml === '') {
@@ -84,7 +81,6 @@ function detailMigrateSummary(array $item): array
     if (is_array($claveNodes) && isset($claveNodes[0])) {
         $summary['suc_clave_acceso'] = trim((string) $claveNodes[0]);
     }
-    $summary['base_success'] = $summary['empresa_invoicy'] !== '' && $summary['suc_clave_acceso'] !== '';
 
     $licNodes = $xml->xpath('//LicMsgRetorno');
     if (is_array($licNodes) && isset($licNodes[0])) {
@@ -92,9 +88,6 @@ function detailMigrateSummary(array $item): array
         $summary['lic_rejected'] = detailIsNegativeMigrateMessage($summary['lic_msg_retorno']);
         if ($summary['lic_msg_retorno'] !== '') {
             $summary['errors'][] = 'Licenciamiento: ' . $summary['lic_msg_retorno'];
-            if ($summary['lic_rejected']) {
-                $summary['lic_errors'][] = 'Licenciamiento: ' . $summary['lic_msg_retorno'];
-            }
         }
     }
 
@@ -104,19 +97,11 @@ function detailMigrateSummary(array $item): array
             $value = trim((string) $node);
             if ($value !== '') {
                 $summary['errors'][] = $value;
-                $normalized = mb_strtolower($value);
-                if (mb_strpos($normalized, 'licmodelo') !== false || mb_strpos($normalized, 'modelo comercial') !== false || mb_strpos($normalized, 'licencia') !== false || mb_strpos($normalized, 'licenc') !== false) {
-                    $summary['lic_errors'][] = $value;
-                } elseif (mb_strpos($normalized, 'usr') !== false || mb_strpos($normalized, 'usuario') !== false || mb_strpos($normalized, 'perfil') !== false || mb_strpos($normalized, 'contras') !== false || mb_strpos($normalized, 'login') !== false) {
-                    $summary['user_errors'][] = $value;
-                }
             }
         }
     }
 
     $summary['errors'] = array_values(array_unique($summary['errors']));
-    $summary['lic_errors'] = array_values(array_unique($summary['lic_errors']));
-    $summary['user_errors'] = array_values(array_unique($summary['user_errors']));
     return $summary;
 }
 
@@ -152,23 +137,26 @@ function detailWorkflowCurrentKey(array $item, array $history): string
     if ($empresaCreada && $clienteCreado && ($migrateSummary['lic_rejected'] || $historicalLicenseIssue !== '')) {
         return 'MIGRATE_ERROR';
     }
-    if ($persisted === 'ERROR_APROBACION' && !$empresaCreada && !$clienteCreado) {
-        return 'APROBACION_PENDIENTE';
-    }
-    if ($persisted !== '') {
-        return $persisted;
-    }
     if (isset($events['HITO_CLIENTE_ACTIVO'])) {
         return 'CLIENTE_ACTIVO';
     }
-    if (isset($events['HITO_ALTA_PENDIENTE'])) {
-        return 'ALTA_PENDIENTE';
+    if (isset($events['HITO_ENVIO_CREDENCIALES'])) {
+        return 'ALTA_FINAL';
+    }
+    if (isset($events['HITO_ENVIO_FACTURA'])) {
+        return 'ENVIO_CREDENCIALES';
+    }
+    if (isset($events['HITO_HOMOLOGACION_DGI'])) {
+        return 'ENVIO_FACTURA';
+    }
+    if (isset($events['HITO_CERTIFICADO_DIGITAL'])) {
+        return 'HOMOLOGACION_DGI';
     }
     if (isset($events['HITO_PENDIENTE_DGI'])) {
-        return 'PENDIENTE_DGI';
+        return 'HOMOLOGACION_DGI';
     }
     if (isset($events['HITO_MIGRATE_OK'])) {
-        return 'MIGRATE';
+        return 'CERTIFICADO_DIGITAL';
     }
     if (isset($events['HITO_DYNAMICA_OK']) || ($empresaCreada && $clienteCreado)) {
         return 'MIGRATE';
@@ -176,11 +164,21 @@ function detailWorkflowCurrentKey(array $item, array $history): string
     if (isset($events['HITO_EN_PROCESO'])) {
         return 'DYNAMICA';
     }
+    if ($persisted === 'ERROR_APROBACION' && !$empresaCreada && !$clienteCreado) {
+        return 'APROBACION_PENDIENTE';
+    }
+    if ($persisted !== '') {
+        if ($persisted === 'PENDIENTE_DGI') {
+            return 'HOMOLOGACION_DGI';
+        }
+
+        return $persisted;
+    }
     if ($estado === ESTADO_ERROR_APROBACION) {
         return ($empresaCreada && $clienteCreado) ? 'MIGRATE' : 'APROBACION_PENDIENTE';
     }
     if ($estado === ESTADO_APROBADO) {
-        return ($empresaCreada && $clienteCreado) ? 'MIGRATE' : 'DYNAMICA';
+        return ($empresaCreada && $clienteCreado) ? 'CERTIFICADO_DIGITAL' : 'DYNAMICA';
     }
 
     return $estado === ESTADO_PENDIENTE_APROBACION ? 'APROBACION_PENDIENTE' : 'DYNAMICA';
@@ -213,23 +211,51 @@ function detailGeneralStatusMeta(array $item, string $currentWorkflow): array
         ];
     }
 
-    if (in_array($currentWorkflow, ['PENDIENTE_DGI', 'ALTA_PENDIENTE'], true)) {
+    if ($currentWorkflow === 'CERTIFICADO_DIGITAL') {
         return [
-            'label' => 'DGI pendiente',
+            'label' => 'Certificado digital',
             'class' => 'bg-amber-50 text-amber-700 border-amber-200',
+        ];
+    }
+
+    if ($currentWorkflow === 'HOMOLOGACION_DGI') {
+        return [
+            'label' => 'Homologación DGI',
+            'class' => 'bg-amber-50 text-amber-700 border-amber-200',
+        ];
+    }
+
+    if (in_array($currentWorkflow, ['ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_FINAL'], true)) {
+        return [
+            'label' => 'Alta pendiente',
+            'class' => 'bg-orange-50 text-orange-700 border-orange-200',
+        ];
+    }
+
+    if ($currentWorkflow === 'ALTA_PENDIENTE') {
+        return [
+            'label' => 'Alta pendiente',
+            'class' => 'bg-orange-50 text-orange-700 border-orange-200',
         ];
     }
 
     if ($currentWorkflow === 'CLIENTE_ACTIVO') {
         return [
-            'label' => 'Completado',
+            'label' => 'Cliente activo',
             'class' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
         ];
     }
 
-    if (in_array($currentWorkflow, ['EN_PROCESO', 'DYNAMICA', 'MIGRATE'], true)) {
+    if ($currentWorkflow === 'DYNAMICA') {
         return [
-            'label' => 'En proceso',
+            'label' => 'Dynamica',
+            'class' => 'bg-blue-50 text-blue-700 border-blue-200',
+        ];
+    }
+
+    if (in_array($currentWorkflow, ['EN_PROCESO', 'MIGRATE'], true)) {
+        return [
+            'label' => 'Migrate',
             'class' => 'bg-blue-50 text-blue-700 border-blue-200',
         ];
     }
@@ -259,6 +285,25 @@ function detailWorkflowDate(?string $value): string
     return $ts ? date('d/m/Y H:i', $ts) : (string) $value;
 }
 
+function detailDeferredTaskScheduleNote(?array $task): string
+{
+    if (!$task) {
+        return '';
+    }
+
+    $estado = strtoupper(trim((string) ($task['Estado'] ?? '')));
+    if (!in_array($estado, ['PENDIENTE', 'PROCESANDO'], true)) {
+        return '';
+    }
+
+    $scheduledAt = detailWorkflowDate((string) ($task['ProgramadoPara'] ?? ''));
+    if ($scheduledAt === '') {
+        return '';
+    }
+
+    return 'Programado para entrega el ' . $scheduledAt . '.';
+}
+
 function detailDynamicaLogin(array $item): string
 {
     $licencia = (int) ($item['licencia'] ?? 0);
@@ -282,34 +327,46 @@ function detailDynamicaPassword(array $item): string
     return $ts ? date('dmY', $ts) : '-';
 }
 
-function detailWorkflowResolveStep(array $step, array $item, array $events, string $currentWorkflow): array
+function detailWorkflowResolveStep(array $step, array $item, array $events, string $currentWorkflow, ?array $deferredTask = null): array
 {
     $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
     $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
     $estado = (string) ($item['estado'] ?? '');
+    $fechaAprobacion = trim((string) ($item['fecha_aprobacion'] ?? ''));
     $modoCert = strtoupper(trim((string) ($item['alta_certificado_digital'] ?? '')));
-    $certificadoDone = isset($events['HITO_CERTIFICADO_DIGITAL']) || $modoCert === 'ADJUNTO';
+$certificadoDone =
+    isset($events['HITO_CERTIFICADO_DIGITAL'])
+    || isset($events['HITO_HOMOLOGACION_DGI'])
+    || isset($events['HITO_ENVIO_FACTURA'])
+    || isset($events['HITO_ENVIO_CREDENCIALES'])
+    || isset($events['HITO_CLIENTE_ACTIVO'])
+    || $modoCert === 'ADJUNTO';
 
     $done = false;
     $current = false;
     $error = false;
     $desc = $step['fallback'];
     $date = '';
+    $note = '';
     $substeps = [];
     $licencia = (int) ($item['licencia'] ?? 0);
     $migrateSummary = detailMigrateSummary($item);
     $historicalLicenseIssue = detailHistoricalLicenseIssue(array_values($events));
+    $workflowReachedMigrate = in_array($currentWorkflow, ['CERTIFICADO_DIGITAL', 'HOMOLOGACION_DGI', 'ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_FINAL', 'CLIENTE_ACTIVO', 'MIGRATE_ERROR'], true);
 
     switch ($step['key']) {
         case 'APROBACION_PENDIENTE':
             $event = $events['HITO_EN_PROCESO'] ?? $events['APROBACION'] ?? null;
-            $done = $event !== null || $empresaCreada || $clienteCreado;
+            $done = $event !== null || $empresaCreada || $clienteCreado || $fechaAprobacion !== '' || $currentWorkflow !== 'APROBACION_PENDIENTE';
             $current = !$done
                 && $currentWorkflow === 'APROBACION_PENDIENTE'
                 && (int) ($item['carpeta_creada'] ?? 0) === 1;
             if ($event) {
                 $desc = trim((string) ($event['descripcion'] ?? $desc));
                 $date = detailWorkflowDate($event['fecha_evento'] ?? null);
+            } elseif ($done) {
+                $desc = 'Aprobado por Admin. Dynamica completado; pendiente Migrate.';
+                $date = detailWorkflowDate($item['fecha_aprobacion'] ?? ($item['fecha_actualizacion'] ?? null));
             }
             break;
 
@@ -343,7 +400,7 @@ function detailWorkflowResolveStep(array $step, array $item, array $events, stri
         case 'MIGRATE':
             $eventOk = $events['HITO_MIGRATE_OK'] ?? null;
             $eventErr = $events['HITO_MIGRATE_ERROR'] ?? null;
-            $done = $eventOk !== null;
+            $done = $eventOk !== null || ($empresaCreada && $clienteCreado && $workflowReachedMigrate);
             $error = $eventErr !== null || $migrateSummary['lic_rejected'] || $historicalLicenseIssue !== '';
             $current = !$done && !$error && in_array($currentWorkflow, ['MIGRATE', 'EN_PROCESO'], true);
             if ($eventOk) {
@@ -356,30 +413,24 @@ function detailWorkflowResolveStep(array $step, array $item, array $events, stri
                 $desc = 'Migrate devolvio novedad en el licenciamiento.';
             } elseif ($historicalLicenseIssue !== '') {
                 $desc = 'Migrate tiene una novedad historica de licenciamiento pendiente de resolver.';
+            } elseif ($done) {
+                $desc = 'Migrate OK.';
+                $date = detailWorkflowDate($item['fecha_actualizacion'] ?? ($item['fecha_aprobacion'] ?? null));
             }
-            $substeps[] = $migrateSummary['base_success']
+            $substeps[] = $done
                 ? ['state' => 'done', 'text' => 'Empresa y sucursal registradas en Migrate.']
-                : (($eventErr !== null || $error)
-                    ? ['state' => 'error', 'text' => 'No se completo el alta base de empresa y sucursal en Migrate.']
-                    : ['state' => 'pending', 'text' => 'Pendiente registro de empresa y sucursal en Migrate.']);
-            $substeps[] = ($migrateSummary['lic_rejected'] || $migrateSummary['lic_errors'] !== [])
-                ? ['state' => 'error', 'text' => implode(' | ', array_values(array_unique(array_merge(
-                    $migrateSummary['lic_rejected'] && $migrateSummary['lic_msg_retorno'] !== '' ? ['Licenciamiento rechazado por Migrate: ' . $migrateSummary['lic_msg_retorno']] : [],
-                    $migrateSummary['lic_errors']
-                ))))]
+                : ['state' => 'pending', 'text' => 'Pendiente registro de empresa y sucursal en Migrate.'];
+            $substeps[] = $migrateSummary['lic_rejected']
+                ? ['state' => 'error', 'text' => 'Licenciamiento rechazado por Migrate: ' . $migrateSummary['lic_msg_retorno']]
                 : ($historicalLicenseIssue !== ''
                     ? ['state' => 'error', 'text' => 'Licenciamiento rechazado en intento previo. Validar antes de continuar.']
-                    : ($migrateSummary['base_success']
-                        ? ['state' => 'done', 'text' => 'Licenciamiento aprobado en Migrate.']
+                    : ($done
+                        ? ['state' => 'done', 'text' => 'Licenciamiento enviado dentro del RegistroEmpresa.']
                         : ['state' => 'pending', 'text' => 'Pendiente envio de licenciamiento a Migrate.']));
             if (WorkflowHelper::licenseCreatesMigrateUser($licencia)) {
                 $substeps[] = [
-                    'state' => $migrateSummary['user_errors'] !== []
-                        ? 'error'
-                        : ($migrateSummary['base_success'] ? 'warning' : 'pending'),
-                    'text' => $migrateSummary['user_errors'] !== []
-                        ? implode(' | ', $migrateSummary['user_errors'])
-                        : trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.')),
+                    'state' => $done ? 'warning' : 'pending',
+                    'text' => trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.')),
                 ];
             } else {
                 $substeps[] = ['state' => 'na', 'text' => WorkflowHelper::migrateUserSubstepLabel($licencia)];
@@ -388,7 +439,7 @@ function detailWorkflowResolveStep(array $step, array $item, array $events, stri
 
         case 'CERTIFICADO_DIGITAL':
             $done = $certificadoDone;
-            $current = !$done && $currentWorkflow === 'PENDIENTE_DGI';
+            $current = !$done && $currentWorkflow === 'CERTIFICADO_DIGITAL';
             if ($done) {
                 $desc = $modoCert === 'ADJUNTO'
                     ? 'Certificado digital recibido y cargado.'
@@ -399,9 +450,9 @@ function detailWorkflowResolveStep(array $step, array $item, array $events, stri
             break;
 
         case 'HOMOLOGACION_DGI':
-            $event = $events['HITO_PENDIENTE_DGI'] ?? null;
-            $done = isset($events['HITO_ALTA_PENDIENTE']) || isset($events['HITO_CLIENTE_ACTIVO']);
-            $current = !$done && $currentWorkflow === 'PENDIENTE_DGI' && $certificadoDone;
+            $event = $events['HITO_HOMOLOGACION_DGI'] ?? $events['HITO_PENDIENTE_DGI'] ?? null;
+            $done = isset($events['HITO_HOMOLOGACION_DGI']) || isset($events['HITO_ENVIO_FACTURA']) || isset($events['HITO_ENVIO_CREDENCIALES']) || isset($events['HITO_CLIENTE_ACTIVO']);
+            $current = !$done && $currentWorkflow === 'HOMOLOGACION_DGI' && $certificadoDone;
             if ($done && $event) {
                 $desc = 'Gestion DGI registrada.';
                 $date = detailWorkflowDate($event['fecha_evento'] ?? null);
@@ -412,17 +463,34 @@ function detailWorkflowResolveStep(array $step, array $item, array $events, stri
             break;
 
         case 'ENVIO_FACTURA':
-            $current = false;
+            $event = $events['HITO_ENVIO_FACTURA'] ?? null;
+            $done = $event !== null || isset($events['HITO_ENVIO_CREDENCIALES']) || isset($events['HITO_CLIENTE_ACTIVO']);
+            $current = !$done && $currentWorkflow === 'ENVIO_FACTURA';
+            if ($event) {
+                $desc = trim((string) ($event['descripcion'] ?? $desc));
+                $date = detailWorkflowDate($event['fecha_evento'] ?? null);
+            }
             break;
 
         case 'ENVIO_CREDENCIALES':
-            $current = false;
+            $event = $events['HITO_ENVIO_CREDENCIALES'] ?? null;
+            $done = $event !== null || isset($events['HITO_CLIENTE_ACTIVO']);
+            $current = !$done && $currentWorkflow === 'ENVIO_CREDENCIALES';
+            if ($event) {
+                $desc = trim((string) ($event['descripcion'] ?? $desc));
+                $date = detailWorkflowDate($event['fecha_evento'] ?? null);
+            } elseif ($current) {
+                $note = detailDeferredTaskScheduleNote($deferredTask);
+                if ($note !== '') {
+                    $desc = 'Envio de credenciales programado para el siguiente ciclo automatico.';
+                }
+            }
             break;
 
         case 'ALTA_FINAL':
             $event = $events['HITO_CLIENTE_ACTIVO'] ?? null;
             $done = $event !== null || $currentWorkflow === 'CLIENTE_ACTIVO';
-            $current = !$done && $currentWorkflow === 'ALTA_PENDIENTE';
+            $current = !$done && $currentWorkflow === 'ALTA_FINAL';
             if ($event) {
                 $desc = trim((string) ($event['descripcion'] ?? $desc));
                 $date = detailWorkflowDate($event['fecha_evento'] ?? null);
@@ -440,6 +508,7 @@ function detailWorkflowResolveStep(array $step, array $item, array $events, stri
         'error' => $error,
         'desc' => $desc,
         'date' => $date,
+        'note' => $note,
         'substeps' => $substeps,
     ];
 }
@@ -450,6 +519,15 @@ function detailSubstepMeta(string $stepState, string $substep): array
     $hasText = static function (string $needle) use ($text): bool {
         return $needle !== '' && mb_strpos($text, $needle) !== false;
     };
+
+    if ($stepState === 'na') {
+        return [
+            'wrapper' => 'bg-slate-100 border-slate-200',
+            'iconWrap' => 'bg-slate-200 text-slate-500',
+            'icon' => 'minus-circle',
+            'text' => 'text-slate-600 line-through',
+        ];
+    }
 
     if ($hasText('rechazad')) {
         return [
@@ -469,16 +547,7 @@ function detailSubstepMeta(string $stepState, string $substep): array
         ];
     }
 
-    if ($stepState === 'na' || $hasText('no aplica')) {
-        return [
-            'wrapper' => 'bg-slate-100 border-slate-200',
-            'iconWrap' => 'bg-slate-200 text-slate-500',
-            'icon' => 'minus',
-            'text' => 'text-slate-700',
-        ];
-    }
-
-    if ($stepState === 'done' || $hasText('incluido') || $hasText('creado') || $hasText('cargado') || $hasText('gestionado')) {
+    if ($stepState === 'done' || $hasText('no aplica') || $hasText('incluido') || $hasText('creado') || $hasText('cargado') || $hasText('gestionado')) {
         return [
             'wrapper' => 'bg-emerald-50 border-emerald-100',
             'iconWrap' => 'bg-emerald-100 text-emerald-600',
@@ -542,9 +611,11 @@ if ($currentWorkflow === 'CLIENTE_ACTIVO') {
 } elseif ($estado === ESTADO_ERROR_APROBACION && $empresaCreada && $clienteCreado) {
     $hitoTexto = 'Migrate';
     $hitoClass = 'bg-rose-50 border-rose-200 text-rose-700';
-} elseif ($currentWorkflow === 'PENDIENTE_DGI') {
-    $hitoTexto = 'Pendiente DGI';
-} elseif ($currentWorkflow === 'ALTA_PENDIENTE') {
+} elseif ($currentWorkflow === 'CERTIFICADO_DIGITAL') {
+    $hitoTexto = 'Certificado digital';
+} elseif ($currentWorkflow === 'HOMOLOGACION_DGI') {
+    $hitoTexto = 'Homologación DGI';
+} elseif (in_array($currentWorkflow, ['ALTA_PENDIENTE', 'ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_FINAL'], true)) {
     $hitoTexto = 'Alta pendiente';
 } elseif (in_array($currentWorkflow, ['EN_PROCESO', 'MIGRATE'], true)) {
     $hitoTexto = 'Migrate';
@@ -652,7 +723,7 @@ if ($currentWorkflow === 'CLIENTE_ACTIVO') {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <?php foreach ($routeSteps as $index => $step): ?>
                             <?php
-                            $state = detailWorkflowResolveStep($step, $item, $events, $currentWorkflow);
+                            $state = detailWorkflowResolveStep($step, $item, $events, $currentWorkflow, $deferredTask ?? null);
                             $isDone = $state['done'];
                             $isCurrent = $state['current'];
                             $isError = $state['error'];
@@ -687,6 +758,11 @@ if ($currentWorkflow === 'CLIENTE_ACTIVO') {
                                             - <?= htmlspecialchars($dateText, ENT_QUOTES, 'UTF-8') ?>
                                         <?php endif; ?>
                                     </p>
+                                    <?php if (!empty($state['note'])): ?>
+                                        <p class="mt-1 text-[11px] font-semibold text-blue-600">
+                                            <?= htmlspecialchars((string) $state['note'], ENT_QUOTES, 'UTF-8') ?>
+                                        </p>
+                                    <?php endif; ?>
                                     <?php if (!empty($state['substeps'])): ?>
                                         <div class="mt-3 rounded-lg border border-slate-200 bg-white/80 p-2.5 space-y-2">
                                             <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Subhitos</p>
@@ -852,20 +928,50 @@ if ($currentWorkflow === 'CLIENTE_ACTIVO') {
                                 <span><?= $estado === ESTADO_ERROR_APROBACION ? u('Reintentar aprobaci&oacute;n') : 'Aprobar alta' ?></span>
                             </button>
                         </form>
-                    <?php elseif ($currentWorkflow === 'PENDIENTE_DGI'): ?>
-                        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=change-hito&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" data-confirm="Confirme el cambio del hito actual a Alta pendiente." data-busy-text="Espere un momento, por favor. Estamos actualizando el hito.">
-                            <input type="hidden" name="target_hito" value="ALTA_PENDIENTE">
+                    <?php elseif ($currentWorkflow === 'CERTIFICADO_DIGITAL'): ?>
+                        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=change-hito&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" data-confirm="Confirme que el hito Certificado Digital fue completado." data-busy-text="Espere un momento, por favor. Estamos ejecutando el alta final.">
+                            <input type="hidden" name="target_hito" value="CERTIFICADO_DIGITAL">
                             <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-xl transition shadow-sm">
                                 <i data-lucide="forward" class="w-4 h-4"></i>
-                                <span>Marcar Alta Pendiente</span>
+                                <span>Marcar Certificado Digital</span>
                             </button>
                         </form>
+                    <?php elseif ($currentWorkflow === 'HOMOLOGACION_DGI'): ?>
+                        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=change-hito&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" data-confirm="Confirme que el hito Homologación DGI fue completado." data-busy-text="Espere un momento, por favor. Estamos actualizando el hito.">
+                            <input type="hidden" name="target_hito" value="HOMOLOGACION_DGI">
+                            <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-xl transition shadow-sm">
+                                <i data-lucide="forward" class="w-4 h-4"></i>
+                                <span>Marcar Homologación DGI</span>
+                            </button>
+                        </form>
+                    <?php elseif ($currentWorkflow === 'ENVIO_FACTURA' || $currentWorkflow === 'ALTA_FINAL'): ?>
+                        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=change-hito&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" data-confirm="Confirme el reintento del cierre automático del onboarding." data-busy-text="Espere un momento, por favor. Estamos reintentando el cierre automático del onboarding.">
+                            <input type="hidden" name="target_hito" value="ALTA_FINAL">
+                            <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-3 rounded-xl transition shadow-sm">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                <span>Reintentar Alta Final</span>
+                            </button>
+                        </form>
+                    <?php elseif ($currentWorkflow === 'ENVIO_CREDENCIALES'): ?>
+                        <div class="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left shadow-sm">
+                            <div class="flex items-start gap-3">
+                                <span class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                                    <i data-lucide="clock-3" class="w-4 h-4"></i>
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-semibold text-amber-900">Env&iacute;o de credenciales programado</p>
+                                    <p class="mt-1 text-sm text-amber-800">
+                                        <?= htmlspecialchars((string) ($item['estado_detalle'] ?: 'La factura ya fue emitida. El sistema est&aacute; esperando el siguiente ciclo autom&aacute;tico para enviar las credenciales.'), ENT_QUOTES, 'UTF-8') ?>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     <?php elseif ($currentWorkflow === 'ALTA_PENDIENTE'): ?>
-                        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=change-hito&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" data-confirm="Confirme el cambio del hito actual a Cliente activo." data-busy-text="Espere un momento, por favor. Estamos actualizando el hito.">
-                            <input type="hidden" name="target_hito" value="CLIENTE_ACTIVO">
+                        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=change-hito&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" data-confirm="Confirme la ejecucion del hito Alta Final." data-busy-text="Espere un momento, por favor. Estamos ejecutando el alta final.">
+                            <input type="hidden" name="target_hito" value="ALTA_FINAL">
                             <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-3 rounded-xl transition shadow-sm">
                                 <i data-lucide="user-check" class="w-4 h-4"></i>
-                                <span>Marcar Cliente Activo</span>
+                                <span>Ejecutar Alta Final</span>
                             </button>
                         </form>
                     <?php endif; ?>
@@ -895,7 +1001,7 @@ if ($currentWorkflow === 'CLIENTE_ACTIVO') {
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
-        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=update&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" class="space-y-6" data-busy-text="Espere un momento, por favor. Estamos guardando los cambios.">
+        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=update&id=' . (int) $item['id']), ENT_QUOTES, 'UTF-8') ?>" enctype="multipart/form-data" class="space-y-6" data-busy-text="Espere un momento, por favor. Estamos guardando los cambios.">
             <div class="bg-slate-50/70 rounded-2xl border border-slate-200 p-5">
                 <div class="form-grid">
                     <?php $prefix = 'edit_'; require __DIR__ . '/_form_fields.php'; ?>
@@ -1043,3 +1149,6 @@ if ($currentWorkflow === 'CLIENTE_ACTIVO') {
 <?php endif; ?>
 
 <?php require __DIR__ . '/../layout/footer.php'; ?>
+
+
+

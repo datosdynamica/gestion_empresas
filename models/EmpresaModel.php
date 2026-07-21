@@ -2,18 +2,6 @@
 
 declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| Sincronizacion con tabla Empresas
-|--------------------------------------------------------------------------
-| Traduce el registro temporal del onboarding a la estructura real de la tabla
-| `Empresas`, aplicando defaults heredados, credenciales Migrate y campos
-| operativos que luego usa el resto del ERP.
-*/
-
-/**
- * Modelo responsable de crear y actualizar empresas definitivas.
- */
 class EmpresaModel extends BaseModel
 {
     private const TEMPLATE_EMPRESA_ID = 1175;
@@ -333,7 +321,13 @@ class EmpresaModel extends BaseModel
         return mb_substr($value, 0, 50);
     }
 
-    public function updateMigrateCredentials(int $empresaId, string $empresaInvoicy, string $claveAcceso): void
+    public function updateMigrateCredentials(
+        int $empresaId,
+        string $empresaInvoicy,
+        string $claveAcceso,
+        ?string $usuarioMigrateEmail = null,
+        ?string $usuarioMigratePassword = null
+    ): void
     {
         $stmt = $this->db->query('SHOW COLUMNS FROM Empresas');
         $columns = [];
@@ -352,6 +346,16 @@ class EmpresaModel extends BaseModel
         if (isset($columns['Clave'])) {
             $sets[] = 'Clave = ?';
             $params[] = $claveAcceso;
+        }
+
+        if ($usuarioMigrateEmail !== null && isset($columns['cUsuarioEmailInv'])) {
+            $sets[] = 'cUsuarioEmailInv = ?';
+            $params[] = $usuarioMigrateEmail;
+        }
+
+        if ($usuarioMigratePassword !== null && isset($columns['cPassInv'])) {
+            $sets[] = 'cPassInv = ?';
+            $params[] = $usuarioMigratePassword;
         }
 
         if ($sets === []) {

@@ -2,26 +2,20 @@
 
 declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| Integracion SOAP con Migrate / InvoiCy
-|--------------------------------------------------------------------------
-| Este helper arma los XML, llama los Web Services y normaliza las respuestas
-| del alta de empresa, consulta de certificados e instalacion de certificados.
-| Tambien concentra reglas de compatibilidad entre el formulario interno y la
-| estructura XML que espera Migrate.
-*/
-
-/**
- * Servicio de integracion externa con Migrate.
- */
 class MigrateInvoicyService
 {
     private const SOAP_METHOD = 'Execute';
 
-    /**
-     * Registra una empresa en Migrate y devuelve el request/response normalizado.
-     */
+    public function resolveExpectedMigrateUserCredentials(array $item): array
+    {
+        $rut = preg_replace('/\D+/', '', (string) ($item['rut'] ?? ''));
+
+        return [
+            'email' => trim((string) ($item['email_principal'] ?? '')),
+            'password' => $this->buildMigrateUserPassword($rut),
+        ];
+    }
+
     public function registerCompany(array $item, array $archivos, array $references, array $userContext = []): array
     {
         $requestXml = $this->buildRegistroEmpresaXml($item, $archivos, $references, $userContext);
@@ -47,9 +41,6 @@ class MigrateInvoicyService
         return $result;
     }
 
-    /**
-     * Consulta certificados existentes en Migrate segun los filtros recibidos.
-     */
     public function queryCertificates(array $filters): array
     {
         $requestXml = $this->buildConsultaCertificadoXml($filters);
@@ -75,9 +66,6 @@ class MigrateInvoicyService
         return $result;
     }
 
-    /**
-     * Envia a Migrate un certificado nuevo para una empresa ya registrada.
-     */
     public function installCertificate(array $empresa, array $certificatePayload): array
     {
         $requestXml = $this->buildCertificateInstallXml($empresa, $certificatePayload);
@@ -102,9 +90,6 @@ class MigrateInvoicyService
         return $result;
     }
 
-    /**
-     * Construye el XML completo de RegistroEmpresa con sus bloques derivados.
-     */
     private function buildRegistroEmpresaXml(array $item, array $archivos, array $references, array $userContext): string
     {
         $giro = trim((string) ($references['giro_nombre'] ?? ''));
@@ -129,8 +114,8 @@ class MigrateInvoicyService
             ? $vendedorNombre
             : trim((string) (($userContext['name'] ?? '') ?: ($userContext['login'] ?? 'admin')));
         $solicitanteEmail = 'soporte@dynamica.com.uy';
-        $exonerado = strtoupper((string) ($item['alta_tributario'] ?? '')) === 'EXONERADO' ? 'S' : 'N';
         $normaExoneracion = trim((string) ($item['alta_exonerado_norma'] ?? ''));
+        $exonerado = $this->resolveExoneradoFlag($item, $normaExoneracion);
         $certificadoMode = strtoupper(trim((string) ($item['alta_certificado_digital'] ?? '')));
         $fechaActual = new DateTimeImmutable('today');
         $fechaProduccion = $fechaActual->modify('+1 day');
@@ -159,13 +144,13 @@ class MigrateInvoicyService
         $includeMigrateUser = WorkflowHelper::licenseCreatesMigrateUser($licencia);
         $usuariosXml = '';
         if ($includeMigrateUser) {
-            $migratePassword = $this->buildMigrateUserPassword($rut);
+            $migrateUserCredentials = $this->resolveExpectedMigrateUserCredentials($item);
             $usuariosXml = '<Usuarios>'
                 . '<UsuarioItem>'
                     . '<UsrAccion>1</UsrAccion>'
                     . $this->tag('UsrNombre', $rut)
-                    . $this->tag('UsrCorreoAcceso', $emailPrincipal)
-                    . $this->tag('UsrContrasena', $migratePassword)
+                    . $this->tag('UsrCorreoAcceso', (string) $migrateUserCredentials['email'])
+                    . $this->tag('UsrContrasena', (string) $migrateUserCredentials['password'])
                     . '<UsrLogin>1</UsrLogin>'
                     . '<UsrEstado>A</UsrEstado>'
                     . '<UsrPerfil>3</UsrPerfil>'
@@ -253,9 +238,6 @@ class MigrateInvoicyService
         . '</RegistroEmpresa>';
     }
 
-    /**
-     * Construye el XML de consulta de certificados.
-     */
     private function buildConsultaCertificadoXml(array $filters): string
     {
         $empCodigo = preg_replace('/\D+/', '', (string) ($filters['emp_codigo'] ?? ''));
@@ -322,9 +304,6 @@ class MigrateInvoicyService
         . '</ConsultaCertificado>';
     }
 
-    /**
-     * Construye el XML para instalar o reemplazar un certificado digital.
-     */
     private function buildCertificateInstallXml(array $empresa, array $certificatePayload): string
     {
         $rut = preg_replace('/\D+/', '', (string) ($empresa['Rut'] ?? ''));
@@ -372,9 +351,6 @@ class MigrateInvoicyService
         . '</RegistroEmpresa>';
     }
 
-    /**
-     * Traduce la licencia interna al tipo de emision esperado por Migrate.
-     */
     private function resolveTipoEmisionByLicense(int $licencia): array
     {
         if ($licencia === 14) {
@@ -388,9 +364,21 @@ class MigrateInvoicyService
         return ['N', 'N'];
     }
 
-    /**
-     * Genera la contrasena base del usuario Migrate segun el criterio actual.
-     */
+    private function resolveExoneradoFlag(array $item, string $normaExoneracion): string
+    {
+        $tributario = strtoupper(trim((string) ($item['alta_tributario'] ?? '')));
+
+        if ($normaExoneracion !== '') {
+            return 'S';
+        }
+
+        if (in_array($tributario, ['EXONERADO', 'IVA MINIMO', 'MONOTRIBUTO', 'MONOTRIBUTO MIDES'], true)) {
+            return 'S';
+        }
+
+        return 'N';
+    }
+
     private function buildMigrateUserPassword(string $rut): string
     {
         $rutDigits = preg_replace('/\D+/', '', $rut);
@@ -399,9 +387,6 @@ class MigrateInvoicyService
         return 'Dy' . $suffix . 'Aa';
     }
 
-    /**
-     * Convierte la respuesta XML del alta en una estructura util para el modulo.
-     */
     private function parseRegistroEmpresaResponse(string $requestXml, string $responseXml): array
     {
         $result = [
@@ -504,9 +489,6 @@ class MigrateInvoicyService
         return $result;
     }
 
-    /**
-     * Identifica si un mensaje corresponde a rechazo del bloque de licenciamiento.
-     */
     private function isLicensingError(string $message): bool
     {
         $normalized = mb_strtolower(trim($message));
@@ -523,9 +505,6 @@ class MigrateInvoicyService
         return false;
     }
 
-    /**
-     * Identifica errores asociados al alta del usuario en Migrate.
-     */
     private function isMigrateUserError(string $message): bool
     {
         $normalized = mb_strtolower(trim($message));
@@ -542,9 +521,6 @@ class MigrateInvoicyService
         return false;
     }
 
-    /**
-     * Convierte la respuesta de consulta de certificados en filas consumibles.
-     */
     private function parseConsultaCertificadoResponse(string $requestXml, string $responseXml): array
     {
         $result = [
@@ -599,9 +575,6 @@ class MigrateInvoicyService
         return $result;
     }
 
-    /**
-     * Interpreta la respuesta devuelta al instalar un certificado.
-     */
     private function parseCertificateInstallResponse(string $requestXml, string $responseXml): array
     {
         $result = [
@@ -660,17 +633,11 @@ class MigrateInvoicyService
         return $result;
     }
 
-    /**
-     * Crea una etiqueta XML obligatoria escapando el contenido.
-     */
     private function tag(string $name, string $value): string
     {
         return '<' . $name . '>' . $this->xml($value) . '</' . $name . '>';
     }
 
-    /**
-     * Crea una etiqueta XML opcional solo cuando el valor tiene contenido.
-     */
     private function optionalTag(string $name, string $value): string
     {
         $value = trim($value);
@@ -681,17 +648,11 @@ class MigrateInvoicyService
         return $this->tag($name, $value);
     }
 
-    /**
-     * Escapa texto para que sea seguro dentro del XML.
-     */
     private function xml(string $value): string
     {
         return htmlspecialchars($value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
     }
 
-    /**
-     * Arma el bloque XML del certificado digital segun el modo de trabajo.
-     */
     private function buildCertificadoDigitalXml(string $mode, array $item, string $pfxOriginalName, string $usuarioEf): string
     {
         if ($mode === '' || in_array($mode, ['SOLICITUD 1', 'SOLICITUD 2', 'GESTION 1', 'GESTION 2'], true)) {
@@ -713,9 +674,6 @@ class MigrateInvoicyService
             . '</CertificadoDigital>';
     }
 
-    /**
-     * Define el apodo del certificado cuando no llega uno explicito.
-     */
     private function buildCertificadoApodo(array $item, string $pfxOriginalName, string $usuarioEf): string
     {
         $candidates = [
@@ -736,9 +694,6 @@ class MigrateInvoicyService
         return '';
     }
 
-    /**
-     * Reutiliza el criterio general de mensajes negativos para respuestas SOAP.
-     */
     private function isNegativeMigrateMessage(string $message): bool
     {
         $normalized = mb_strtolower(trim($message));
@@ -746,7 +701,7 @@ class MigrateInvoicyService
             return false;
         }
 
-        foreach (['rechaz', 'error', 'falla', 'fallo', 'inv√°lid', 'invalid', 'deneg', 'no autorizado'] as $needle) {
+        foreach (['rechaz', 'error', 'falla', 'fallo', 'inv·lid', 'invalid', 'deneg', 'no autorizado'] as $needle) {
             if (mb_strpos($normalized, $needle) !== false) {
                 return true;
             }

@@ -1,9 +1,4 @@
-/*
- * Worker offline del modulo.
- * Pre-carga el shell basico del panel y reutiliza cache para mejorar apertura
- * de login, panel y assets principales cuando la red falla o responde lento.
- */
-const CACHE_NAME = 'gestion-empresas-v1';
+const CACHE_NAME = 'gestion-empresas-v3';
 const APP_SHELL = [
     '/administrativo/login',
     '/administrativo/panel',
@@ -35,11 +30,20 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    const requestUrl = new URL(request.url);
+    if (!['http:', 'https:'].includes(requestUrl.protocol)) {
+        return;
+    }
+
     event.respondWith(
         fetch(request)
             .then((response) => {
+                if (!response || response.status !== 200 || response.type === 'opaque') {
+                    return response;
+                }
+
                 const cloned = response.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned)).catch(() => {});
                 return response;
             })
             .catch(() => caches.match(request).then((cached) => cached || caches.match('/administrativo/login')))

@@ -1,202 +1,166 @@
-# Gestion de Empresas
+# Gestion de Empresas - Modulo de onboarding
 
-> Realizado por Leonardo Navarro.
->
-> Fecha: 2026-07-21
+Realizado por Leonardo Navarro.
 
-Este repositorio contiene el programa del modulo administrativo de altas y automatizaciones de empresas de Dynamica.
+## Que hace este modulo
 
-Su objetivo es centralizar en una sola aplicacion:
+Este proyecto administra el alta de nuevas empresas dentro del flujo de onboarding de Dynamica. El objetivo es que una empresa nueva pase por una hoja de ruta controlada, mezclando pasos manuales y automaticos sin perder trazabilidad.
 
-- el alta de nuevas empresas
-- el flujo de onboarding por hitos
-- la integracion con Dynamica y Migrate/InvoiCy
-- el control de certificados digitales
-- los recordatorios y correos automaticos del proceso
+De forma resumida, este modulo permite:
 
-## Explicacion general
-
-Este modulo se hizo para que el proceso de alta de una empresa nueva no dependa de controles sueltos, correos separados o pasos manuales repartidos en varios lugares.
-
-La idea es que desde un solo panel se pueda:
-
-- registrar la empresa nueva
-- revisar y aprobar la informacion cargada
-- ejecutar los pasos que corresponden en Dynamica
-- enviar la empresa a Migrate/InvoiCy segun la licencia contratada
-- llevar trazabilidad del avance real del caso
-- controlar certificados digitales y sus recordatorios
-
-En otras palabras, este modulo funciona como una mesa de control del onboarding.
-
-No solo guarda datos. Tambien ordena el proceso, muestra en que punto va cada caso y ayuda a que el equipo no pierda el hilo de lo que ya se hizo y de lo que todavia falta.
-
-## Como se entiende el flujo sin entrar en codigo
-
-De manera simple, el recorrido del sistema es este:
-
-1. Se crea una empresa nueva desde el formulario.
-2. El registro queda guardado primero en una tabla temporal.
-3. Un usuario administrativo revisa y aprueba el caso.
-4. El sistema crea la estructura base en Dynamica.
-5. Si aplica, envia la informacion a Migrate/InvoiCy.
-6. El flujo sigue avanzando por hitos manuales o automaticos.
-7. El modulo puede emitir recordatorios, consultar certificados y dejar registro de acciones.
-
-Ese orden es importante porque permite separar muy bien:
-
-- lo que aun esta en revision
-- lo que ya fue aprobado
-- lo que ya se creo en los sistemas externos
-- lo que queda pendiente por completar
-
-## Que hace hoy el modulo
-
-- registra nuevas empresas en una tabla temporal
-- permite aprobacion administrativa
-- crea empresa y cliente en Dynamica
-- envia altas a Migrate/InvoiCy segun la licencia
-- controla el flujo de onboarding por hitos
-- consulta certificados digitales
-- envia recordatorios y correos automaticos relacionados con onboarding y certificados
-
-## Que partes funcionales cubre
-
-Hoy el modulo concentra cuatro frentes principales:
-
-### 1. Alta de empresas
-
-Permite cargar la empresa, sus datos fiscales, adjuntos y campos de apoyo para luego continuar el flujo de aprobacion.
-
-### 2. Onboarding por hitos
-
-Cada caso se mueve por un flujo visible. Eso ayuda a que cualquiera del equipo pueda entender si el caso esta:
-
-- recien creado
-- aprobado
-- en proceso de Migrate
-- pendiente de certificado
-- en homologacion
-- en envio de factura
-- en envio de credenciales
-- o ya en etapa final
-
-### 3. Certificados digitales
-
-El modulo consulta vencimientos, guarda cache local de certificados, muestra alertas visuales y dispara correos de recordatorio segun la cercania al vencimiento.
-
-### 4. Automatizaciones y notificaciones
-
-Incluye procesos automaticos que ayudan a evitar tareas repetitivas, como:
-
-- refresco de cache de certificados
-- envio de recordatorios
-- apoyo a etapas posteriores del onboarding
-
-## A quien le sirve este repositorio
-
-Este repositorio le sirve sobre todo a tres perfiles:
-
-### Perfil funcional u operativo
-
-Para entender el flujo del onboarding, validar que el panel acompane la operativa y revisar que los hitos reflejen correctamente el estado de cada empresa.
-
-### Perfil tecnico de mantenimiento
-
-Para ubicar rapido el controlador principal, los modelos, los helpers de integracion y los scripts auxiliares del modulo.
-
-### Perfil de despliegue o infraestructura
-
-Para tomar el codigo del modulo, preparar la configuracion real del entorno y publicarlo sin depender de archivos sensibles versionados.
+- registrar una nueva empresa de forma temporal;
+- validar y completar sus datos fiscales;
+- crear la empresa y el cliente en Dynamica;
+- registrar la empresa en Migrate;
+- controlar los hitos manuales como Certificado Digital y Homologacion DGI;
+- emitir la factura de onboarding cuando corresponde;
+- programar y enviar las credenciales;
+- dejar historial visible de acciones, avisos y recordatorios.
 
 ## Estructura principal
 
-- `index.php`
-  Punto de entrada del modulo.
+### `controllers/`
 
-- `bootstrap.php`
-  Carga configuracion, helpers, modelos y controladores.
+Contiene la logica de flujo del modulo. Aqui vive el controlador principal que decide que se muestra en pantalla, que accion puede ejecutar el usuario y que hito corresponde marcar en cada momento.
 
-- `config/`
-  Parametros generales y archivos ejemplo de configuracion.
+Archivo principal:
 
-- `controllers/`
-  Orquestacion de flujos de pantalla y acciones.
+- `controllers/NuevasEmpresasController.php`
 
-- `models/`
-  Acceso a tablas temporales, maestras y auxiliares.
+### `models/`
 
-- `helpers/`
-  Integracion, utilidades, validaciones y servicios de apoyo.
+Contiene el acceso a base de datos. Aqui se consultan y actualizan tablas como las temporales del onboarding, clientes, empresas, historial y cola de automatizaciones.
 
-- `views/`
-  Vistas del panel, formularios, login, detalle y certificados.
+Archivos importantes:
 
-- `public/`
-  Assets del frontend.
+- `models/ClienteModel.php`
+- `models/EmpresaNuevaHitoAutoModel.php`
 
-- `sql/`
-  Scripts de creacion o ajuste de tablas del modulo.
+### `helpers/`
 
-- `tools/`
-  Scripts CLI operativos, por ejemplo cache de certificados y notificaciones.
+Contiene servicios auxiliares que resuelven tareas especificas del negocio.
 
-## Archivos principales del programa
+Archivos importantes:
 
-- [controllers/NuevasEmpresasController.php](C:\DYNAMICA_PLUGINS\gestion_empresas\controllers\NuevasEmpresasController.php)
-- [helpers/MigrateInvoicyService.php](C:\DYNAMICA_PLUGINS\gestion_empresas\helpers\MigrateInvoicyService.php)
-- [models/EmpresaModel.php](C:\DYNAMICA_PLUGINS\gestion_empresas\models\EmpresaModel.php)
-- [models/ClienteModel.php](C:\DYNAMICA_PLUGINS\gestion_empresas\models\ClienteModel.php)
-- [models/MigrateCertificateCacheModel.php](C:\DYNAMICA_PLUGINS\gestion_empresas\models\MigrateCertificateCacheModel.php)
-- [tools/refresh_certificate_cache.php](C:\DYNAMICA_PLUGINS\gestion_empresas\tools\refresh_certificate_cache.php)
-- [tools/send_certificate_notifications.php](C:\DYNAMICA_PLUGINS\gestion_empresas\tools\send_certificate_notifications.php)
+- `helpers/OnboardingInvoiceService.php`
+  - arma y emite la factura del onboarding;
+  - resuelve vendedor, cliente, sucursal y configuracion necesaria;
+  - aplica la logica de fecha base de facturacion.
 
-## Resumen tecnico rapido
+### `views/`
 
-Para una lectura tecnica corta, el proyecto esta organizado asi:
+Contiene las plantillas de la interfaz del panel administrativo.
 
-- `index.php` resuelve la accion principal y enruta la solicitud.
-- `bootstrap.php` carga configuracion base, helpers, modelos y controladores.
-- `controllers/NuevasEmpresasController.php` concentra la mayor parte de la orquestacion funcional.
-- `helpers/MigrateInvoicyService.php` encapsula la logica de integracion con Migrate/InvoiCy.
-- `models/` contiene el acceso a tablas principales y auxiliares.
-- `views/` contiene la interfaz del panel administrativo.
-- `tools/` contiene scripts de consola para tareas automaticas del modulo.
-- `sql/` contiene la evolucion de tablas y ajustes necesarios del proyecto.
+### `config/`
 
-## Configuracion
+Contiene configuraciones operativas del modulo.
 
-El repositorio no guarda configuracion sensible real. Por eso se dejaron archivos ejemplo para que el entorno se pueda montar sin exponer credenciales:
+Archivo importante:
 
-- [config/runtime.example.php](C:\DYNAMICA_PLUGINS\gestion_empresas\config\runtime.example.php)
-- [config/database.example.php](C:\DYNAMICA_PLUGINS\gestion_empresas\config\database.example.php)
+- `config/app.php`
+  - define valores de integracion y constantes de negocio;
+  - incluye el tipo de documento usado para la factura de onboarding.
 
-Los valores reales deben crearse localmente o en servidor segun el entorno donde se vaya a ejecutar el modulo.
+### `tools/`
 
-Para no subir informacion sensible real, este repositorio deja fuera o parametriza:
+Contiene scripts operativos y de automatizacion.
 
-- llaves privadas
-- tokens
-- archivos locales de conexion
-- runtime con claves reales
-- credenciales reales de base de datos
+Archivo importante:
 
-Los archivos base para configurar el entorno son:
+- `tools/process_onboarding_hitos_auto.php`
+  - procesa hitos automaticos pendientes;
+  - ejecuta tareas diferidas como envio de credenciales y cierre de alta final.
 
-- [config/runtime.example.php](C:\DYNAMICA_PLUGINS\gestion_empresas\config\runtime.example.php)
-- [config/database.example.php](C:\DYNAMICA_PLUGINS\gestion_empresas\config\database.example.php)
+### `notificaciones_alertas_recordatorios/`
 
-## Nota final
+Contiene plantillas y recursos usados para correos del modulo, especialmente recordatorios y notificaciones del panel de certificados.
 
-Este repositorio se dejo enfocado en el programa como tal.
+## Flujo funcional resumido
 
-No incluye:
+### 1. Registro inicial
 
-- seguimientos de trabajo
-- bitacoras internas
-- videos de prueba
-- archivos de conexion
-- llaves privadas
-- herramientas locales de despliegue
+La empresa se carga primero en una tabla temporal. Desde ahi se puede editar, adjuntar documentos y validar informacion antes de confirmar el avance.
 
-La idea fue que arriba quedara un repositorio limpio, entendible y util para tomar el modulo, revisarlo y continuarlo sin mezclarlo con material operativo o sensible.
+### 2. Aprobacion
+
+Cuando el caso se aprueba, el modulo crea la empresa y el cliente en Dynamica, y luego intenta registrar la empresa en Migrate segun la licencia y las reglas del Excel del proyecto.
+
+### 3. Hitos manuales
+
+Los pasos de Certificado Digital y Homologacion DGI siguen siendo manuales. El sistema debe reflejar exactamente el punto real del flujo y no adelantar hitos que todavia no corresponden.
+
+### 4. Factura de onboarding
+
+En Alta Final se genera la factura real del onboarding. La logica actual contempla:
+
+- casos mensuales del dia 1 al 20: la factura se emite en el momento y `abonado_FechaDesde` toma la fecha actual;
+- casos mensuales despues del dia 20: la factura se emite en el momento, pero `abonado_FechaDesde` pasa al dia 1 del mes siguiente al inmediato;
+- casos anuales: la factura se emite en el momento.
+
+### 5. Envio de credenciales
+
+El envio de credenciales no se marca como enviado en el mismo instante del alta. Primero queda programado y luego un proceso automatico lo ejecuta en el siguiente ciclo definido.
+
+### 6. Alta final
+
+Cuando los pasos anteriores quedan correctos, el sistema marca el cliente como activo y deja registro visible del avance en el panel.
+
+## Ajustes importantes ya incorporados
+
+### Factura de onboarding en eFactura
+
+La factura del onboarding se dejo configurada para usar eFactura, evitando que el flujo genere eTicket cuando no corresponde.
+
+### Control para no duplicar facturas
+
+Si el hito de factura ya fue ejecutado, el sistema evita volver a emitir un segundo documento en reintentos posteriores.
+
+### Persistencia temprana de `abonado_FechaDesde`
+
+La fecha base de facturacion ahora se guarda desde el hito de factura, para que el panel y la base de datos reflejen el valor correcto sin esperar al cierre completo del alta.
+
+### Cola automatica de hitos
+
+Las tareas diferidas del onboarding se apoyan en una tabla propia del modulo para no mezclar el flujo manual con el automatico.
+
+## Archivos de bitacora incluidos
+
+Estas bitacoras resumen los cambios principales realizados durante el desarrollo:
+
+- `BITACORA_20260709_HITOS_ONBOARDING.md`
+- `BITACORA_20260717_ONBOARDING_FACTURA_CRON.md`
+- `BITACORA_20260720_DEPLOY_PRODUCCION_ONBOARDING_FACTURA.md`
+- `BITACORA_20260721_AJUSTES_FACTURA_VISUAL_Y_REINTENTOS.md`
+
+## Rutas de despliegue
+
+### Produccion
+
+- host: `www.datosdynamica.net`
+- ruta del proyecto: `/var/www/plugin/gestion_empresas`
+- alias web: `/administrativo`
+
+### Desarrollo
+
+- host: `www.desarrollodynamica.net`
+- ruta del proyecto: `/var/www/html/plugin/gestion_empresas`
+- alias web: `/administrativo`
+
+## Tareas automáticas
+
+### Produccion
+
+Se utilizan tareas automaticas para procesar hitos diferidos del onboarding y para mantener otros procesos relacionados con certificados y notificaciones. La logica del onboarding debe ejecutarse respetando la cola interna del modulo.
+
+### Desarrollo
+
+En desarrollo se prueban los mismos pasos, pero con entorno de testing y rutas separadas. Cuando un flujo depende de cron, la validacion puede hacerse por ejecucion manual del script correspondiente.
+
+## Criterio de trabajo usado en este proyecto
+
+- primero se inspecciona;
+- luego se respalda;
+- despues se ajusta solo el archivo necesario;
+- y al final se valida con evidencia real.
+
+Ese criterio se mantuvo durante los cambios de onboarding, Migrate, certificados y factura automatica.

@@ -49,6 +49,30 @@ define('MIGRATE_CERT_PUBLIC_KEY', (string) ($runtimeConfig['MIGRATE_CERT_PUBLIC_
 define('MIGRATE_LIC_AMBIENTE', 1);
 define('MIGRATE_CERT_CACHE_HOURS', (int) ($runtimeConfig['MIGRATE_CERT_CACHE_HOURS'] ?? 24));
 define('MIGRATE_CERT_BATCH_SIZE', (int) ($runtimeConfig['MIGRATE_CERT_BATCH_SIZE'] ?? 10));
+define('ONBOARDING_TEST_EMAIL', (string) ($runtimeConfig['ONBOARDING_TEST_EMAIL'] ?? (MIGRATE_ENVIRONMENT === 'testing' ? 'leo2904.trabajo@gmail.com' : '')));
+define('ONBOARDING_INVO_MANUAL_URL', (string) ($runtimeConfig['ONBOARDING_INVO_MANUAL_URL'] ?? 'https://dynamica.tawk.help/category/invo'));
+define('ONBOARDING_FACTURACION_API_BASE_TESTING', (string) ($runtimeConfig['ONBOARDING_FACTURACION_API_BASE_TESTING'] ?? 'http://127.0.0.1/api'));
+define('ONBOARDING_FACTURACION_API_BASE_PRODUCTION', (string) ($runtimeConfig['ONBOARDING_FACTURACION_API_BASE_PRODUCTION'] ?? 'https://www.datosdynamica.net/api'));
+define(
+    'ONBOARDING_FACTURACION_API_BASE',
+    MIGRATE_ENVIRONMENT === 'production'
+        ? ONBOARDING_FACTURACION_API_BASE_PRODUCTION
+        : ONBOARDING_FACTURACION_API_BASE_TESTING
+);
+define('ONBOARDING_FACTURACION_EMPRESA_ID_TESTING', (int) ($runtimeConfig['ONBOARDING_FACTURACION_EMPRESA_ID_TESTING'] ?? 1));
+define('ONBOARDING_FACTURACION_EMPRESA_ID_PRODUCTION', (int) ($runtimeConfig['ONBOARDING_FACTURACION_EMPRESA_ID_PRODUCTION'] ?? ID_EMPRESA_MASTER));
+define(
+    'ONBOARDING_FACTURACION_EMPRESA_ID',
+    MIGRATE_ENVIRONMENT === 'production'
+        ? ONBOARDING_FACTURACION_EMPRESA_ID_PRODUCTION
+        : ONBOARDING_FACTURACION_EMPRESA_ID_TESTING
+);
+// En onboarding la factura administrativa debe salir como e-FACTURA.
+define('ONBOARDING_FACTURACION_IDTIPODOC', (int) ($runtimeConfig['ONBOARDING_FACTURACION_IDTIPODOC'] ?? 111));
+define('ONBOARDING_FACTURACION_IDSUCURSAL', (int) ($runtimeConfig['ONBOARDING_FACTURACION_IDSUCURSAL'] ?? 1));
+define('ONBOARDING_FACTURACION_IDCAJA', (int) ($runtimeConfig['ONBOARDING_FACTURACION_IDCAJA'] ?? 1));
+define('ONBOARDING_FACTURACION_IDMEDIOPAGO', (int) ($runtimeConfig['ONBOARDING_FACTURACION_IDMEDIOPAGO'] ?? 1));
+define('ONBOARDING_CREDENCIALES_DELAY_HOURS', (int) ($runtimeConfig['ONBOARDING_CREDENCIALES_DELAY_HOURS'] ?? 24));
 
 define('ESTADO_PENDIENTE_APROBACION', 'PENDIENTE_APROBACION');
 define('ESTADO_APROBADO', 'APROBADO');
@@ -58,17 +82,19 @@ define('ESTADO_ERROR_APROBACION', 'ERROR_APROBACION');
 define('TABLA_EMPRESAS_NUEVAS', 'EmpresasNuevas');
 define('TABLA_EMPRESAS_NUEVAS_ARCHIVOS', 'EmpresasNuevasArchivos');
 define('TABLA_EMPRESAS_NUEVAS_HISTORIAL', 'EmpresasNuevasHistorial');
+define('TABLA_EMPRESAS_NUEVAS_HITOS_AUTO', 'EmpresasNuevasHitosAuto');
 define('TABLA_CERTIFICADOS_ACCIONES', 'CertificadosAcciones');
 define('TABLA_CERTIFICADOS_NOTIFICACIONES', 'CertificadosNotificaciones');
 define('TABLA_SEC_USERS', 'sec_users');
 define('AUTH_SESSION_KEY', 'gestion_empresas_auth');
 define('AUTH_REMEMBER_LOGIN_COOKIE', 'gestion_empresas_login');
 define('CERT_NOTIFICATION_TEMPLATE_DIR', BASE_PATH . '/notificaciones_alertas_recordatorios');
+define('ONBOARDING_TEMPLATE_DIR', BASE_PATH . '/notificaciones_alertas_recordatorios/onboarding');
 
 const TIPOS_ARCHIVO_PERMITIDOS = [
     'pfx' => ['pfx', 'p12', 'zip'],
     'credito_fiscal' => ['pdf', 'doc', 'docx'],
-    'contrato' => ['pdf'],
+    'contrato' => ['pdf', 'jpg', 'jpeg', 'png'],
     'f6906' => ['pdf'],
     'logo' => ['jpg', 'jpeg', 'png', 'webp'],
 ];

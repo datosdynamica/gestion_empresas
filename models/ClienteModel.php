@@ -2,18 +2,6 @@
 
 declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| Sincronizacion con tabla Clientes
-|--------------------------------------------------------------------------
-| Construye o actualiza el cliente espejo que usa la empresa maestra para la
-| facturacion y el seguimiento comercial. Aqui tambien se arma la adenda con
-| informacion legible del onboarding.
-*/
-
-/**
- * Modelo de persistencia en la tabla Clientes.
- */
 class ClienteModel extends BaseModel
 {
     private const BILLING_MONTHS = [
@@ -152,6 +140,45 @@ class ClienteModel extends BaseModel
         $stmt->execute($params);
     }
 
+    public function activateForOnboarding(int $clienteId, array $item): array
+    {
+        $billingStartDate = $this->resolveBillingStartDate((string) ($item['cliente_abonado_periodo'] ?? 'MENSUAL'));
+        $pnMonto = (float) ($item['cliente_pn_monto'] ?? 0);
+        $pnCreditoFiscal = $pnMonto > 0
+            ? 'SI'
+            : strtoupper(trim((string) ($item['cliente_pn_credito_fiscal'] ?? 'NO')));
+
+        $stmt = $this->db->prepare(
+            "UPDATE Clientes
+             SET abonado = 'SI',
+                 abonado_FechaDesde = ?,
+                 pnCreditoFiscal = ?
+             WHERE IdCliente = ?"
+        );
+        $stmt->execute([$billingStartDate, $pnCreditoFiscal, $clienteId]);
+
+        return [
+            'billing_start_date' => $billingStartDate,
+            'pn_credito_fiscal' => $pnCreditoFiscal,
+            'pn_monto' => $pnMonto,
+        ];
+    }
+
+    public function previewBillingStartDate(string $periodo): string
+    {
+        return $this->resolveBillingStartDate($periodo);
+    }
+
+    public function persistBillingStartDateForOnboarding(int $clienteId, string $billingStartDate): void
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE Clientes
+             SET abonado_FechaDesde = ?
+             WHERE IdCliente = ?"
+        );
+        $stmt->execute([$billingStartDate, $clienteId]);
+    }
+
     private function buildClienteParamsFromNuevaEmpresa(array $item, int $idEmpresaMaster): array
     {
         $periodo = $item['cliente_abonado_periodo'] ?: 'MENSUAL';
@@ -226,6 +253,30 @@ class ClienteModel extends BaseModel
 
         return $map[$licencia] ?? (string) $licencia;
     }
+
+    private function resolveBillingStartDate(string $periodo): string
+    {
+        $periodo = strtoupper(trim($periodo));
+        $today = new DateTimeImmutable('today');
+
+        if ($periodo === 'ANUAL') {
+            return $today->format('Y-m-d');
+        }
+
+        $day = (int) $today->format('d');
+        if ($day <= 20) {
+            return $today->format('Y-m-d');
+        }
+
+        // Regla corregida: si el alta mensual ocurre luego del dia 20,
+        // la factura igual sale inmediata, pero la fecha desde pasa
+        // al primer dia del mes subsiguiente.
+        return $today
+            ->modify('first day of next month')
+            ->modify('first day of next month')
+            ->format('Y-m-d');
+    }
+
     private function resolveCiudadId($value, int $idEmpresa): int
     {
         $raw = trim((string) ($value ?? ''));

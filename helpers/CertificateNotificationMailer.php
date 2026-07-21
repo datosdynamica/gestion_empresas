@@ -5,18 +5,6 @@ declare(strict_types=1);
 use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\PHPMailer;
 
-/*
-|--------------------------------------------------------------------------
-| Correo de recordatorios y confirmaciones
-|--------------------------------------------------------------------------
-| Este helper encapsula el envio de correos relacionados con certificados:
-| recordatorios de vencimiento y confirmaciones de instalacion. Mantiene en un
-| solo punto el SMTP, las plantillas y el armado de destinatarios.
-*/
-
-/**
- * Servicio de correo del panel de certificados.
- */
 class CertificateNotificationMailer
 {
     private const SMTP_HOST = 'mail.dynamica.com.uy';
@@ -33,9 +21,6 @@ class CertificateNotificationMailer
     private const TEMPLATE_FILE = 'email_de_renovaci_n_con_indicador.html';
     private const INSTALL_TEMPLATE_FILE = 'confirmacion_de_instalacion_de_certificado.html';
 
-    /**
-     * Envia el recordatorio de vencimiento del certificado al cliente.
-     */
     public function sendCertificateReminder(array $company, array $certificateRow, int $daysTarget, array $options = []): array
     {
         if (!class_exists(PHPMailer::class)) {
@@ -110,9 +95,6 @@ class CertificateNotificationMailer
         }
     }
 
-    /**
-     * Envia la confirmacion luego de instalar un certificado nuevo.
-     */
     public function sendCertificateInstallationConfirmation(array $company, array $certificateData, array $options = []): array
     {
         if (!class_exists(PHPMailer::class)) {
@@ -179,9 +161,6 @@ class CertificateNotificationMailer
         }
     }
 
-    /**
-     * Define los destinatarios finales del correo, incluyendo modo de prueba.
-     */
     private function resolveRecipients(array $company, array $options = []): array
     {
         $overrideEmail = strtolower(trim((string) ($options['override_email'] ?? '')));
@@ -224,17 +203,11 @@ class CertificateNotificationMailer
         ];
     }
 
-    /**
-     * Renderiza la plantilla principal de recordatorios.
-     */
     private function renderTemplate(array $replacements): string
     {
         return $this->renderTemplateFile(self::TEMPLATE_FILE, $replacements);
     }
 
-    /**
-     * Carga una plantilla HTML y reemplaza sus marcadores dinamicos.
-     */
     private function renderTemplateFile(string $templateFile, array $replacements): string
     {
         $templatePath = CERT_NOTIFICATION_TEMPLATE_DIR . DIRECTORY_SEPARATOR . $templateFile;
@@ -250,9 +223,6 @@ class CertificateNotificationMailer
         return strtr($html, $replacements);
     }
 
-    /**
-     * Genera una version texto plano del correo de confirmacion.
-     */
     private function renderInstallationPlainText(string $razonSocial, string $rut, string $expiryDate): string
     {
         $parts = [
@@ -271,9 +241,6 @@ class CertificateNotificationMailer
         return implode("\n", $parts);
     }
 
-    /**
-     * Genera una version texto plano del recordatorio de vencimiento.
-     */
     private function renderPlainText(string $razonSocial, string $rut, string $expiryDate, int $daysRemaining, string $apodo): string
     {
         $parts = [
@@ -292,9 +259,6 @@ class CertificateNotificationMailer
         return implode("\n", $parts);
     }
 
-    /**
-     * Normaliza fechas para mostrarlas en formato amigable al usuario.
-     */
     private function formatDate(string $value): string
     {
         $value = trim($value);

@@ -2,7 +2,7 @@
 <?php
 function h(?string $value): string
 {
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 function u(string $value): string
@@ -193,9 +193,6 @@ function listMigrateSummary(array $item): array
     $summary = [
         'lic_msg_retorno' => '',
         'lic_rejected' => false,
-        'base_success' => false,
-        'lic_errors' => [],
-        'user_errors' => [],
     ];
 
     if ($responseXml === '') {
@@ -210,40 +207,11 @@ function listMigrateSummary(array $item): array
         return $summary;
     }
 
-    $empresaNodes = $xml->xpath('//DatosSucursal/EmpCodigo');
-    $claveNodes = $xml->xpath('//DatosSucursal/SucClaveAcceso');
-    $empresaInvoicy = is_array($empresaNodes) && isset($empresaNodes[0]) ? trim((string) $empresaNodes[0]) : '';
-    $claveAcceso = is_array($claveNodes) && isset($claveNodes[0]) ? trim((string) $claveNodes[0]) : '';
-    $summary['base_success'] = $empresaInvoicy !== '' && $claveAcceso !== '';
-
     $licNodes = $xml->xpath('//LicMsgRetorno');
     if (is_array($licNodes) && isset($licNodes[0])) {
         $summary['lic_msg_retorno'] = trim((string) $licNodes[0]);
         $summary['lic_rejected'] = listIsNegativeMigrateMessage($summary['lic_msg_retorno']);
-        if ($summary['lic_rejected'] && $summary['lic_msg_retorno'] !== '') {
-            $summary['lic_errors'][] = 'Licenciamiento rechazado por Migrate: ' . $summary['lic_msg_retorno'];
-        }
     }
-
-    $errorNodes = $xml->xpath('//ErrosItem/*[contains(local-name(), "Desc")]');
-    if (is_array($errorNodes)) {
-        foreach ($errorNodes as $node) {
-            $value = trim((string) $node);
-            if ($value === '') {
-                continue;
-            }
-
-            $normalized = mb_strtolower($value);
-            if (mb_strpos($normalized, 'licmodelo') !== false || mb_strpos($normalized, 'modelo comercial') !== false || mb_strpos($normalized, 'licencia') !== false || mb_strpos($normalized, 'licenc') !== false) {
-                $summary['lic_errors'][] = $value;
-            } elseif (mb_strpos($normalized, 'usr') !== false || mb_strpos($normalized, 'usuario') !== false || mb_strpos($normalized, 'perfil') !== false || mb_strpos($normalized, 'contras') !== false || mb_strpos($normalized, 'login') !== false) {
-                $summary['user_errors'][] = $value;
-            }
-        }
-    }
-
-    $summary['lic_errors'] = array_values(array_unique($summary['lic_errors']));
-    $summary['user_errors'] = array_values(array_unique($summary['user_errors']));
 
     return $summary;
 }
@@ -282,31 +250,47 @@ function workflowCurrentKey(array $item, array $history): string
         return 'MIGRATE_ERROR';
     }
 
-    if ($persisted === 'ERROR_APROBACION' && !$empresaCreada && !$clienteCreado) {
-        return 'APROBACION_PENDIENTE';
-    }
-
-    if ($persisted !== '') {
-        return $persisted;
-    }
-
     if (isset($events['HITO_CLIENTE_ACTIVO'])) {
         return 'CLIENTE_ACTIVO';
+    }
+    if (isset($events['HITO_ENVIO_CREDENCIALES'])) {
+        return 'ALTA_FINAL';
+    }
+    if (isset($events['HITO_ENVIO_FACTURA'])) {
+        return 'ENVIO_CREDENCIALES';
     }
     if (isset($events['HITO_ALTA_PENDIENTE'])) {
         return 'ALTA_PENDIENTE';
     }
+    if (isset($events['HITO_HOMOLOGACION_DGI'])) {
+        return 'ENVIO_FACTURA';
+    }
+    if (isset($events['HITO_CERTIFICADO_DIGITAL'])) {
+        return 'HOMOLOGACION_DGI';
+    }
     if (isset($events['HITO_PENDIENTE_DGI'])) {
-        return 'PENDIENTE_DGI';
+        return 'HOMOLOGACION_DGI';
     }
     if (isset($events['HITO_MIGRATE_OK'])) {
-        return 'MIGRATE';
+        return 'CERTIFICADO_DIGITAL';
     }
     if (isset($events['HITO_DYNAMICA_OK']) || ($empresaCreada && $clienteCreado)) {
         return 'MIGRATE';
     }
     if (isset($events['HITO_EN_PROCESO'])) {
         return 'DYNAMICA';
+    }
+
+    if ($persisted === 'ERROR_APROBACION' && !$empresaCreada && !$clienteCreado) {
+        return 'APROBACION_PENDIENTE';
+    }
+
+    if ($persisted !== '') {
+        if ($persisted === 'PENDIENTE_DGI') {
+            return 'HOMOLOGACION_DGI';
+        }
+
+        return $persisted;
     }
 
     if ($estado === ESTADO_ERROR_APROBACION) {
@@ -318,7 +302,7 @@ function workflowCurrentKey(array $item, array $history): string
     }
 
     if ($estado === ESTADO_APROBADO) {
-        return ($empresaCreada && $clienteCreado) ? 'MIGRATE' : 'DYNAMICA';
+        return ($empresaCreada && $clienteCreado) ? 'CERTIFICADO_DIGITAL' : 'DYNAMICA';
     }
 
     return 'APROBACION_PENDIENTE';
@@ -354,25 +338,49 @@ function workflowGeneralStatusMeta(array $item, string $current): array
         ];
     }
 
-    if (in_array($current, ['PENDIENTE_DGI', 'ALTA_PENDIENTE'], true)) {
+    if ($current === 'CERTIFICADO_DIGITAL') {
         return [
-            'label' => 'DGI pendiente',
+            'label' => 'Certificado digital',
             'class' => 'bg-amber-50 text-amber-700 border border-amber-200',
             'dot' => 'bg-amber-500',
         ];
     }
 
+    if ($current === 'HOMOLOGACION_DGI') {
+        return [
+            'label' => u('Homologaci&oacute;n DGI'),
+            'class' => 'bg-amber-50 text-amber-700 border border-amber-200',
+            'dot' => 'bg-amber-500',
+        ];
+    }
+
+    if (in_array($current, ['ALTA_PENDIENTE', 'ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_FINAL'], true)) {
+        return [
+            'label' => 'Alta pendiente',
+            'class' => 'bg-orange-50 text-orange-700 border border-orange-200',
+            'dot' => 'bg-orange-500',
+        ];
+    }
+
     if ($current === 'CLIENTE_ACTIVO') {
         return [
-            'label' => 'Completado',
+            'label' => 'Cliente activo',
             'class' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
             'dot' => 'bg-emerald-500',
         ];
     }
 
-    if (in_array($current, ['EN_PROCESO', 'DYNAMICA', 'MIGRATE'], true)) {
+    if ($current === 'DYNAMICA') {
         return [
-            'label' => 'Generacion en proceso',
+            'label' => 'Dynamica',
+            'class' => 'bg-blue-50 text-blue-700 border border-blue-200',
+            'dot' => 'bg-blue-500 animate-pulse',
+        ];
+    }
+
+    if (in_array($current, ['EN_PROCESO', 'MIGRATE'], true)) {
+        return [
+            'label' => 'Migrate',
             'class' => 'bg-blue-50 text-blue-700 border border-blue-200',
             'dot' => 'bg-blue-500 animate-pulse',
         ];
@@ -453,35 +461,82 @@ function buildListMeta(array $item, array $history): array
         ];
     }
 
-    if ($current === 'PENDIENTE_DGI') {
+    if ($current === 'CERTIFICADO_DIGITAL') {
         return [
             'status_label' => $generalStatus['label'],
             'status_class' => $generalStatus['class'],
             'status_dot' => $generalStatus['dot'],
-            'hito_key' => 'Pendiente DGI',
-            'hito_text' => 'Pendiente DGI (Marcar Alta Pendiente)',
+            'hito_key' => 'Certificado Digital',
+            'hito_text' => 'Certificado Digital',
             'hito_class' => 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800',
-            'hito_icon' => 'stamp',
+            'hito_icon' => 'file-badge',
             'action_mode' => 'change_hito',
-            'next_hito' => 'ALTA_PENDIENTE',
-            'next_hito_label' => 'Marcar Alta Pendiente',
+            'next_hito' => 'CERTIFICADO_DIGITAL',
+            'next_hito_label' => 'Marcar Certificado Digital',
             'timeline_mode' => 'progress',
             'can_cancel' => true,
         ];
     }
 
-    if ($current === 'ALTA_PENDIENTE') {
+    if ($current === 'HOMOLOGACION_DGI') {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => u('Homologaci&oacute;n DGI'),
+            'hito_text' => u('Homologaci&oacute;n DGI'),
+            'hito_class' => 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800',
+            'hito_icon' => 'stamp',
+            'action_mode' => 'change_hito',
+            'next_hito' => 'HOMOLOGACION_DGI',
+            'next_hito_label' => u('Marcar Homologaci&oacute;n DGI'),
+            'timeline_mode' => 'progress',
+            'can_cancel' => true,
+        ];
+    }
+
+    if ($current === 'ENVIO_FACTURA') {
         return [
             'status_label' => $generalStatus['label'],
             'status_class' => $generalStatus['class'],
             'status_dot' => $generalStatus['dot'],
             'hito_key' => 'Alta Pendiente',
-            'hito_text' => 'Alta Pendiente (Activar Cliente)',
+            'hito_text' => 'Envio de Factura',
+            'hito_class' => 'bg-orange-50 text-orange-700 border border-orange-200',
+            'hito_icon' => 'receipt',
+            'action_mode' => 'disabled',
+            'timeline_mode' => 'progress',
+            'can_cancel' => true,
+        ];
+    }
+
+    if ($current === 'ENVIO_CREDENCIALES') {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => 'Alta Pendiente',
+            'hito_text' => 'Envio de Credenciales',
+            'hito_class' => 'bg-orange-50 text-orange-700 border border-orange-200',
+            'hito_icon' => 'mail',
+            'action_mode' => 'disabled',
+            'timeline_mode' => 'progress',
+            'can_cancel' => true,
+        ];
+    }
+
+    if ($current === 'ALTA_PENDIENTE' || $current === 'ALTA_FINAL') {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => 'Alta Pendiente',
+            'hito_text' => 'Alta Final (Ejecutar)',
             'hito_class' => 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800',
             'hito_icon' => 'user-check',
             'action_mode' => 'change_hito',
-            'next_hito' => 'CLIENTE_ACTIVO',
-            'next_hito_label' => 'Marcar Cliente Activo',
+            'next_hito' => 'ALTA_FINAL',
+            'next_hito_label' => 'Ejecutar Alta Final',
             'timeline_mode' => 'progress',
             'can_cancel' => true,
         ];
@@ -527,6 +582,25 @@ function formatWorkflowDate(?string $value): string
     return $ts ? date('d/m/Y H:i', $ts) : (string) $value;
 }
 
+function deferredTaskScheduleNote(?array $task): string
+{
+    if (!$task) {
+        return '';
+    }
+
+    $estado = strtoupper(trim((string) ($task['Estado'] ?? '')));
+    if (!in_array($estado, ['PENDIENTE', 'PROCESANDO'], true)) {
+        return '';
+    }
+
+    $scheduledAt = formatWorkflowDate((string) ($task['ProgramadoPara'] ?? ''));
+    if ($scheduledAt === '') {
+        return '';
+    }
+
+    return 'Programado para entrega el ' . $scheduledAt . '.';
+}
+
 function dynamicaLoginForItem(array $item): string
 {
     $licencia = (int) ($item['licencia'] ?? 0);
@@ -550,14 +624,24 @@ function dynamicaPasswordForItem(array $item): string
     return $ts ? date('dmY', $ts) : '-';
 }
 
-function buildTimeline(array $item, array $meta, array $history): array
+function buildTimeline(array $item, array $meta, array $history, ?array $deferredTask = null): array
 {
     $events = workflowEventsMap($history);
     $current = workflowCurrentKey($item, $history);
     $migrateSummary = listMigrateSummary($item);
     $historicalLicenseIssue = listHistoricalLicenseIssue($history);
+    $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+    $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+    $fechaAprobacion = trim((string) ($item['fecha_aprobacion'] ?? ''));
     $modoCert = strtoupper(trim((string) ($item['alta_certificado_digital'] ?? '')));
-    $certificadoDone = isset($events['HITO_CERTIFICADO_DIGITAL']) || $modoCert === 'ADJUNTO';
+$certificadoDone =
+    isset($events['HITO_CERTIFICADO_DIGITAL'])
+    || isset($events['HITO_HOMOLOGACION_DGI'])
+    || isset($events['HITO_PENDIENTE_DGI'])
+    || isset($events['HITO_ALTA_PENDIENTE'])
+    || isset($events['HITO_CLIENTE_ACTIVO'])
+    || $modoCert === 'ADJUNTO';
+    $workflowReachedMigrate = in_array($current, ['CERTIFICADO_DIGITAL', 'HOMOLOGACION_DGI', 'ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_FINAL', 'CLIENTE_ACTIVO', 'MIGRATE_ERROR'], true);
     $steps = [
         ['key' => 'HITO_CARPETA', 'title' => '1. Hito Carpeta', 'type' => 'Auto', 'state' => 'pending', 'desc' => u('Creaci&oacute;n autom&aacute;tica del directorio de archivos.'), 'substeps' => []],
         ['key' => 'HITO_EN_PROCESO', 'title' => u('2. Aprobaci&oacute;n pendiente'), 'type' => 'Manual', 'state' => 'pending', 'desc' => u('Pendiente de aprobaci&oacute;n administrativa.'), 'substeps' => []],
@@ -575,7 +659,8 @@ function buildTimeline(array $item, array $meta, array $history): array
         'DYNAMICA' => 'HITO_DYNAMICA_OK',
         'MIGRATE' => 'HITO_MIGRATE_OK',
         'EN_PROCESO' => 'HITO_MIGRATE_OK',
-        'PENDIENTE_DGI' => 'HITO_PENDIENTE_DGI',
+        'CERTIFICADO_DIGITAL' => 'HITO_CERTIFICADO_DIGITAL',
+        'HOMOLOGACION_DGI' => 'HITO_PENDIENTE_DGI',
         'ALTA_PENDIENTE' => 'HITO_ALTA_PENDIENTE',
         'CLIENTE_ACTIVO' => 'HITO_CLIENTE_ACTIVO',
         'ERROR_APROBACION' => 'HITO_MIGRATE_OK',
@@ -598,15 +683,29 @@ function buildTimeline(array $item, array $meta, array $history): array
             continue;
         }
 
+        if ($step['key'] === 'HITO_EN_PROCESO') {
+            $event = $events['HITO_EN_PROCESO'] ?? $events['APROBACION'] ?? null;
+            $done = $event !== null || $empresaCreada || $clienteCreado || $fechaAprobacion !== '' || $current !== 'APROBACION_PENDIENTE';
+            if ($done) {
+                $step['state'] = 'done';
+                $desc = trim((string) (($event['descripcion'] ?? '') ?: 'Aprobado por Admin. Dynamica completado; pendiente Migrate.'));
+                $date = formatWorkflowDate($event['fecha_evento'] ?? ($item['fecha_aprobacion'] ?? ($item['fecha_actualizacion'] ?? null)));
+                $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
+            } elseif ($step['key'] === $currentStepKey && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+                $step['state'] = $meta['timeline_mode'] === 'error' ? 'error' : 'current';
+            }
+            continue;
+        }
+
         if ($step['key'] === 'HITO_DYNAMICA_OK') {
-            $step['state'] = ((int) ($item['empresa_creada'] ?? 0) === 1 && (int) ($item['cliente_creado'] ?? 0) === 1) ? 'done' : 'pending';
+            $step['state'] = ($empresaCreada && $clienteCreado) ? 'done' : 'pending';
             $step['substeps'] = [
                 $step['state'] === 'done'
                     ? 'Empresa y cliente creados en tablas Dynamica.'
                     : u('Pendiente creaci&oacute;n de empresa y cliente en tablas Dynamica.'),
                 WorkflowHelper::licenseCreatesDynamicaUser((int) ($item['licencia'] ?? 0))
                     ? trim((string) (($events['HITO_DYNAMICA_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Dynamica requerido.'))
-                    : ['state' => 'na', 'text' => WorkflowHelper::dynamicaUserSubstepLabel((int) ($item['licencia'] ?? 0))],
+                    : WorkflowHelper::dynamicaUserSubstepLabel((int) ($item['licencia'] ?? 0)),
             ];
             if ($step['state'] === 'done') {
                 $event = $events['HITO_DYNAMICA_OK'] ?? $events['APROBACION'] ?? null;
@@ -623,6 +722,55 @@ function buildTimeline(array $item, array $meta, array $history): array
             continue;
         }
 
+        if ($step['key'] === 'HITO_MIGRATE_OK') {
+            $eventOk = $events['HITO_MIGRATE_OK'] ?? null;
+            $eventErr = $events['HITO_MIGRATE_ERROR'] ?? null;
+            $done = $eventOk !== null || ($empresaCreada && $clienteCreado && $workflowReachedMigrate);
+            $error = $eventErr !== null || $migrateSummary['lic_rejected'] || $historicalLicenseIssue !== '';
+
+            if ($done) {
+                $step['state'] = 'done';
+            } elseif ($error) {
+                $step['state'] = 'error';
+            } elseif ($step['key'] === $currentStepKey && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+                $step['state'] = $meta['timeline_mode'] === 'error' ? 'error' : 'current';
+            }
+
+            if ($eventOk) {
+                $desc = trim((string) ($eventOk['descripcion'] ?? 'Migrate OK.'));
+                $date = formatWorkflowDate($eventOk['fecha_evento'] ?? null);
+                $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
+            } elseif ($eventErr) {
+                $desc = trim((string) ($eventErr['descripcion'] ?? $step['desc']));
+                $date = formatWorkflowDate($eventErr['fecha_evento'] ?? null);
+                $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
+            } elseif ($migrateSummary['lic_rejected']) {
+                $step['desc'] = 'Migrate devolvio novedad en el licenciamiento.';
+            } elseif ($historicalLicenseIssue !== '') {
+                $step['desc'] = 'Migrate tiene una novedad historica de licenciamiento pendiente de resolver.';
+            } elseif ($done) {
+                $date = formatWorkflowDate($item['fecha_actualizacion'] ?? ($item['fecha_aprobacion'] ?? null));
+                $step['desc'] = $date !== '' ? 'Migrate OK. - ' . $date : 'Migrate OK.';
+            }
+
+            $step['substeps'] = [
+                $done
+                    ? ['state' => 'done', 'text' => 'Empresa y sucursal registradas en Migrate.']
+                    : ['state' => 'pending', 'text' => 'Pendiente registro de empresa y sucursal en Migrate.'],
+                $migrateSummary['lic_rejected']
+                    ? ['state' => 'error', 'text' => 'Licenciamiento rechazado por Migrate: ' . $migrateSummary['lic_msg_retorno']]
+                    : ($historicalLicenseIssue !== ''
+                        ? ['state' => 'error', 'text' => 'Licenciamiento rechazado en intento previo. Validar antes de continuar.']
+                        : ($done
+                            ? ['state' => 'done', 'text' => 'Licenciamiento enviado dentro del RegistroEmpresa.']
+                            : ['state' => 'pending', 'text' => 'Pendiente envio de licenciamiento a Migrate.'])),
+                WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0))
+                    ? ['state' => $done ? 'warning' : 'pending', 'text' => trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.'))]
+                    : ['state' => 'na', 'text' => WorkflowHelper::migrateUserSubstepLabel((int) ($item['licencia'] ?? 0))],
+            ];
+            continue;
+        }
+
         if ($step['key'] === 'HITO_CERTIFICADO_DIGITAL') {
             if ($certificadoDone) {
                 $step['state'] = 'done';
@@ -631,7 +779,7 @@ function buildTimeline(array $item, array $meta, array $history): array
                     : 'Certificado digital gestionado manualmente.';
             } elseif ($modoCert !== '') {
                 $step['desc'] = 'Modo de certificado definido: ' . trim((string) ($item['alta_certificado_digital'] ?? ''));
-                if ($current === 'PENDIENTE_DGI' && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+                if ($current === 'CERTIFICADO_DIGITAL' && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
                     $step['state'] = 'current';
                 }
             } elseif ($step['key'] === $currentStepKey && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
@@ -641,20 +789,31 @@ function buildTimeline(array $item, array $meta, array $history): array
         }
 
         if ($step['key'] === 'HITO_PENDIENTE_DGI') {
-            $done = isset($events['HITO_ALTA_PENDIENTE']) || isset($events['HITO_CLIENTE_ACTIVO']);
+            $done = isset($events['HITO_HOMOLOGACION_DGI']) || isset($events['HITO_ALTA_PENDIENTE']) || isset($events['HITO_CLIENTE_ACTIVO']);
             if ($done) {
                 $step['state'] = 'done';
-            } elseif ($current === 'PENDIENTE_DGI' && $certificadoDone && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+            } elseif ($current === 'HOMOLOGACION_DGI' && $certificadoDone && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
                 $step['state'] = 'current';
             }
 
-            if (isset($events[$step['key']])) {
-                $desc = trim((string) ($events[$step['key']]['descripcion'] ?? $step['desc']));
-                $date = formatWorkflowDate($events[$step['key']]['fecha_evento'] ?? null);
+            $dgiEvent = $events['HITO_HOMOLOGACION_DGI'] ?? $events[$step['key']] ?? null;
+            if ($dgiEvent) {
+                $desc = trim((string) ($dgiEvent['descripcion'] ?? $step['desc']));
+                $date = formatWorkflowDate($dgiEvent['fecha_evento'] ?? null);
                 $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
             }
 
             continue;
+        }
+
+        if ($step['key'] === 'HITO_ENVIO_CREDENCIALES' && !isset($events[$step['key']])) {
+            $note = deferredTaskScheduleNote($deferredTask);
+            if ($note !== '' && $current === 'ENVIO_CREDENCIALES') {
+                $step['state'] = 'current';
+                $step['desc'] = 'Envio de credenciales programado para el siguiente ciclo automatico.';
+                $step['note'] = $note;
+                continue;
+            }
         }
 
             if (isset($events[$step['key']])) {
@@ -662,30 +821,24 @@ function buildTimeline(array $item, array $meta, array $history): array
                 $desc = trim((string) ($events[$step['key']]['descripcion'] ?? 'Completado.'));
                 if ($step['key'] === 'HITO_MIGRATE_OK') {
                     $step['substeps'] = [
-                        $migrateSummary['base_success']
-                            ? ['state' => 'done', 'text' => 'Empresa y sucursal registradas en Migrate.']
-                            : ['state' => 'error', 'text' => 'No se completo el alta base de empresa y sucursal en Migrate.'],
-                        ($migrateSummary['lic_rejected'] || $migrateSummary['lic_errors'] !== [])
-                            ? ['state' => 'error', 'text' => implode(' | ', array_values(array_unique($migrateSummary['lic_errors'])))]
+                        ['state' => 'done', 'text' => 'Empresa y sucursal registradas en Migrate.'],
+                        $migrateSummary['lic_rejected']
+                            ? ['state' => 'error', 'text' => 'Licenciamiento rechazado por Migrate: ' . $migrateSummary['lic_msg_retorno']]
                             : ($historicalLicenseIssue !== ''
                                 ? ['state' => 'error', 'text' => 'Licenciamiento rechazado en intento previo. Validar antes de continuar.']
-                                : ['state' => 'done', 'text' => 'Licenciamiento aprobado en Migrate.']),
+                                : ['state' => 'done', 'text' => 'Licenciamiento enviado dentro del RegistroEmpresa.']),
                         WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0))
-                        ? ($migrateSummary['user_errors'] !== []
-                            ? ['state' => 'error', 'text' => implode(' | ', $migrateSummary['user_errors'])]
-                            : ['state' => 'warning', 'text' => trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.'))])
+                        ? ['state' => 'warning', 'text' => trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.'))]
                         : ['state' => 'na', 'text' => WorkflowHelper::migrateUserSubstepLabel((int) ($item['licencia'] ?? 0))],
                     ];
                 $userNote = WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0))
-                    ? ($migrateSummary['user_errors'] !== []
-                        ? implode(' | ', $migrateSummary['user_errors'])
-                        : trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.')))
+                    ? trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.'))
                     : WorkflowHelper::migrateUserSubstepLabel((int) ($item['licencia'] ?? 0));
-                $desc .= ' ' . (($migrateSummary['lic_rejected'] || $migrateSummary['lic_errors'] !== [])
-                    ? 'Licenciamiento con error en Migrate. '
+                $desc .= ' ' . ($migrateSummary['lic_rejected']
+                    ? 'Licenciamiento rechazado por Migrate. '
                     : ($historicalLicenseIssue !== ''
                         ? 'Licenciamiento rechazado en intento previo. '
-                        : 'Licenciamiento aprobado en Migrate. ')) . $userNote;
+                        : 'Licenciamiento enviado dentro del RegistroEmpresa. ')) . $userNote;
             }
             $date = formatWorkflowDate($events[$step['key']]['fecha_evento'] ?? null);
             $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
@@ -741,12 +894,12 @@ function substepMeta(string $stepState, string $substep): array
         ];
     }
 
-    if ($stepState === 'na' || $hasText('no aplica')) {
+    if ($stepState === 'na') {
         return [
             'wrapper' => 'bg-slate-100 border-slate-200',
             'iconWrap' => 'bg-slate-200 text-slate-500',
-            'icon' => 'minus',
-            'text' => 'text-slate-700',
+            'icon' => 'minus-circle',
+            'text' => 'text-slate-600 line-through',
         ];
     }
 
@@ -878,9 +1031,12 @@ window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_U
                 <select id="filtro-estado" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
                     <option value="todos">Todos</option>
                     <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>"><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
-                    <option value="Generacion en proceso">Generacion en proceso</option>
-                    <option value="DGI pendiente">DGI pendiente</option>
-                    <option value="Completado">Completado</option>
+                    <option value="Dynamica">Dynamica</option>
+                    <option value="Migrate">Migrate</option>
+                    <option value="Certificado digital">Certificado digital</option>
+                    <option value="Homologación DGI">Homologación DGI</option>
+                    <option value="Alta pendiente">Alta pendiente</option>
+                    <option value="Cliente activo">Cliente activo</option>
                     <option value="Cancelado">Cancelado</option>
                 </select>
             </div>
@@ -890,8 +1046,10 @@ window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_U
                 <select id="filtro-hito" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
                     <option value="todos">Todos los hitos</option>
                     <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>"><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
+                    <option value="Dynamica">Dynamica</option>
                     <option value="Migrate">Migrate</option>
-                    <option value="Pendiente DGI">Pendiente DGI</option>
+                    <option value="Certificado Digital">Certificado Digital</option>
+                    <option value="Homologación DGI">Homologación DGI</option>
                     <option value="Alta Pendiente">Alta pendiente</option>
                     <option value="Cliente Activo">Cliente activo</option>
                     <option value="Cancelado">Cancelado</option>
@@ -918,13 +1076,15 @@ window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_U
                 <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
                     <?php foreach ($rows as $item): ?>
                         <?php
+                        $itemId = (int) $item['id'];
                         $itemHistory = $workflowHistory[$item['id']] ?? [];
                         $meta = buildListMeta($item, $itemHistory);
-                        $timeline = buildTimeline($item, $meta, $itemHistory);
-                        $itemId = (int) $item['id'];
+                        $deferredTask = $deferredTasks[$itemId] ?? null;
+                        $timeline = buildTimeline($item, $meta, $itemHistory, $deferredTask);
                         $licencia = licenciaEtiqueta($item);
                         $displayDate = !empty($item['fecha_creacion']) ? date('d/m/Y', strtotime((string) $item['fecha_creacion'])) : '-';
                         $recordForJs = $item;
+                        $recordForJs['current_files'] = $fileMetaByNuevaEmpresa[$itemId] ?? [];
                         $recordJson = json_encode($recordForJs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                         ?>
                         <tr class="hover:bg-slate-50/70 transition cursor-pointer row-registro" data-id="<?= $itemId ?>" data-status="<?= h($meta['status_label']) ?>" data-hito="<?= h($meta['hito_key']) ?>" data-record='<?= h((string) $recordJson) ?>' onclick="toggleFilaExpandida(<?= $itemId ?>, event)">
@@ -1040,6 +1200,9 @@ window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_U
                                                                     <span class="text-[9px] px-1 py-0.2 rounded font-normal <?= $classes['type'] ?>"><?= h($step['type']) ?></span>
                                                                 </h5>
                                                                 <p class="<?= $classes['desc'] ?>"><?= h($step['desc']) ?></p>
+                                                                <?php if (!empty($step['note'])): ?>
+                                                                    <p class="mt-1 text-[10px] font-semibold text-blue-600"><?= h((string) $step['note']) ?></p>
+                                                                <?php endif; ?>
                                                                 <?php if (!empty($step['substeps'])): ?>
                                                                     <div class="mt-2 rounded-lg border border-slate-200 bg-white/90 p-2 space-y-1.5">
                                                                         <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Subhitos</p>
@@ -1364,4 +1527,6 @@ window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_U
 </div>
 
 <?php require __DIR__ . '/../layout/footer.php'; ?>
+
+
 

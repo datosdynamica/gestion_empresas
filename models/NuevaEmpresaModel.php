@@ -2,17 +2,6 @@
 
 declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| Registro temporal del onboarding
-|--------------------------------------------------------------------------
-| Esta tabla es el corazon del modulo: almacena la empresa mientras atraviesa
-| aprobacion, alta en Dynamica, alta en Migrate y cierre final del proceso.
-*/
-
-/**
- * Modelo principal del flujo de nuevas empresas.
- */
 class NuevaEmpresaModel extends BaseModel
 {
     private const SELECT_ALIASES = "
@@ -283,7 +272,7 @@ class NuevaEmpresaModel extends BaseModel
                 ErrorProceso = ?
             WHERE Id = ?
         ");
-        $stmt->execute([ESTADO_ERROR_APROBACION, 'Error al aprobar', $message, $id]);
+        $stmt->execute([ESTADO_ERROR_APROBACION, $this->normalizeWorkflowDetail('Error al aprobar'), $message, $id]);
     }
 
     public function updateWorkflowDetail(int $id, string $detail): void
@@ -293,7 +282,17 @@ class NuevaEmpresaModel extends BaseModel
             SET EstadoDetalle = ?
             WHERE Id = ?
         ");
-        $stmt->execute([$detail, $id]);
+        $stmt->execute([$this->normalizeWorkflowDetail($detail), $id]);
+    }
+
+    public function updateErrorProceso(int $id, ?string $error): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE " . TABLA_EMPRESAS_NUEVAS . "
+            SET ErrorProceso = ?
+            WHERE Id = ?
+        ");
+        $stmt->execute([$error, $id]);
     }
 
     public function updateHitoActual(int $id, string $hitoActual, ?string $detail = null): void
@@ -304,7 +303,7 @@ class NuevaEmpresaModel extends BaseModel
                 SET HitoActual = ?, EstadoDetalle = ?
                 WHERE Id = ?
             ");
-            $stmt->execute([$hitoActual, $detail, $id]);
+            $stmt->execute([$hitoActual, $this->normalizeWorkflowDetail($detail), $id]);
             return;
         }
 
@@ -321,12 +320,12 @@ class NuevaEmpresaModel extends BaseModel
         $stmt = $this->db->prepare("
             UPDATE " . TABLA_EMPRESAS_NUEVAS . "
             SET Estado = ?,
-                HitoActual = 'PENDIENTE_DGI',
+                HitoActual = 'CERTIFICADO_DIGITAL',
                 EstadoDetalle = ?,
                 ErrorProceso = NULL
             WHERE Id = ?
         ");
-        $stmt->execute([ESTADO_APROBADO, $detail, $id]);
+        $stmt->execute([ESTADO_APROBADO, $this->normalizeWorkflowDetail($detail), $id]);
     }
 
     public function markMigrateError(int $id, string $detail): void
@@ -342,6 +341,13 @@ class NuevaEmpresaModel extends BaseModel
         $stmt->execute([ESTADO_ERROR_APROBACION, $detail, $id]);
     }
 
+    private function normalizeWorkflowDetail(string $detail): string
+    {
+        // Evita cortes por longitud y elimina saltos raros antes de guardar el detalle visible del flujo.
+        $detail = trim(preg_replace('/\s+/u', ' ', $detail) ?? $detail);
+        return mb_substr($detail, 0, 900);
+    }
+
     public function storeMigrateExchange(int $id, string $requestXml, string $responseXml): void
     {
         $stmt = $this->db->prepare("
@@ -353,3 +359,4 @@ class NuevaEmpresaModel extends BaseModel
         $stmt->execute([$requestXml, $responseXml, $id]);
     }
 }
+

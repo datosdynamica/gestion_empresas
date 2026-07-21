@@ -110,8 +110,10 @@ foreach ($candidates as $row) {
     $company = $companyMap[$empresaId] ?? null;
 
     if ($company === null) {
-        $errors++;
-        fwrite(STDOUT, "[ERROR] Empresa {$empresaId}: no se encontro informacion base para notificar." . PHP_EOL);
+        $skipped++;
+        $companyRut = preg_replace('/\D+/', '', (string) ($row['Rut'] ?? ''));
+        $companyName = trim((string) ($row['RazonSocial'] ?? ('Empresa ' . $empresaId)));
+        fwrite(STDOUT, "[SKIP] {$companyName} ({$companyRut}): ya no integra la base activa vigente para notificar." . PHP_EOL);
         continue;
     }
 
@@ -175,13 +177,11 @@ foreach ($candidates as $row) {
         ]);
 
         if (!$dryRun) {
-            $daysLabel = $diasRestantes === 1 ? '1 dia' : ($diasRestantes . ' dias');
-            $destinatarios = implode('; ', (array) ($sentPayload['to'] ?? []));
             $actionModel->create([
                 'empresa_id' => $empresaId,
                 'rut' => $company['rut'],
-                'accion' => 'AVISO_CORREO',
-                'descripcion' => 'Recordatorio automatico de certificado enviado por correo. Ventana: ' . $daysLabel . '. Destinatarios: ' . $destinatarios . '.',
+                'accion' => 'CERTIFICADO_RECORDATORIO',
+                'descripcion' => 'Recordatorio de vencimiento enviado por correo. Restan ' . $diasRestantes . ' dia(s). Vence: ' . $fechaVencimiento . '.',
                 'usuario_login' => 'sistema',
                 'usuario_nombre' => 'Sistema',
             ]);

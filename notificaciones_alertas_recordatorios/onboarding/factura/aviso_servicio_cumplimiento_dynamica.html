@@ -1,0 +1,242 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Activación de Servicio - Dynamica</title>
+  <!-- Importación de la fuente Nunito Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..900;1,6..12,300..900&display=swap" rel="stylesheet" />
+  <style type="text/css">
+    /* Estilos de reajuste globales para clientes de correo */
+    body, table, td, a {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    table, td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+    table {
+      border-collapse: collapse !important;
+    }
+    body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background-color: #F4F6F8;
+    }
+
+    /* Fallback de tipografía para clientes que no soportan Web Fonts */
+    body, table, td, p, a, li {
+      font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Estilos interactivos */
+    a {
+      color: #FF6B35;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline !important;
+    }
+
+    /* Media Queries para optimización responsive */
+    @media screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      .content-block {
+        padding: 30px 16px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F6F8;">
+
+  <!-- Contenedor Principal (Fondo gris claro para dar contraste) -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #F4F6F8;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        
+        <!-- Tabla del Correo (Ancho máximo 600px centrado) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+          
+          <!-- Encabezado / Logo -->
+          <tr>
+            <td align="center" style="padding: 40px 40px 20px 40px; background-color: #FFFFFF; border-bottom: 3px solid #FF6B35;">
+              <table border="0" cellpadding="0" cellspacing="0" align="center">
+                <tr>
+                  <td style="font-size: 28px; font-weight: 800; color: #0F2C59; letter-spacing: -0.5px;">
+                    dynamica<span style="color: #FF6B35;">.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Cuerpo del Mensaje -->
+          <tr>
+            <td class="content-block" style="padding: 40px 40px 30px 40px; background-color: #FFFFFF;">
+              
+              <!-- Título y Subtítulo: Razón Social y RUT -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px; border-bottom: 1px solid #F1F5F9; padding-bottom: 20px;">
+                <tr>
+                  <td style="font-size: 22px; font-weight: 800; color: #0F2C59; line-height: 28px; padding-bottom: 4px;">
+                    {{RAZON_SOCIAL}}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 14px; font-weight: 700; color: #FF6B35; letter-spacing: 0.5px; text-transform: uppercase;">
+                    RUT: {{RUT}}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Saludo -->
+              <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333; font-weight: 600;">
+                Hola, ¿cómo estás? 👋
+              </p>
+
+              <!-- Introducción -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Nos comunicamos para informarte que el <strong>Servicio de Cumplimiento</strong> de tu cuenta ya se encuentra activo. A partir de este momento, queda operativo el envío automatizado de tus reportes diarios hacia DGI 🏢.
+              </p>
+
+              <p style="margin: 0 0 25px 0; font-size: 15px; line-height: 24px; color: #333333; font-weight: 600;">
+                Queremos recordarte algunos puntos clave sobre el alcance de esta modalidad:
+              </p>
+
+              <!-- Lista Estilizada (Implementada con tablas para asegurar alineación de viñetas) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px;">
+                
+                <!-- Punto 1: Alcance del servicio -->
+                <tr>
+                  <td valign="top" style="width: 32px; padding-bottom: 20px; font-size: 18px; line-height: 24px; text-align: left; user-select: none;">
+                    📊
+                  </td>
+                  <td style="padding-bottom: 20px; padding-left: 8px; font-size: 15px; line-height: 24px; color: #333333;">
+                    <strong style="color: #0F2C59;">Alcance del servicio:</strong> Esta cobertura se enfoca exclusivamente en el cumplimiento automatizado del envío de reportes. No otorga acceso a ninguna de nuestras plataformas de facturación. En caso de que en el futuro requieras emitir comprobantes, será necesario contratar uno de nuestros planes de plataforma correspondientes.
+                  </td>
+                </tr>
+
+                <!-- Punto 2: Condiciones comerciales -->
+                <tr>
+                  <td valign="top" style="width: 32px; padding-bottom: 20px; font-size: 18px; line-height: 24px; text-align: left; user-select: none;">
+                    💳
+                  </td>
+                  <td style="padding-bottom: 20px; padding-left: 8px; font-size: 15px; line-height: 24px; color: #333333;">
+                    <strong style="color: #0F2C59;">Condiciones comerciales:</strong> El servicio se contrata por el período completo; no se prorratea ni se realizan devoluciones en caso de bajas anticipadas o cambios de plan.
+                  </td>
+                </tr>
+
+                <!-- Punto 3: Vigencia y renovación -->
+                <tr>
+                  <td valign="top" style="width: 32px; padding-bottom: 20px; font-size: 18px; line-height: 24px; text-align: left; user-select: none;">
+                    ⏳
+                  </td>
+                  <td style="padding-bottom: 20px; padding-left: 8px; font-size: 15px; line-height: 24px; color: #333333;">
+                    <strong style="color: #0F2C59;">Vigencia y renovación:</strong> El Servicio de Cumplimiento es válido estrictamente durante el período contratado. Una vez finalizado, deberá ser renovado para mantener la automatización, siendo este vencimiento totalmente independiente de la fecha de vigencia de tu certificado digital.
+                  </td>
+                </tr>
+
+              </table>
+
+              <!-- Mensaje sobre la factura -->
+              <p style="margin: 0 0 15px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Te informamos que la <strong style="color: #0F2C59;">factura 📄</strong> que respalda la contratación ya fue emitida y la recibirás en tu correo o podrás visualizarla en el sector de recibidos de nuestro sistema.
+              </p>
+
+              <!-- Indicación de pago -->
+              <p style="margin: 0 0 25px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Te recordamos que dispones de <strong style="color: #FF6B35;">10 días</strong> para realizar el pago correspondiente a través de nuestra plataforma de pago de forma simple y segura.
+              </p>
+
+              <!-- Botón de Pago Call to Action -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center">
+                    <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                      <tr>
+                        <td align="center" bgcolor="#FF6B35" style="border-radius: 6px;">
+                          <a href="https://www.datosdynamica.net/pagarenlinea/" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: 700; color: #FFFFFF; text-decoration: none; border-radius: 6px; background-color: #FF6B35; border: 1px solid #FF6B35; letter-spacing: 0.5px;">
+                            Pagar Factura en Línea
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Agradecimiento -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Muchas gracias por confiar en Dynamica para asegurar la tranquilidad fiscal 🔐 de tu negocio. Apreciamos mucho que nos elijas.
+              </p>
+
+              <!-- Cierre -->
+              <p style="margin: 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Ante cualquier consulta, quedamos a las órdenes.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Bloque de Firma y Cierre -->
+          <tr>
+            <td style="padding: 0 40px 40px 40px; background-color: #FFFFFF;">
+              
+              <!-- Divisor Sutil -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="border-top: 1px solid #E5E7EB; padding-top: 25px;"></td>
+                </tr>
+              </table>
+
+              <!-- Datos de la firma -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="font-size: 15px; line-height: 22px; color: #333333;">
+                    <span style="font-weight: 600; color: #0F2C59;">Saludos,</span><br />
+                    <span style="font-weight: 600; color: #0F2C59;">Equipo de Dynamica</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top: 8px; font-size: 14px; line-height: 20px; color: #777777;">
+                    Central de Whatsapp: 097 471 484<br />
+                    <a href="https://www.dynamica.com.uy" target="_blank" style="color: #777777; text-decoration: none; font-weight: 600;">www.dynamica.com.uy</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Pie de página informativo externo -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="margin-top: 20px;">
+          <tr>
+            <td align="center" style="font-size: 11px; line-height: 16px; color: #9CA3AF; padding: 0 20px;">
+              Este es un correo automático enviado por Dynamica. Por favor no respondas directamente a este mensaje.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

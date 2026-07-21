@@ -2,19 +2,6 @@
 
 declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| Controlador principal del modulo
-|--------------------------------------------------------------------------
-| Orquesta todo el ciclo de vida del onboarding: alta temporal, aprobacion,
-| provisionamiento interno, integracion con Migrate, panel de certificados,
-| exportaciones y cambios de hitos. Si hay que seguir el flujo completo del
-| negocio, este es el primer archivo que conviene leer.
-*/
-
-/**
- * Controlador central del onboarding y del panel de certificados.
- */
 class NuevasEmpresasController
 {
     private $model;
@@ -27,10 +14,10 @@ class NuevasEmpresasController
     private $localModel;
     private $secUserModel;
     private $provisioningModel;
+    private $onboardingMailer;
+    private $onboardingInvoiceService;
+    private $hitoAutoModel;
 
-    /**
-     * Inicializa todos los modelos y servicios usados por el modulo.
-     */
     public function __construct()
     {
         $this->model = new NuevaEmpresaModel();
@@ -43,11 +30,12 @@ class NuevasEmpresasController
         $this->localModel = new LocalModel();
         $this->secUserModel = new SecUserModel();
         $this->provisioningModel = new EmpresaProvisioningModel();
+        $this->onboardingMailer = new OnboardingMailer();
+        $this->onboardingInvoiceService = new OnboardingInvoiceService();
+        $this->hitoAutoModel = new EmpresaNuevaHitoAutoModel();
+        $this->hitoAutoModel->ensureTable();
     }
 
-    /**
-     * Muestra el listado principal del panel con paginacion e historial resumido.
-     */
     public function index(): void
     {
         $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -61,11 +49,28 @@ class NuevasEmpresasController
 
         $offset = ($page - 1) * $perPage;
         $items = $this->model->listPage($perPage, $offset);
+        $itemIds = array_values(array_filter(array_map(static function (array $item): int {
+            return (int) ($item['id'] ?? 0);
+        }, $items)));
         $formOptions = $this->loadFormOptions();
         $items = $this->hydrateReferenceLabelsForItems($items, $formOptions);
-        $workflowHistory = $this->historialModel->listWorkflowEventsByNuevaEmpresaIds(array_map(static function (array $item): int {
-            return (int) ($item['id'] ?? 0);
-        }, $items));
+        $deferredTasks = $this->hitoAutoModel->findLatestCredentialsTasksByNuevaEmpresaIds($itemIds);
+        $workflowHistory = $this->historialModel->listWorkflowEventsByNuevaEmpresaIds($itemIds);
+        $fileMetaByNuevaEmpresa = [];
+        foreach ($itemIds as $itemId) {
+            foreach ($this->archivoModel->listByNuevaEmpresaId($itemId) as $archivo) {
+                $tipoArchivo = (string) ($archivo['tipo_archivo'] ?? '');
+                if ($tipoArchivo === '' || isset($fileMetaByNuevaEmpresa[$itemId][$tipoArchivo])) {
+                    continue;
+                }
+
+                $fileMetaByNuevaEmpresa[$itemId][$tipoArchivo] = [
+                    'id' => (int) ($archivo['id'] ?? 0),
+                    'name' => (string) ($archivo['nombre_original'] ?? ''),
+                    'download_url' => app_url('index.php?action=download-file&id=' . (int) ($archivo['id'] ?? 0)),
+                ];
+            }
+        }
         $pagination = [
             'page' => $page,
             'per_page' => $perPage,
@@ -80,9 +85,6 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/list.php';
     }
 
-    /**
-     * Abre el formulario de alta de una nueva empresa.
-     */
     public function create(): void
     {
         $pageTitle = 'Altas y Automatizaciones';
@@ -90,9 +92,6 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/form.php';
     }
 
-    /**
-     * Muestra la trazabilidad general de eventos del modulo.
-     */
     public function trace(): void
     {
         $events = $this->historialModel->listRecent(120);
@@ -100,9 +99,6 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/nuevas_empresas/trace.php';
     }
 
-    /**
-     * Presenta la configuracion operativa editable del modulo.
-     */
     public function settings(): void
     {
         $pageTitle = 'Configuracion';
@@ -132,9 +128,6 @@ class NuevasEmpresasController
         require __DIR__ . '/../views/settings/index.php';
     }
 
-    /**
-     * Resuelve la pantalla del panel de certificados, filtros y cache local.
-     */
     public function certificates(): void
     {
         @set_time_limit(0);
@@ -327,11 +320,14 @@ class NuevasEmpresasController
                             continue;
                         }
 
-                        $diasRestantes = (int) ($row['DiasRestantes'] ?? 0);
+                        $diasRestantes = $this->resolveCertificateDaysRemaining(
+                            (string) ($row['CerFchVencimiento'] ?? ''),
+                            (string) ($row['DiasRestantes'] ?? '')
+                        );
                         if (in_array($filters['cer_status'], ['A', 'I'], true) && (string) ($row['CerStatus'] ?? '') !== $filters['cer_status']) {
                             continue;
                         }
-                        if ($intervalLimit > 0 && ($diasRestantes < 0 || $diasRestantes > $intervalLimit)) {
+                        if ($intervalLimit > 0 && abs($diasRestantes) > $intervalLimit) {
                             continue;
                         }
 
@@ -349,7 +345,7 @@ class NuevasEmpresasController
                             'nombre_completo_firmante' => (string) ($companyMap[$empresaId]['nombre_completo_firmante'] ?? ''),
                             'ci_firmante' => (string) ($companyMap[$empresaId]['ci_firmante'] ?? ''),
                             'cer_status' => (string) ($row['CerStatus'] ?? ''),
-                            'dias_restantes' => (string) ($row['DiasRestantes'] ?? ''),
+                            'dias_restantes' => (string) $diasRestantes,
                             'cer_fch_vencimiento' => (string) ($row['CerFchVencimiento'] ?? ''),
                             'fecha_consulta' => (string) ($row['FechaConsulta'] ?? ''),
                             'action_history' => $actionHistoryByEmpresa[$empresaId] ?? [],
@@ -1153,6 +1149,35 @@ class NuevasEmpresasController
         return strtoupper(trim($status)) === 'A' ? 'Activo' : 'Inactivo';
     }
 
+    private function resolveCertificateDaysRemaining(string $expiryDate, string $fallbackValue = ''): int
+    {
+        $expiryDate = trim($expiryDate);
+        if ($expiryDate === '') {
+            return (int) $fallbackValue;
+        }
+
+        $formats = ['Y-m-d', 'Y-m-d H:i:s', 'Y-m-d H:i'];
+        $expiry = null;
+        foreach ($formats as $format) {
+            $parsed = DateTimeImmutable::createFromFormat($format, $expiryDate);
+            if ($parsed instanceof DateTimeImmutable) {
+                $expiry = $parsed;
+                break;
+            }
+        }
+
+        if (!$expiry instanceof DateTimeImmutable) {
+            try {
+                $expiry = new DateTimeImmutable($expiryDate);
+            } catch (Throwable $e) {
+                return (int) $fallbackValue;
+            }
+        }
+
+        $today = new DateTimeImmutable('today');
+        return (int) $today->diff($expiry)->format('%r%a');
+    }
+
     private function resolveCertificateServiceCredentials(EmpresaModel $empresaModel): array
     {
         $empresa = null;
@@ -1364,6 +1389,8 @@ class NuevasEmpresasController
 
         $archivos = $this->archivoModel->listByNuevaEmpresaId($id);
         $workflowHistory = $this->historialModel->listWorkflowEventsByNuevaEmpresaIds([$id]);
+        $deferredTasks = $this->hitoAutoModel->findLatestCredentialsTasksByNuevaEmpresaIds([$id]);
+        $deferredTask = $deferredTasks[$id] ?? null;
         $formOptions = $this->loadFormOptions();
         $item = $this->hydrateReferenceLabelsForItem($item, $formOptions);
         $pageTitle = 'Altas y Automatizaciones';
@@ -1538,6 +1565,81 @@ class NuevasEmpresasController
         );
         $this->model->updateFolder($id, $folderInfo['relative'], 1);
         $this->model->updateTemp($id, $data);
+
+        // En edicion, cada input de adjunto debe crear el archivo si no existe
+        // o reemplazar el existente del mismo tipo sin obligar al usuario a ir
+        // al flujo separado de "Reemplazar".
+        $filesMap = [
+            'archivo_pfx' => ['tipo' => 'pfx', 'obligatorio' => (($data['alta_certificado_digital'] ?? '') === 'ADJUNTO') ? 1 : 0],
+            'archivo_credito_fiscal' => ['tipo' => 'credito_fiscal', 'obligatorio' => (($data['alta_credito_fiscal'] ?? 'NO') !== 'NO') ? 1 : 0],
+            'archivo_contrato' => ['tipo' => 'contrato', 'obligatorio' => ((float) ($data['cliente_abonado_importe'] ?? 0) > 1000) ? 1 : 0],
+            'archivo_6906' => ['tipo' => 'f6906', 'obligatorio' => 0],
+            'archivo_logo' => ['tipo' => 'logo', 'obligatorio' => 0],
+        ];
+        $existingFiles = [];
+        foreach ($this->archivoModel->listByNuevaEmpresaId($id) as $archivoExistente) {
+            $tipo = (string) ($archivoExistente['tipo_archivo'] ?? '');
+            if ($tipo !== '' && !isset($existingFiles[$tipo])) {
+                $existingFiles[$tipo] = $archivoExistente;
+            }
+        }
+
+        foreach ($filesMap as $inputName => $cfg) {
+            if (empty($_FILES[$inputName]) || ($_FILES[$inputName]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+
+            $stored = FileStorage::storeUploadedFileInFolder($_FILES[$inputName], $cfg['tipo'], (string) $folderInfo['relative']);
+            $existing = $existingFiles[$cfg['tipo']] ?? null;
+
+            if (is_array($existing)) {
+                if (!empty($existing['ruta_archivo']) && (string) $existing['ruta_archivo'] !== (string) $stored['relative_path']) {
+                    FileStorage::deleteRelativeFile((string) $existing['ruta_archivo']);
+                }
+                $this->archivoModel->updateFile((int) $existing['id'], [
+                    'nombre_original' => $stored['original_name'],
+                    'nombre_guardado' => $stored['stored_name'],
+                    'ruta_archivo' => $stored['relative_path'],
+                    'extension' => $stored['extension'],
+                    'mime_type' => $stored['mime_type'],
+                    'tamano_bytes' => $stored['size'],
+                    'usuario_subida' => $_SESSION['usuario'] ?? 'admin',
+                ]);
+                $this->appendRecordLog((string) $folderInfo['relative'], 'REEMPLAZO_ADJUNTO', [
+                    'nueva_empresa_id' => $id,
+                    'usuario' => $_SESSION['usuario'] ?? 'admin',
+                    'tipo_archivo' => $cfg['tipo'],
+                    'nombre_original' => $stored['original_name'],
+                    'nombre_guardado' => $stored['stored_name'],
+                    'ruta_archivo' => $stored['relative_path'],
+                    'tamano_bytes' => $stored['size'],
+                ]);
+                continue;
+            }
+
+            $this->archivoModel->create([
+                'nueva_empresa_id' => $id,
+                'tipo_archivo' => $cfg['tipo'],
+                'nombre_original' => $stored['original_name'],
+                'nombre_guardado' => $stored['stored_name'],
+                'ruta_archivo' => $stored['relative_path'],
+                'extension' => $stored['extension'],
+                'mime_type' => $stored['mime_type'],
+                'tamano_bytes' => $stored['size'],
+                'obligatorio' => $cfg['obligatorio'],
+                'usuario_subida' => $_SESSION['usuario'] ?? 'admin',
+            ]);
+            $this->appendRecordLog((string) $folderInfo['relative'], 'ADJUNTO_CARGADO', [
+                'nueva_empresa_id' => $id,
+                'tipo_archivo' => $cfg['tipo'],
+                'nombre_original' => $stored['original_name'],
+                'nombre_guardado' => $stored['stored_name'],
+                'ruta_archivo' => $stored['relative_path'],
+                'obligatorio' => (bool) $cfg['obligatorio'],
+                'tamano_bytes' => $stored['size'],
+            ]);
+        }
+
         $this->historialModel->create([
             'nueva_empresa_id' => $id,
             'evento' => 'EDICION',
@@ -1929,39 +2031,567 @@ class NuevasEmpresasController
 
         $target = trim((string) ($_POST['target_hito'] ?? ''));
         $usuario = $_SESSION['usuario'] ?? 'admin';
+        $normalizedTarget = strtoupper($target);
+        $currentHito = $this->resolveCurrentWorkflowForAction($item);
 
-        $allowed = [
-            'PENDIENTE_DGI' => ['evento' => 'HITO_PENDIENTE_DGI', 'descripcion' => 'Pendiente DGI.'],
-            'ALTA_PENDIENTE' => ['evento' => 'HITO_ALTA_PENDIENTE', 'descripcion' => 'Alta pendiente.'],
-            'CLIENTE_ACTIVO' => ['evento' => 'HITO_CLIENTE_ACTIVO', 'descripcion' => 'Cliente activo.'],
-        ];
-
-        if (!isset($allowed[$target])) {
-            Response::flash('error', 'El hito solicitado no es valido.');
+        if ($normalizedTarget === 'CERTIFICADO_DIGITAL') {
+            if (!$this->canMarkCertificateDigital($item, $currentHito)) {
+                Response::flash('error', 'El caso no esta habilitado para marcar Certificado Digital en este momento.');
+                Response::redirect('index.php?action=show&id=' . $id);
+            }
+            $this->completeCertificateDigitalStep($id, $item, $usuario);
+            Response::flash('success', 'Certificado digital marcado correctamente. El flujo quedo listo para Homologacion DGI.');
             Response::redirect('index.php?action=show&id=' . $id);
         }
 
-        $config = $allowed[$target];
-        $this->model->updateHitoActual($id, $target, $config['descripcion']);
+        if ($normalizedTarget === 'HOMOLOGACION_DGI') {
+            if (!$this->canMarkHomologacionDgi($item, $currentHito)) {
+                Response::flash('error', 'El caso no esta habilitado para marcar Homologacion DGI en este momento.');
+                Response::redirect('index.php?action=show&id=' . $id);
+            }
+            $this->completeHomologacionDgiStep($id, $item, $usuario);
+            Response::flash('success', 'Homologacion DGI marcada correctamente. El caso quedo listo para Alta Final.');
+            Response::redirect('index.php?action=show&id=' . $id);
+        }
+
+        if ($normalizedTarget === 'ALTA_FINAL') {
+            if (!$this->canRunAltaFinal($item, $currentHito)) {
+                Response::flash('error', 'El caso no esta habilitado para ejecutar Alta Final en este momento.');
+                Response::redirect('index.php?action=show&id=' . $id);
+            }
+            try {
+                $result = $this->completeAltaFinalAndAutoStages($id, $item, $usuario);
+                Response::flash('success', $result['message']);
+            } catch (Throwable $e) {
+                try {
+                    $restoreHito = 'ALTA_PENDIENTE';
+                    $restoreDetail = trim((string) ($item['estado_detalle'] ?? ''));
+                    if ($restoreDetail === '') {
+                        $restoreDetail = 'Alta final pendiente por novedad al procesar la factura automatica.';
+                    }
+                    $this->model->updateHitoActual($id, $restoreHito, $restoreDetail);
+                    $this->model->updateErrorProceso($id, $e->getMessage());
+                    $this->appendRecordLog((string) ($item['carpeta_base'] ?? ''), 'ERROR_ALTA_FINAL', [
+                        'nueva_empresa_id' => $id,
+                        'usuario' => $usuario,
+                        'error' => $e->getMessage(),
+                        'target_hito' => $normalizedTarget,
+                    ]);
+                } catch (Throwable $restoreError) {
+                    // Intencional: no ocultar el error principal si falla la restauracion del estado.
+                }
+
+                Response::flash('error', 'No fue posible completar el Alta Final: ' . $e->getMessage());
+            }
+            Response::redirect('index.php?action=show&id=' . $id);
+        }
+
+        if ($normalizedTarget === 'CLIENTE_ACTIVO') {
+            if (!$this->canMarkClienteActivo($item, $currentHito)) {
+                Response::flash('error', 'El caso no esta habilitado para marcar Cliente Activo en este momento.');
+                Response::redirect('index.php?action=show&id=' . $id);
+            }
+            $this->registerWorkflowEvent(
+                $id,
+                'CLIENTE_ACTIVO',
+                'HITO_CLIENTE_ACTIVO',
+                'Cliente activo.',
+                $usuario,
+                (string) ($item['carpeta_base'] ?? '')
+            );
+            Response::flash('success', 'El cliente se marco como activo.');
+            Response::redirect('index.php?action=show&id=' . $id);
+        }
+
+        Response::flash('error', 'El hito solicitado no es valido.');
+        Response::redirect('index.php?action=show&id=' . $id);
+    }
+
+    private function canMarkCertificateDigital(array $item, string $currentHito): bool
+    {
+        if ((string) ($item['estado'] ?? '') === ESTADO_ERROR_APROBACION) {
+            return false;
+        }
+
+        return $currentHito === 'CERTIFICADO_DIGITAL';
+    }
+
+    private function canMarkHomologacionDgi(array $item, string $currentHito): bool
+    {
+        if ((string) ($item['estado'] ?? '') === ESTADO_ERROR_APROBACION) {
+            return false;
+        }
+
+        return $currentHito === 'HOMOLOGACION_DGI';
+    }
+
+    private function canRunAltaFinal(array $item, string $currentHito): bool
+    {
+        if ((string) ($item['estado'] ?? '') === ESTADO_ERROR_APROBACION) {
+            return false;
+        }
+
+        return in_array($currentHito, ['ALTA_PENDIENTE', 'ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_FINAL'], true);
+    }
+
+    private function canMarkClienteActivo(array $item, string $currentHito): bool
+    {
+        if ((string) ($item['estado'] ?? '') === ESTADO_ERROR_APROBACION) {
+            return false;
+        }
+
+        return in_array($currentHito, ['ALTA_FINAL', 'CLIENTE_ACTIVO'], true);
+    }
+
+    private function resolveCurrentWorkflowForAction(array $item): string
+    {
+        $estado = (string) ($item['estado'] ?? '');
+        $persisted = strtoupper(trim((string) ($item['hito_actual'] ?? '')));
+        $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+        $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+        $historyByItem = $this->historialModel->listWorkflowEventsByNuevaEmpresaIds([(int) ($item['id'] ?? 0)]);
+        $history = $historyByItem[(int) ($item['id'] ?? 0)] ?? [];
+        $events = [];
+
+        foreach ($history as $event) {
+            $events[(string) ($event['evento'] ?? '')] = $event;
+        }
+
+        if ($estado === ESTADO_ELIMINADO) {
+            return 'CANCELADO';
+        }
+        if (isset($events['HITO_CLIENTE_ACTIVO'])) {
+            return 'CLIENTE_ACTIVO';
+        }
+        if (isset($events['HITO_ENVIO_CREDENCIALES'])) {
+            return 'ALTA_FINAL';
+        }
+        if (isset($events['HITO_ENVIO_FACTURA'])) {
+            return 'ENVIO_CREDENCIALES';
+        }
+        if (isset($events['HITO_ALTA_PENDIENTE'])) {
+            return 'ALTA_PENDIENTE';
+        }
+        if (isset($events['HITO_HOMOLOGACION_DGI'])) {
+            return 'ENVIO_FACTURA';
+        }
+        if (isset($events['HITO_CERTIFICADO_DIGITAL'])) {
+            return 'HOMOLOGACION_DGI';
+        }
+        if (isset($events['HITO_PENDIENTE_DGI'])) {
+            return 'HOMOLOGACION_DGI';
+        }
+        if (isset($events['HITO_MIGRATE_OK'])) {
+            return 'CERTIFICADO_DIGITAL';
+        }
+        if (isset($events['HITO_DYNAMICA_OK']) || ($empresaCreada && $clienteCreado)) {
+            return 'MIGRATE';
+        }
+        if (isset($events['HITO_EN_PROCESO'])) {
+            return 'DYNAMICA';
+        }
+        if ($persisted === 'ERROR_APROBACION' && !$empresaCreada && !$clienteCreado) {
+            return 'APROBACION_PENDIENTE';
+        }
+        if ($persisted !== '') {
+            return $persisted === 'PENDIENTE_DGI' ? 'HOMOLOGACION_DGI' : $persisted;
+        }
+        if ($estado === ESTADO_ERROR_APROBACION) {
+            return ($empresaCreada && $clienteCreado) ? 'MIGRATE' : 'APROBACION_PENDIENTE';
+        }
+        if ($estado === ESTADO_APROBADO) {
+            return ($empresaCreada && $clienteCreado) ? 'CERTIFICADO_DIGITAL' : 'DYNAMICA';
+        }
+
+        return $estado === ESTADO_PENDIENTE_APROBACION ? 'APROBACION_PENDIENTE' : 'DYNAMICA';
+    }
+
+    private function completeCertificateDigitalStep(int $id, array $item, string $usuario): void
+    {
+        $this->registerWorkflowEvent(
+            $id,
+            'HOMOLOGACION_DGI',
+            'HITO_CERTIFICADO_DIGITAL',
+            'Certificado digital gestionado.',
+            $usuario,
+            (string) ($item['carpeta_base'] ?? '')
+        );
+    }
+
+    private function completeHomologacionDgiStep(int $id, array $item, string $usuario): void
+    {
+        $folderBase = (string) ($item['carpeta_base'] ?? '');
+        $this->registerWorkflowEvent(
+            $id,
+            'ALTA_PENDIENTE',
+            'HITO_HOMOLOGACION_DGI',
+            'Homologación DGI completada.',
+            $usuario,
+            $folderBase
+        );
+    }
+
+    private function loadWorkflowEventMap(int $nuevaEmpresaId): array
+    {
+        $historyByItem = $this->historialModel->listWorkflowEventsByNuevaEmpresaIds([$nuevaEmpresaId]);
+        $history = $historyByItem[$nuevaEmpresaId] ?? [];
+        $events = [];
+
+        foreach ($history as $event) {
+            $code = (string) ($event['evento'] ?? '');
+            if ($code === '') {
+                continue;
+            }
+            $events[$code] = $event;
+        }
+
+        return $events;
+    }
+
+    private function completeAltaFinalAndAutoStages(int $id, array $item, string $usuario): array
+    {
+        $folderBase = (string) ($item['carpeta_base'] ?? '');
+        $overrideEmail = $this->resolveOnboardingOverrideEmail();
+        $events = $this->loadWorkflowEventMap($id);
+        $invoiceAlreadyDone = isset($events['HITO_ENVIO_FACTURA']);
+
+        if ($invoiceAlreadyDone) {
+            $invoiceInfo = [
+                'mode_label' => 'ya emitida previamente',
+                'already_emitted' => true,
+            ];
+        } else {
+            $this->model->updateHitoActual($id, 'ENVIO_FACTURA', 'Preparando hito automatico de envio de factura.');
+            $invoiceInfo = $this->processInvoiceStage($item, $usuario, $folderBase, $overrideEmail);
+        }
+
+        $scheduledAt = $this->resolveCredentialsScheduledAt();
+        $taskId = $this->hitoAutoModel->scheduleCredentialsTask($id, $scheduledAt, [
+            'scheduled_at' => $scheduledAt,
+            'created_by' => $usuario,
+            'environment' => MIGRATE_ENVIRONMENT,
+        ]);
+        $this->model->updateHitoActual(
+            $id,
+            'ENVIO_CREDENCIALES',
+            'Factura emitida. Credenciales programadas para envio diferido el ' . $scheduledAt . '.'
+        );
+
+        $summary = [
+            $invoiceAlreadyDone
+                ? 'Factura ya emitida previamente; no se genero un segundo documento.'
+                : 'Factura automatizada (' . $invoiceInfo['mode_label'] . ').',
+            'Credenciales programadas para el siguiente ciclo automatico.',
+        ];
+
+        return [
+            'message' => implode(' ', $summary),
+            'invoice' => $invoiceInfo,
+            'queue' => [
+                'task_id' => $taskId,
+                'scheduled_at' => $scheduledAt,
+            ],
+        ];
+    }
+
+    private function processInvoiceStage(array $item, string $usuario, string $folderBase, string $overrideEmail): array
+    {
+        $periodo = strtoupper(trim((string) ($item['cliente_abonado_periodo'] ?? 'MENSUAL')));
+        $clienteModel = new ClienteModel();
+        $billingStartDate = $clienteModel->previewBillingStartDate($periodo);
+        $today = new DateTimeImmutable('today');
+        $modeLabel = $periodo === 'ANUAL'
+            ? 'anual inmediata'
+            : (((int) $today->format('d') <= 20) ? 'mensual inmediata' : 'mensual inmediata con fecha desde al mes subsiguiente');
+
+        $invoiceResult = $this->onboardingInvoiceService->emitInvoice($item);
+        $clienteId = (int) ($item['cliente_id_creado'] ?? 0);
+        if ($clienteId > 0) {
+            // La fecha base de facturacion debe quedar visible desde el hito 7,
+            // aun cuando el alta final del cliente se complete en el siguiente ciclo.
+            $clienteModel->persistBillingStartDateForOnboarding($clienteId, $billingStartDate);
+        }
+        $mailResult = [
+            'sent' => false,
+            'template' => '',
+            'to' => [],
+            'error' => '',
+        ];
+        $mailSummary = 'Aviso administrativo de factura pendiente.';
+        try {
+            $mailResult = $this->onboardingMailer->sendInvoiceNotice($item, [
+                'override_email' => $overrideEmail,
+            ]);
+            $mailSummary = 'Aviso administrativo de factura enviado.';
+        } catch (Throwable $mailError) {
+            $mailSummary = 'Aviso administrativo de factura pendiente por error: ' . $mailError->getMessage();
+            $this->appendRecordLog($folderBase, 'AUTO_ENVIO_FACTURA_MAIL_ERROR', [
+                'nueva_empresa_id' => (int) ($item['id'] ?? 0),
+                'usuario' => $usuario,
+                'error' => $mailError->getMessage(),
+            ]);
+        }
+
+        $description = sprintf(
+            'Factura emitida y enviada a Migrate (%s). Fecha base de facturacion: %s. %s',
+            $modeLabel,
+            $billingStartDate,
+            $mailSummary
+        );
+
+        $this->registerWorkflowEvent(
+            (int) $item['id'],
+            'ENVIO_CREDENCIALES',
+            'HITO_ENVIO_FACTURA',
+            $description,
+            $usuario,
+            $folderBase,
+            'AUTO_ENVIO_FACTURA',
+            [
+                'template' => $mailResult['template'] ?? '',
+                'to' => implode(';', (array) ($mailResult['to'] ?? [])),
+                'mode_label' => $modeLabel,
+                'billing_start_date' => $billingStartDate,
+                'invoice_idventa' => (string) ($invoiceResult['idventa'] ?? ''),
+                'invoice_estado' => (string) ($invoiceResult['estado_descripcion'] ?? ''),
+                'invoice_request_create' => (string) ($invoiceResult['request_create'] ?? ''),
+                'invoice_response_create' => (string) ($invoiceResult['response_create'] ?? ''),
+                'invoice_request_send' => (string) ($invoiceResult['request_send'] ?? ''),
+                'invoice_response_send' => (string) ($invoiceResult['response_send'] ?? ''),
+            ]
+        );
+
+        return [
+            'billing_start_date' => $billingStartDate,
+            'mode_label' => $modeLabel,
+            'mail' => $mailResult,
+            'invoice' => $invoiceResult,
+        ];
+    }
+
+    private function processCredentialsStage(array $item, string $usuario, string $folderBase, string $overrideEmail): array
+    {
+        $licencia = (int) ($item['licencia'] ?? 0);
+        if ($licencia === 14) {
+            $migrateCredentials = $this->migrateService->resolveExpectedMigrateUserCredentials($item);
+            $credentials = [
+                'user' => (string) ($migrateCredentials['email'] ?? ''),
+                'password' => (string) ($migrateCredentials['password'] ?? ''),
+            ];
+        } else {
+            $credentials = [
+                'user' => preg_replace('/\D+/', '', (string) ($item['rut'] ?? '')),
+                'password' => $this->resolveDynamicaPassword($item),
+            ];
+        }
+
+        $mailResult = $this->onboardingMailer->sendCredentialsNotice($item, $credentials, [
+            'override_email' => $overrideEmail,
+        ]);
+
+        if (!empty($mailResult['skipped'])) {
+            $description = 'Correo de credenciales no aplica para esta licencia.';
+        } else {
+            $description = 'Correo de credenciales enviado correctamente.';
+        }
+
+        $this->registerWorkflowEvent(
+            (int) $item['id'],
+            'ALTA_FINAL',
+            'HITO_ENVIO_CREDENCIALES',
+            $description,
+            $usuario,
+            $folderBase,
+            'AUTO_ENVIO_CREDENCIALES',
+            [
+                'template' => (string) ($mailResult['template'] ?? ''),
+                'to' => implode(';', (array) ($mailResult['to'] ?? [])),
+                'user' => (string) ($credentials['user'] ?? ''),
+            ]
+        );
+
+        return [
+            'summary' => $description,
+            'credentials' => $credentials,
+            'mail' => $mailResult,
+        ];
+    }
+
+    private function processFinalActivationStage(array $item, string $usuario, string $folderBase): array
+    {
+        $clienteId = (int) ($item['cliente_id_creado'] ?? 0);
+        if ($clienteId <= 0) {
+            throw new RuntimeException('No existe ClienteId creado para completar el alta final.');
+        }
+
+        $activation = (new ClienteModel())->activateForOnboarding($clienteId, $item);
+        $description = 'Cliente activo. Abonado=SI. FechaDesde=' . $activation['billing_start_date'];
+        if ((float) ($activation['pn_monto'] ?? 0) > 0) {
+            $description .= '. pnCreditoFiscal=' . $activation['pn_credito_fiscal'];
+        }
+
+        $this->registerWorkflowEvent(
+            (int) $item['id'],
+            'CLIENTE_ACTIVO',
+            'HITO_CLIENTE_ACTIVO',
+            $description,
+            $usuario,
+            $folderBase,
+            'AUTO_ALTA_FINAL',
+            $activation
+        );
+
+        return $activation;
+    }
+
+    private function registerWorkflowEvent(
+        int $id,
+        string $nextHito,
+        string $eventCode,
+        string $description,
+        string $usuario,
+        string $folderBase,
+        string $logEvent = 'CAMBIO_HITO',
+        array $extraContext = []
+    ): void {
+        $currentItem = $this->model->findById($id);
+        $this->model->updateHitoActual($id, $nextHito, $description);
         $this->historialModel->create([
             'nueva_empresa_id' => $id,
-            'evento' => $config['evento'],
-            'estado_anterior' => $item['estado'] ?? null,
-            'estado_nuevo' => $item['estado'] ?? null,
-            'descripcion' => $config['descripcion'],
+            'evento' => $eventCode,
+            'estado_anterior' => $currentItem['estado'] ?? null,
+            'estado_nuevo' => $currentItem['estado'] ?? null,
+            'descripcion' => $description,
             'usuario_evento' => $usuario,
         ]);
 
-        $this->appendRecordLog((string) ($item['carpeta_base'] ?? ''), 'CAMBIO_HITO_MANUAL', [
+        $this->appendRecordLog($folderBase, $logEvent, array_merge([
             'nueva_empresa_id' => $id,
             'usuario' => $usuario,
-            'hito_anterior' => $item['hito_actual'] ?? '',
-            'hito_nuevo' => $target,
-            'descripcion' => $config['descripcion'],
-        ]);
+            'hito_anterior' => (string) ($currentItem['hito_actual'] ?? ''),
+            'hito_nuevo' => $nextHito,
+            'evento' => $eventCode,
+            'descripcion' => $description,
+        ], $extraContext));
+    }
 
-        Response::flash('success', 'El hito se actualizo correctamente.');
-        Response::redirect('index.php?action=show&id=' . $id);
+    private function resolveOnboardingOverrideEmail(): string
+    {
+        return MIGRATE_ENVIRONMENT === 'testing'
+            ? trim((string) ONBOARDING_TEST_EMAIL)
+            : '';
+    }
+
+    private function resolveCredentialsScheduledAt(): string
+    {
+        $timezone = new DateTimeZone('America/Montevideo');
+        $scheduledAt = (new DateTimeImmutable('now', $timezone))
+            ->setTime(8, 0, 0)
+            ->modify('+1 day');
+
+        while (in_array((int) $scheduledAt->format('N'), [6, 7], true)) {
+            $scheduledAt = $scheduledAt->modify('+1 day');
+        }
+
+        return $scheduledAt->format('Y-m-d H:i:s');
+    }
+
+    public function processDeferredOnboardingQueue(int $limit = 20): array
+    {
+        $messages = [];
+        $read = 0;
+        $success = 0;
+        $errors = 0;
+        $skipped = 0;
+
+        foreach ($this->hitoAutoModel->listDueTasks('ENVIO_CREDENCIALES', $limit) as $task) {
+            $read++;
+            $taskId = (int) ($task['Id'] ?? 0);
+            $nuevaEmpresaId = (int) ($task['NuevaEmpresaId'] ?? 0);
+            if ($taskId <= 0 || $nuevaEmpresaId <= 0) {
+                $skipped++;
+                continue;
+            }
+
+            if (!$this->hitoAutoModel->markProcessing($taskId)) {
+                $skipped++;
+                continue;
+            }
+
+            $db = Db::conn();
+            try {
+                $db->beginTransaction();
+
+                $item = $this->model->findByIdForUpdate($nuevaEmpresaId);
+                if (!$item) {
+                    throw new RuntimeException('No se encontro el registro temporal asociado a la tarea diferida.');
+                }
+
+                $currentHito = strtoupper(trim((string) ($item['hito_actual'] ?? '')));
+                if ($currentHito === 'CLIENTE_ACTIVO') {
+                    $db->commit();
+                    $this->hitoAutoModel->markSuccess($taskId, [
+                        'skipped' => true,
+                        'reason' => 'El cliente ya estaba activo.',
+                    ]);
+                    $messages[] = '[SKIP] #' . $nuevaEmpresaId . ' ya estaba en cliente activo.';
+                    $skipped++;
+                    continue;
+                }
+
+                if (!in_array($currentHito, ['ENVIO_CREDENCIALES', 'ALTA_FINAL'], true)) {
+                    throw new RuntimeException('El caso no esta listo para procesar credenciales diferidas. Hito actual: ' . $currentHito);
+                }
+
+                $folderBase = (string) ($item['carpeta_base'] ?? '');
+                $overrideEmail = $this->resolveOnboardingOverrideEmail();
+                $credentialsInfo = $this->processCredentialsStage($item, 'sistema', $folderBase, $overrideEmail);
+
+                $itemAfterCredentials = $this->model->findByIdForUpdate($nuevaEmpresaId) ?? $item;
+                $activationInfo = $this->processFinalActivationStage($itemAfterCredentials, 'sistema', $folderBase);
+
+                $db->commit();
+                $this->hitoAutoModel->markSuccess($taskId, [
+                    'credentials' => $credentialsInfo,
+                    'activation' => $activationInfo,
+                ]);
+
+                $messages[] = '[OK] #' . $nuevaEmpresaId . ' credenciales y alta final completadas.';
+                $success++;
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+
+                $this->hitoAutoModel->markError($taskId, $e->getMessage(), [
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                ]);
+                $this->appendRecordLog('', 'AUTO_HITOS_DIFERIDOS_ERROR', [
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                    'usuario' => 'sistema',
+                    'error' => $e->getMessage(),
+                    'task_id' => $taskId,
+                ]);
+
+                $messages[] = '[ERROR] #' . $nuevaEmpresaId . ': ' . $e->getMessage();
+                $errors++;
+            }
+        }
+
+        return [
+            'read' => $read,
+            'success' => $success,
+            'errors' => $errors,
+            'skipped' => $skipped,
+            'messages' => $messages,
+        ];
+    }
+
+    private function resolveDynamicaPassword(array $item): string
+    {
+        $sourceDate = (string) (($item['fecha_aprobacion'] ?? '') ?: ($item['fecha_creacion'] ?? ''));
+        $ts = strtotime($sourceDate);
+        return $ts ? date('dmY', $ts) : '';
     }
 
     public function runMigrate(int $id): void
@@ -2011,6 +2641,7 @@ class NuevasEmpresasController
 
             $empresaInvoicy = trim((string) ($result['empresa_invoicy'] ?? ''));
             $claveAcceso = trim((string) ($result['suc_clave_acceso'] ?? ''));
+            $migrateUserCredentials = $this->migrateService->resolveExpectedMigrateUserCredentials($item);
             $alreadyRegistered = $this->isMigrateAlreadyRegistered($result);
             $licMsgRetorno = trim((string) ($result['lic_msg_retorno'] ?? ''));
             $empresaLocal = !empty($item['empresa_id_creada'])
@@ -2123,14 +2754,6 @@ class NuevasEmpresasController
                 ]);
                 $this->historialModel->create([
                     'nueva_empresa_id' => $id,
-                    'evento' => 'HITO_PENDIENTE_DGI',
-                    'estado_anterior' => ESTADO_APROBADO,
-                    'estado_nuevo' => ESTADO_APROBADO,
-                    'descripcion' => 'Pendiente DGI.',
-                    'usuario_evento' => (string) ($usuario['login'] ?? 'admin'),
-                ]);
-                $this->historialModel->create([
-                    'nueva_empresa_id' => $id,
                     'evento' => WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0)) ? 'HITO_MIGRATE_USUARIO_ENVIADO' : 'HITO_MIGRATE_USUARIO_NA',
                     'estado_anterior' => ESTADO_APROBADO,
                     'estado_nuevo' => ESTADO_APROBADO,
@@ -2141,7 +2764,13 @@ class NuevasEmpresasController
                 ]);
 
                 if ($empresaInvoicy !== '' && $claveAcceso !== '') {
-                    $empresaModel->updateMigrateCredentials((int) $item['empresa_id_creada'], $empresaInvoicy, $claveAcceso);
+                    $empresaModel->updateMigrateCredentials(
+                        (int) $item['empresa_id_creada'],
+                        $empresaInvoicy,
+                        $claveAcceso,
+                        WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0)) ? (string) ($migrateUserCredentials['email'] ?? '') : null,
+                        WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0)) ? (string) ($migrateUserCredentials['password'] ?? '') : null
+                    );
                 }
 
                 $db->commit();
@@ -2423,3 +3052,4 @@ class NuevasEmpresasController
         ];
     }
 }
+
