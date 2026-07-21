@@ -123,15 +123,6 @@ La fecha base de facturacion ahora se guarda desde el hito de factura, para que 
 
 Las tareas diferidas del onboarding se apoyan en una tabla propia del modulo para no mezclar el flujo manual con el automatico.
 
-## Archivos de bitacora incluidos
-
-Estas bitacoras resumen los cambios principales realizados durante el desarrollo:
-
-- `BITACORA_20260709_HITOS_ONBOARDING.md`
-- `BITACORA_20260717_ONBOARDING_FACTURA_CRON.md`
-- `BITACORA_20260720_DEPLOY_PRODUCCION_ONBOARDING_FACTURA.md`
-- `BITACORA_20260721_AJUSTES_FACTURA_VISUAL_Y_REINTENTOS.md`
-
 ## Rutas de despliegue
 
 ### Produccion
