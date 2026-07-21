@@ -2,15 +2,24 @@
 
 > Realizado por Leonardo Navarro.
 >
-> Ultima actualizacion documental: 2026-07-02 11:19:17
+> Fecha de esta portada documental: 2026-07-21
 
-Este proyecto concentra el flujo de alta de nuevas empresas, su aprobacion operativa, la provision inicial en Dynamica y la integracion con Migrate/InvoiCy. Tambien incluye el monitoreo interno de certificados digitales y las alertas por vencimiento.
+Este repositorio guarda el desarrollo del modulo administrativo de altas y automatizaciones de empresas de Dynamica.
 
-La idea de este `README` es que cualquier persona que entre al proyecto entienda rapido tres cosas:
+Aqui quedo reunido:
 
-1. que resuelve el modulo
-2. donde estan las piezas importantes
-3. cual documento debe abrir segun lo que vaya a hacer
+- el codigo del modulo
+- la documentacion operativa
+- la bitacora de cambios
+- los SQL de apoyo
+- las plantillas y automatizaciones relacionadas con onboarding y certificados
+- la evidencia funcional que se fue consolidando durante el proyecto
+
+La idea de este `README` es que una persona nueva pueda entender rapido:
+
+1. que hace el proyecto
+2. donde esta cada cosa
+3. por cual documento debe empezar
 
 ## Que hace hoy el modulo
 
@@ -23,10 +32,22 @@ La idea de este `README` es que cualquier persona que entre al proyecto entienda
 - mantiene una cache local de vencimientos
 - envia recordatorios automaticos por correo
 
+## Por donde empezar
+
+Si alguien entra por primera vez, conviene abrir esto en este orden:
+
+1. [docs/INDICE_DOCUMENTAL.md](C:\DYNAMICA_PLUGINS\gestion_empresas\docs\INDICE_DOCUMENTAL.md)
+2. [docs/INSTRUCTIVO_GENERAL_GESTION_EMPRESAS.md](C:\DYNAMICA_PLUGINS\gestion_empresas\docs\INSTRUCTIVO_GENERAL_GESTION_EMPRESAS.md)
+3. [RUNBOOK-OPERATIVO.md](C:\DYNAMICA_PLUGINS\gestion_empresas\RUNBOOK-OPERATIVO.md)
+4. [GUARDRAILS.md](C:\DYNAMICA_PLUGINS\gestion_empresas\GUARDRAILS.md)
+
 ## Documentos principales
 
 - [docs/INSTRUCTIVO_GENERAL_GESTION_EMPRESAS.md](C:\DYNAMICA_PLUGINS\gestion_empresas\docs\INSTRUCTIVO_GENERAL_GESTION_EMPRESAS.md)
   Documento maestro del proyecto. Resume arquitectura, flujo, scripts, cron, logs, ambientes y puntos sensibles.
+
+- [docs/INDICE_DOCUMENTAL.md](C:\DYNAMICA_PLUGINS\gestion_empresas\docs\INDICE_DOCUMENTAL.md)
+  Mapa general del repositorio. Sirve para ubicar rapido que leer y donde quedo cada tema.
 
 - [RUNBOOK-OPERATIVO.md](C:\DYNAMICA_PLUGINS\gestion_empresas\RUNBOOK-OPERATIVO.md)
   Guia practica para desplegar, validar en servidor y no romper codificacion ni `strict_types`.
@@ -78,6 +99,20 @@ La idea de este `README` es que cualquier persona que entre al proyecto entienda
 - `bitacora/`
   Historial tecnico del proyecto.
 
+## Carpetas de seguimiento que se dejaron dentro del respaldo
+
+Dentro de este repositorio tambien quedaron varias carpetas de seguimiento funcional y pruebas porque ayudan a reconstruir decisiones del proyecto y a entender de donde salieron ciertos cambios.
+
+Las mas importantes son:
+
+- `28052026 - Seguimiento Sebastián/`
+- `07072026 - Pruebas Sebastian y ajustes/`
+- `08072026 - Seguimiento a certficados/`
+- `16072026 - Seguiento Sebastián/`
+- `16072026 - Testing Sebastián/`
+
+No son parte del runtime del modulo, pero si sirven como respaldo funcional y documental.
+
 ## Archivos que hoy son especialmente importantes
 
 - [controllers/NuevasEmpresasController.php](C:\DYNAMICA_PLUGINS\gestion_empresas\controllers\NuevasEmpresasController.php)
@@ -99,6 +134,19 @@ La idea de este `README` es que cualquier persona que entre al proyecto entienda
   - ruta del proyecto `/var/www/html/plugin/gestion_empresas`
 
 Los detalles tecnicos de acceso y despliegue quedaron en [RUNBOOK-OPERATIVO.md](C:\DYNAMICA_PLUGINS\gestion_empresas\RUNBOOK-OPERATIVO.md).
+
+## Que no se dejo como dato real dentro del respaldo
+
+Para no subir informacion sensible real, el respaldo deja fuera o parametriza:
+
+- llaves privadas
+- tokens
+- archivos locales de conexion
+- runtime con claves reales
+
+Por eso el archivo de referencia para configuracion es:
+
+- [config/runtime.example.php](C:\DYNAMICA_PLUGINS\gestion_empresas\config\runtime.example.php)
 
 ## Recomendacion practica
 
