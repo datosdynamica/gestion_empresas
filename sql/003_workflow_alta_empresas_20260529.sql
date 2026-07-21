@@ -1,0 +1,2 @@
+ALTER TABLE EmpresasNuevas
+    ADD COLUMN AltaTipoEmpresa VARCHAR(20) NOT NULL DEFAULT 'SOCIEDAD' AFTER SucCodFechaVigencia;

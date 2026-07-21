@@ -4,6 +4,42 @@ declare(strict_types=1);
 
 class NuevaEmpresaHistorialModel extends BaseModel
 {
+    public function listWorkflowEventsByNuevaEmpresaIds(array $ids): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), static function (int $id): bool {
+            return $id > 0;
+        }));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = "
+            SELECT
+                NuevaEmpresaId AS nueva_empresa_id,
+                Evento AS evento,
+                Descripcion AS descripcion,
+                FechaEvento AS fecha_evento
+            FROM " . TABLA_EMPRESAS_NUEVAS_HISTORIAL . "
+            WHERE NuevaEmpresaId IN ($placeholders)
+              AND (Evento = 'CREACION' OR Evento = 'APROBACION' OR Evento LIKE 'HITO_%')
+            ORDER BY FechaEvento ASC, Id ASC
+        ";
+
+        $rows = $this->fetchAll($sql, $ids);
+        $grouped = [];
+        foreach ($rows as $row) {
+            $empresaId = (int) ($row['nueva_empresa_id'] ?? 0);
+            if ($empresaId <= 0) {
+                continue;
+            }
+            $grouped[$empresaId][] = $row;
+        }
+
+        return $grouped;
+    }
+
     public function listRecent(int $limit = 100): array
     {
         $limit = max(1, $limit);

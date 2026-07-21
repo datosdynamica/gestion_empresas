@@ -1,0 +1,9 @@
+Envío las plantilals para la etapa Envío de Credenciales:
+
+CONDICIONES:
+
+Si Licencia = 14 (invo) mandar bienvenida_invo
+
+Si Licencia = 12 (cumplimiento) o 13 (partner) NO MANDAR NADA
+
+Si Licnecia = (resto de casos) 0.2.3.10 mandar bienvenida_dynamica

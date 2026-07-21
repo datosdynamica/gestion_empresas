@@ -65,6 +65,20 @@ class NuevaEmpresaArchivoModel extends BaseModel
         $stmt->execute($data);
     }
 
+    public function rebasePathsForNuevaEmpresa(int $nuevaEmpresaId, string $baseRelativePath): void
+    {
+        $baseRelativePath = rtrim($baseRelativePath, '\\/');
+        $sql = "UPDATE " . TABLA_EMPRESAS_NUEVAS_ARCHIVOS . "
+                SET RutaArchivo = CONCAT(:base_relative_path, '/', NombreGuardado)
+                WHERE NuevaEmpresaId = :nueva_empresa_id";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            'base_relative_path' => $baseRelativePath,
+            'nueva_empresa_id' => $nuevaEmpresaId,
+        ]);
+    }
+
     public function deleteByNuevaEmpresaId(int $id): void
     {
         $stmt = $this->db->prepare('DELETE FROM ' . TABLA_EMPRESAS_NUEVAS_ARCHIVOS . ' WHERE NuevaEmpresaId = ?');

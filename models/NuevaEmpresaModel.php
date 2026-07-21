@@ -8,6 +8,7 @@ class NuevaEmpresaModel extends BaseModel
         Id AS id,
         Estado AS estado,
         EstadoDetalle AS estado_detalle,
+        HitoActual AS hito_actual,
         FechaCreacion AS fecha_creacion,
         FechaActualizacion AS fecha_actualizacion,
         FechaAprobacion AS fecha_aprobacion,
@@ -52,8 +53,11 @@ class NuevaEmpresaModel extends BaseModel
         ClienteAdenda AS cliente_adenda,
         SucCodSucursal AS suc_cod_sucursal,
         SucCodFechaVigencia AS suc_cod_fecha_vigencia,
+        AltaTipoEmpresa AS alta_tipoempresa,
         AltaEspecial AS alta_especial,
+        AltaEspecial AS alta_tributario,
         AltaEspecialNorma AS alta_especial_norma,
+        AltaEspecialNorma AS alta_exonerado_norma,
         AltaEsEmisor AS alta_es_emisor,
         AltaCreditoFiscal AS alta_credito_fiscal,
         AltaCertificadoDigital AS alta_certificado_digital,
@@ -64,6 +68,8 @@ class NuevaEmpresaModel extends BaseModel
         ClienteCreada AS cliente_creado,
         EmpresaIdCreada AS empresa_id_creada,
         ClienteIdCreado AS cliente_id_creado,
+        MigrateRequestXml AS migrate_request_xml,
+        MigrateResponseXml AS migrate_response_xml,
         Observaciones AS observaciones,
         NotasAdmin AS notas_admin,
         ErrorProceso AS error_proceso
@@ -102,34 +108,51 @@ class NuevaEmpresaModel extends BaseModel
         return $this->fetchOne('SELECT ' . self::SELECT_ALIASES . ' FROM ' . TABLA_EMPRESAS_NUEVAS . ' WHERE Id = ? FOR UPDATE', [$id]);
     }
 
+    public function findLatestByRut(string $rut): ?array
+    {
+        $rut = trim($rut);
+        if ($rut === '') {
+            return null;
+        }
+
+        return $this->fetchOne(
+            'SELECT ' . self::SELECT_ALIASES . ' FROM ' . TABLA_EMPRESAS_NUEVAS . ' WHERE Rut = ? ORDER BY Id DESC LIMIT 1',
+            [$rut]
+        );
+    }
+
     public function create(array $data): int
     {
         $sql = "INSERT INTO " . TABLA_EMPRESAS_NUEVAS . " (
                     Estado, UsuarioCreacion, RazonSocial, NombreFantasia, Domicilio,
+                    HitoActual,
                     EmailPrincipal, Rut, Telefono, Ciudad, Departamento,
                     UsuarioEF, ClaveUsuarioEF, Licencia, LicenciaTexto, Plan,
                     Usuarios, CfeMensuales, ClienteIdGiro, ClienteIdVendedor,
                     ClienteIdFidelizacion, EmailEnvioFE, ClienteAbonadoImporte,
-                    ClienteAbonadoMoneda, ClienteAbonadoPeriodo, ClienteAbonadoDescuento,
-                    SucCodSucursal, SucCodFechaVigencia, AltaEspecial,
+                    ClienteAbonadoIdProducto, ClienteAbonadoTV, ClienteAbonadoMoneda, ClienteAbonadoPeriodo, ClienteAbonadoGrupo, ClienteAbonadoDescuento,
+                    ClientePnCreditoFiscal, ClientePnMonto, ClienteIdFormaPago, ClienteIdMedioPago, ClienteAdenda,
+                    SucCodSucursal, SucCodFechaVigencia, AltaTipoEmpresa, AltaEspecial,
                     AltaEspecialNorma, AltaEsEmisor, AltaCreditoFiscal,
                     AltaCertificadoDigital, NombreCompletoFirmante, CIFirmante,
                     Observaciones
                 ) VALUES (
                     :estado, :usuario_creacion, :razon_social, :nombre_fantasia, :domicilio,
+                    :hito_actual,
                     :email_principal, :rut, :telefono, :ciudad, :departamento,
                     :usuario_ef, :clave_usuario_ef, :licencia, :licencia_texto, :plan,
                     :usuarios, :cfe_mensuales, :cliente_id_giro, :cliente_id_vendedor,
                     :cliente_id_fidelizacion, :email_envio_fe, :cliente_abonado_importe,
-                    :cliente_abonado_moneda, :cliente_abonado_periodo, :cliente_abonado_descuento,
-                    :suc_cod_sucursal, :suc_cod_fecha_vigencia, :alta_especial,
-                    :alta_especial_norma, :alta_es_emisor, :alta_credito_fiscal,
+                    :cliente_abonado_id_producto, :cliente_abonado_tv, :cliente_abonado_moneda, :cliente_abonado_periodo, :cliente_abonado_grupo, :cliente_abonado_descuento,
+                    :cliente_pn_credito_fiscal, :cliente_pn_monto, :cliente_id_formapago, :cliente_id_medio_pago, :cliente_adenda,
+                    :suc_cod_sucursal, :suc_cod_fecha_vigencia, :alta_tipoempresa, :alta_tributario,
+                    :alta_exonerado_norma, :alta_es_emisor, :alta_credito_fiscal,
                     :alta_certificado_digital, :nombre_completo_firmante, :ci_firmante,
                     :observaciones
                 )";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($data);
+        $stmt->execute($this->filterParamsForSql($sql, $data));
 
         return (int) $this->db->lastInsertId();
     }
@@ -152,6 +175,7 @@ class NuevaEmpresaModel extends BaseModel
                     Ciudad = :ciudad,
                     Departamento = :departamento,
                     UsuarioEF = :usuario_ef,
+                    ClaveUsuarioEF = :clave_usuario_ef,
                     Licencia = :licencia,
                     LicenciaTexto = :licencia_texto,
                     Plan = :plan,
@@ -162,13 +186,22 @@ class NuevaEmpresaModel extends BaseModel
                     ClienteIdFidelizacion = :cliente_id_fidelizacion,
                     EmailEnvioFE = :email_envio_fe,
                     ClienteAbonadoImporte = :cliente_abonado_importe,
+                    ClienteAbonadoIdProducto = :cliente_abonado_id_producto,
+                    ClienteAbonadoTV = :cliente_abonado_tv,
                     ClienteAbonadoMoneda = :cliente_abonado_moneda,
                     ClienteAbonadoPeriodo = :cliente_abonado_periodo,
+                    ClienteAbonadoGrupo = :cliente_abonado_grupo,
                     ClienteAbonadoDescuento = :cliente_abonado_descuento,
+                    ClientePnCreditoFiscal = :cliente_pn_credito_fiscal,
+                    ClientePnMonto = :cliente_pn_monto,
+                    ClienteIdFormaPago = :cliente_id_formapago,
+                    ClienteIdMedioPago = :cliente_id_medio_pago,
+                    ClienteAdenda = :cliente_adenda,
                     SucCodSucursal = :suc_cod_sucursal,
                     SucCodFechaVigencia = :suc_cod_fecha_vigencia,
-                    AltaEspecial = :alta_especial,
-                    AltaEspecialNorma = :alta_especial_norma,
+                    AltaTipoEmpresa = :alta_tipoempresa,
+                    AltaEspecial = :alta_tributario,
+                    AltaEspecialNorma = :alta_exonerado_norma,
                     AltaEsEmisor = :alta_es_emisor,
                     AltaCreditoFiscal = :alta_credito_fiscal,
                     AltaCertificadoDigital = :alta_certificado_digital,
@@ -180,7 +213,19 @@ class NuevaEmpresaModel extends BaseModel
 
         $stmt = $this->db->prepare($sql);
         $data['id'] = $id;
-        $stmt->execute($data);
+        $stmt->execute($this->filterParamsForSql($sql, $data));
+    }
+
+    private function filterParamsForSql(string $sql, array $data): array
+    {
+        preg_match_all('/:([a-zA-Z0-9_]+)/', $sql, $matches);
+        $params = [];
+
+        foreach ($matches[1] as $key) {
+            $params[$key] = $data[$key] ?? null;
+        }
+
+        return $params;
     }
 
     public function markApproved(int $id, int $empresaId, int $clienteId, string $usuario): void
@@ -191,11 +236,13 @@ class NuevaEmpresaModel extends BaseModel
                 Aprobada = 1,
                 FechaAprobacion = NOW(),
                 UsuarioAprobacion = ?,
+                HitoActual = 'MIGRATE',
                 EmpresaCreada = 1,
                 ClienteCreada = 1,
                 EmpresaIdCreada = ?,
                 ClienteIdCreado = ?,
-                EstadoDetalle = 'Aprobado y creado en Empresas/Clientes'
+                EstadoDetalle = 'Dynamica OK. Pendiente Migrate.',
+                ErrorProceso = NULL
             WHERE Id = ?
         ");
         $stmt->execute([ESTADO_APROBADO, $usuario, $empresaId, $clienteId, $id]);
@@ -206,6 +253,7 @@ class NuevaEmpresaModel extends BaseModel
         $stmt = $this->db->prepare("
             UPDATE " . TABLA_EMPRESAS_NUEVAS . "
             SET Estado = ?,
+                HitoActual = 'CANCELADO',
                 FechaEliminacion = NOW(),
                 UsuarioEliminacion = ?,
                 MotivoEliminacion = ?
@@ -219,10 +267,78 @@ class NuevaEmpresaModel extends BaseModel
         $stmt = $this->db->prepare("
             UPDATE " . TABLA_EMPRESAS_NUEVAS . "
             SET Estado = ?,
+                HitoActual = 'ERROR_APROBACION',
                 EstadoDetalle = ?,
                 ErrorProceso = ?
             WHERE Id = ?
         ");
         $stmt->execute([ESTADO_ERROR_APROBACION, 'Error al aprobar', $message, $id]);
+    }
+
+    public function updateWorkflowDetail(int $id, string $detail): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE " . TABLA_EMPRESAS_NUEVAS . "
+            SET EstadoDetalle = ?
+            WHERE Id = ?
+        ");
+        $stmt->execute([$detail, $id]);
+    }
+
+    public function updateHitoActual(int $id, string $hitoActual, ?string $detail = null): void
+    {
+        if ($detail !== null) {
+            $stmt = $this->db->prepare("
+                UPDATE " . TABLA_EMPRESAS_NUEVAS . "
+                SET HitoActual = ?, EstadoDetalle = ?
+                WHERE Id = ?
+            ");
+            $stmt->execute([$hitoActual, $detail, $id]);
+            return;
+        }
+
+        $stmt = $this->db->prepare("
+            UPDATE " . TABLA_EMPRESAS_NUEVAS . "
+            SET HitoActual = ?
+            WHERE Id = ?
+        ");
+        $stmt->execute([$hitoActual, $id]);
+    }
+
+    public function markMigrateSuccess(int $id, string $detail): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE " . TABLA_EMPRESAS_NUEVAS . "
+            SET Estado = ?,
+                HitoActual = 'PENDIENTE_DGI',
+                EstadoDetalle = ?,
+                ErrorProceso = NULL
+            WHERE Id = ?
+        ");
+        $stmt->execute([ESTADO_APROBADO, $detail, $id]);
+    }
+
+    public function markMigrateError(int $id, string $detail): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE " . TABLA_EMPRESAS_NUEVAS . "
+            SET Estado = ?,
+                HitoActual = 'ERROR_APROBACION',
+                EstadoDetalle = 'Error al ejecutar Migrate',
+                ErrorProceso = ?
+            WHERE Id = ?
+        ");
+        $stmt->execute([ESTADO_ERROR_APROBACION, $detail, $id]);
+    }
+
+    public function storeMigrateExchange(int $id, string $requestXml, string $responseXml): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE " . TABLA_EMPRESAS_NUEVAS . "
+            SET MigrateRequestXml = ?,
+                MigrateResponseXml = ?
+            WHERE Id = ?
+        ");
+        $stmt->execute([$requestXml, $responseXml, $id]);
     }
 }

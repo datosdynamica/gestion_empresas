@@ -1,0 +1,455 @@
+= Gestion de Empresas - Modulo administrativo =
+
+'''Documentacion y carga en wiki realizadas por Leonardo Navarro.'''
+
+'''Ultima actualizacion documental: 2026-07-02 11:19:17'''
+
+== Para que existe este modulo ==
+
+Este modulo se hizo para que el equipo no tenga que manejar el alta de una empresa nueva por pedazos ni por fuera del sistema.
+
+La idea es simple: que desde un solo panel se pueda ver el caso desde que entra, revisarlo, aprobarlo, llevarlo por los hitos correctos y dejar evidencia de todo lo que paso.
+
+Ademas del flujo de altas, aqui mismo quedaron integrados otros dos temas que antes se resolvian con mas esfuerzo manual:
+
+* el control de vencimientos de certificados digitales
+* el envio automatico de recordatorios por correo
+
+[[File:workflow.png|thumb|center|900px|Referencia visual general del flujo de alta de empresas.]]
+
+== Que puede hacer hoy el modulo ==
+
+=== En la parte de onboarding ===
+
+* recibe una nueva solicitud de empresa
+* permite cargar y revisar adjuntos
+* deja aprobar o corregir el caso
+* crea la empresa en Dynamica
+* crea el cliente relacionado
+* muestra los hitos y subhitos del proceso
+* guarda historial de lo que hizo cada usuario
+
+=== En la parte de Migrate ===
+
+* arma el XML de alta
+* envia la empresa al ambiente configurado
+* guarda el request y el response
+* manda el bloque de licenciamiento
+* manda usuario Migrate cuando la licencia lo exige
+
+=== En la parte de certificados ===
+
+* consulta certificados desde Migrate
+* guarda una cache local para no consultar siempre en vivo
+* muestra vencimientos por pantalla
+* permite revisar casos puntuales
+
+=== En la parte de notificaciones ===
+
+* envia recordatorios automaticos
+* maneja ventanas de 30, 20, 10, 5 y 1 dia
+* deja trazabilidad de lo enviado
+
+== Como se entiende el proceso de punta a punta ==
+
+# Se crea el registro en <code>EmpresasNuevas</code>.
+# Los adjuntos quedan primero en temporal.
+# El equipo revisa la informacion.
+# Si el caso esta correcto, se aprueba.
+# En la aprobacion se crea la base en Dynamica.
+# Si la licencia lo requiere, se ejecuta el paso de Migrate.
+# Los hitos manuales posteriores siguen por operacion real.
+
+Dicho mas facil: primero entra la solicitud, despues se valida, luego se crea la base operativa y finalmente se sigue el caso hasta dejarlo listo.
+
+== Las tablas principales explicadas sin enredo ==
+
+=== Tablas temporales ===
+
+* <code>EmpresasNuevas</code>
+  Aqui vive el caso mientras todavia esta en proceso. Es la bandeja de entrada del onboarding.
+
+* <code>EmpresasNuevasArchivos</code>
+  Aqui quedan registrados los documentos que se subieron para ese caso.
+
+* <code>EmpresasNuevasHistorial</code>
+  Aqui queda anotado todo lo importante que fue pasando: creacion, aprobacion, hitos, errores y cambios.
+
+=== Tablas maestras ===
+
+* <code>Empresas</code>
+  Esta ya es la tabla de empresas reales del sistema. Si un caso llego hasta aqui, ya no es solo una solicitud.
+
+* <code>Clientes</code>
+  Aqui queda el cliente operativo relacionado con la empresa para lo comercial y lo fiscal.
+
+* <code>sec_users</code>
+  Aqui estan los usuarios que pueden entrar al modulo.
+
+=== Tablas auxiliares del mismo proyecto ===
+
+* <code>MigrateCertificadosCache</code>
+  Sirve como memoria local de certificados para no depender de una consulta completa a Migrate cada vez.
+
+* <code>CertificadosNotificaciones</code>
+  Guarda los correos enviados por vencimiento de certificado.
+
+* <code>CertificadosAcciones</code>
+  Guarda acciones internas del equipo, por ejemplo avisos o gestiones hechas sobre un caso.
+
+=== Regla operativa importante ===
+
+En el flujo actual, el cliente se crea sobre la empresa operativa:
+
+* <code>Clientes.IdEmpresa = 397</code>
+
+== Archivos del proyecto que conviene ubicar primero ==
+
+Si una persona va a retomar este desarrollo, estos son los archivos que mas rapido le dan contexto:
+
+* <code>controllers/NuevasEmpresasController.php</code>
+* <code>helpers/MigrateInvoicyService.php</code>
+* <code>helpers/CertificateNotificationMailer.php</code>
+* <code>models/MigrateCertificateCacheModel.php</code>
+* <code>tools/refresh_certificate_cache.php</code>
+* <code>tools/send_certificate_notifications.php</code>
+
+== Ambientes ==
+
+=== Produccion ===
+
+* host: <code>www.datosdynamica.net</code>
+* ruta interna del servidor: <code>/var/www/plugin/gestion_empresas</code>
+* alias web: <code>/administrativo</code>
+* ruta web completa: <code>https://www.datosdynamica.net/administrativo</code>
+
+=== Desarrollo ===
+
+* host: <code>www.desarrollodynamica.net</code>
+* ruta interna del servidor: <code>/var/www/html/plugin/gestion_empresas</code>
+* ruta web completa: <code>https://www.desarrollodynamica.net/administrativo</code>
+
+En esta parte es importante distinguir dos cosas:
+
+* la '''ruta interna del servidor''' es donde viven los archivos fisicos del proyecto
+* la '''ruta web completa''' es la direccion por la que entra el usuario desde navegador
+
+== Guia visual del panel ==
+
+=== Pantalla de inicio ===
+
+[[File:captura_panel_inicio.png|thumb|center|1000px|Pantalla principal del modulo una vez iniciada la sesion.]]
+
+Esta es la pantalla que el equipo ve para trabajar el dia a dia.
+
+Desde aqui se puede:
+
+* revisar el listado de altas
+* filtrar por estado general
+* filtrar por hito actual
+* abrir el detalle de un caso
+* editar un caso
+* lanzar acciones operativas
+
+Esta pantalla funciona como la mesa principal de trabajo del modulo.
+
+Lo normal antes de abrir un caso es:
+
+* buscar la empresa por razon social o por RUT
+* revisar el estado general
+* mirar la columna de hito o accion requerida
+* decidir si corresponde entrar al detalle, editar o ejecutar la accion visible
+
+La grilla no debe leerse como un simple listado. En realidad es la cola de trabajo diaria.
+
+=== Formulario de nuevo registro ===
+
+[[File:captura_nuevo_registro.png|thumb|center|1000px|Formulario para crear una nueva alta de empresa.]]
+
+Esta es la puerta de entrada del proceso.
+
+Aqui se captura:
+
+* identificacion de la empresa
+* datos fiscales
+* datos de licencia
+* datos operativos
+* referencias que luego necesita el flujo
+
+Esta pantalla define la calidad del caso desde el principio.
+
+Si aqui quedan mal la licencia, el RUT o los datos fiscales, el problema normalmente no aparece en esta misma vista sino mas adelante, cuando llegue la aprobacion o el envio a Migrate.
+
+Por eso, la lectura operativa correcta es: primero capturar bien, despues guardar.
+
+=== Ficha detallada del onboarding ===
+
+[[File:captura_detalle_onboarding.png|thumb|center|1000px|Detalle de un registro con hoja de ruta, hitos y datos operativos.]]
+
+Esta es la pantalla mas importante para analizar un caso puntual.
+
+Normalmente aqui se revisan tres bloques:
+
+* la cabecera del caso
+* la hoja de ruta con hitos y subhitos
+* los datos operativos y acciones administrativas
+
+Si alguien quiere entender por que un caso avanzo o por que se freno, esta es la primera pantalla que deberia mirar.
+
+La forma mas util de leer esta ficha es por capas:
+
+* primero la cabecera para saber de que empresa se trata
+* despues la hoja de ruta para ubicar el paso exacto del proceso
+* por ultimo los laterales para revisar credenciales, adjuntos o acciones disponibles
+
+En terminos simples, esta es la ficha maestra del registro.
+
+=== Pantalla de aprobaciones ===
+
+[[File:captura_aprobaciones.png|thumb|center|1000px|Vista del modulo con la opcion Aprobaciones seleccionada en el menu lateral.]]
+
+Esta vista usa el mismo panel principal, pero orientado a casos pendientes de revision.
+
+Si aparece vacia, no necesariamente es error. Puede significar simplemente que no hay registros pendientes para ese filtro en ese momento.
+
+La forma mas simple de entender esta pantalla es esta:
+
+* aqui llega el operador cuando quiere revisar que casos estan esperando decision humana
+* aqui no se resuelve el caso completo, aqui se detecta cual registro necesita abrirse
+* desde aqui normalmente se entra al detalle del caso para aprobar, corregir o seguir con el siguiente paso
+
+Que conviene mirar primero:
+
+* la razon social y el RUT
+* el estado general
+* el hito o accion requerida
+* si el registro pide ejecutar Migrate, marcar DGI pendiente o solo seguir revisando
+
+Si un usuario entra aqui y no ve nada, la lectura correcta no es asumir fallo. Primero debe revisar:
+
+* si el filtro activo deja ver aprobaciones pendientes
+* si realmente no hay casos en ese estado
+* si los casos ya pasaron a otro hito y por eso dejaron de mostrarse aqui
+
+=== Pantalla de trazabilidad ===
+
+[[File:captura_trazabilidad_v2.png|thumb|center|1000px|Vista de trazabilidad e historial operativo.]]
+
+Esta vista sirve como auditoria interna.
+
+Aqui se puede reconstruir el camino real de un caso:
+
+* cuando se creo
+* quien lo aprobo
+* si llego a Dynamica
+* si llego a Migrate
+* si quedo con error o con novedad
+
+Dicho de una forma muy practica: esta es la pantalla para responder la pregunta "que fue lo ultimo que paso con este caso".
+
+Si un usuario recibe una consulta interna del tipo:
+
+* quien toco este registro
+* a que hora se aprobo
+* si ya paso por Migrate
+* por que quedo en rojo
+
+la respuesta normalmente sale de esta vista.
+
+Lo recomendable es leer cada fila como una pequeña evidencia operativa:
+
+* fecha del evento
+* empresa afectada
+* tipo de evento
+* cambio de estado
+* detalle libre
+* usuario que ejecuto la accion
+
+Mientras mas delicado sea el caso, mas importante es revisar esta pantalla antes de tocar datos o reintentar procesos.
+
+=== Pantalla de certificados ===
+
+[[File:captura_certificados.png|thumb|center|1000px|Pantalla de control de certificados digitales.]]
+
+Esta vista se usa para revisar certificados proximos a vencer o para consultar un caso puntual.
+
+Lo importante aqui es que la pantalla no depende siempre de una consulta pesada en vivo. Primero trabaja con cache local y solo refresca cuando hace falta.
+
+=== Consulta de certificados con resultado ===
+
+[[File:captura_certificados_consulta.png|thumb|center|1000px|Resultado real de una consulta de certificados en produccion con lista visible de registros.]]
+
+Cuando el usuario pulsa <code>Consultar certificados</code>, esta pantalla muestra un resumen que ayuda a entender de donde salio el resultado:
+
+* empresas base revisadas
+* empresas servidas desde cache
+* empresas refrescadas desde Migrate
+* registros visibles segun el filtro usado
+
+Si el resultado es cero, no siempre significa error. Puede significar que no hay certificados dentro del intervalo pedido.
+
+En esta vista conviene explicarle al usuario tres lecturas muy concretas:
+
+* si hay lista visible, esos son los certificados que hoy merecen atencion
+* si no hay lista visible pero el resumen dice consulta correcta, puede ser simplemente que no hay vencimientos dentro del rango
+* si hay novedades detectadas, el operador ya sabe que hay empresas que requieren revision adicional
+
+La lista debe leerse de arriba hacia abajo como prioridad de trabajo:
+
+* los certificados mas cercanos al vencimiento van primero
+* cada fila representa una empresa que puede necesitar aviso o gestion
+* desde esta pantalla se puede copiar informacion clave para actuar con el cliente
+
+El resumen superior no esta solo por tema tecnico. Operativamente sirve para saber:
+
+* si el sistema trabajo con cache
+* si tuvo que salir a refrescar algo en Migrate
+* si el resultado mostrado es amplio o puntual
+
+En pocas palabras: esta pantalla ya no es solo una consulta, es la bandeja de trabajo del control de vencimientos.
+
+=== Pantalla de configuracion ===
+
+[[File:captura_configuracion.png|thumb|center|1000px|Pantalla de configuracion operativa del modulo.]]
+
+Aqui se cambian parametros del modulo sin tocar codigo fuente.
+
+Esta pantalla sirve para ajustar:
+
+* entorno de Migrate
+* referencias base del entorno
+* datos que el modulo guarda en <code>config/runtime.php</code>
+
+== Para que sirve cada opcion del menu ==
+
+* '''Inicio'''
+  Muestra el tablero principal con registros, filtros y acciones.
+
+* '''Nuevo registro cliente'''
+  Abre el formulario para capturar una nueva solicitud.
+
+* '''Aprobaciones'''
+  Lleva al mismo panel, pero pensado para concentrarse en revision operativa.
+
+* '''Trazabilidad'''
+  Muestra la historia del modulo y ayuda a auditar lo que paso.
+
+* '''Configuracion'''
+  Permite cambiar parametros de operacion e integracion.
+
+* '''Certificados Migrate'''
+  Permite revisar vencimientos y validar casos puntuales.
+
+* '''Instalar app'''
+  Apoya la instalacion del panel como app en equipos compatibles.
+
+== Botones que mas se usan ==
+
+* '''Nueva Empresa Cliente'''
+  Abre la captura de un nuevo caso.
+
+* '''Ruta y Fiscal'''
+  Despliega la hoja de ruta y la informacion fiscal del registro.
+
+* '''Resumen'''
+  Cambia a una vista mas resumida del mismo caso.
+
+* '''Mas info'''
+  Muestra informacion adicional sin salir del listado.
+
+* '''Editar'''
+  Reabre el registro para corregir datos.
+
+* '''Cancelar proceso'''
+  Corta el onboarding del caso.
+
+* '''Migrate (Ejecutar) / Migrate (Reintentar)'''
+  Lanza o repite el paso de integracion con Migrate.
+
+* '''Marcar Alta Pendiente'''
+  Mueve el caso al siguiente estado cuando la parte previa ya quedo lista.
+
+== Como funciona la parte de certificados ==
+
+La pantalla de certificados no deberia disparar una consulta completa y pesada a Migrate cada vez que alguien la abre.
+
+Por eso el modulo trabaja asi:
+
+# toma la base de empresas activas
+# revisa si ya tiene informacion reciente en cache
+# solo refresca lo que hace falta
+# muestra el resultado desde base local
+
+=== Tabla usada ===
+
+* <code>MigrateCertificadosCache</code>
+
+=== Regla actual ===
+
+* solo se refrescan empresas sin snapshot o con snapshot vencido
+* la vigencia se controla por horas
+
+=== Script de refresco ===
+
+* <code>tools/refresh_certificate_cache.php</code>
+
+=== Cron confirmado en produccion ===
+
+<pre>
+0 1 * * * /usr/bin/flock -n /tmp/gestion_empresas_refresh_cache.lock /usr/bin/ionice -c2 -n7 /usr/bin/nice -n 15 /usr/bin/php /var/www/plugin/gestion_empresas/tools/refresh_certificate_cache.php --chunk=10 > /home/ubuntu/gestion_empresas_logs/refresh_certificate_cache.log 2>&1
+</pre>
+
+Explicado simple:
+
+* corre todos los dias
+* se ejecuta a la 01:00 del servidor
+* el servidor trabaja en horario de Uruguay
+* evita que se lance dos veces al mismo tiempo
+* corre con prioridad baja para no competir con la operacion del dia
+* deja el log en <code>/home/ubuntu/gestion_empresas_logs/refresh_certificate_cache.log</code>
+
+== Como funciona la parte de notificaciones ==
+
+El envio de recordatorios toma la informacion de la cache local de certificados y genera correos con la plantilla definida para el proyecto.
+
+=== Script de envio ===
+
+* <code>tools/send_certificate_notifications.php</code>
+
+=== Tabla de seguimiento ===
+
+* <code>CertificadosNotificaciones</code>
+
+=== Cron confirmado en produccion ===
+
+<pre>
+10 8 * * * /usr/bin/flock -n /tmp/gestion_empresas_cert_notif.lock /usr/bin/php /var/www/plugin/gestion_empresas/tools/send_certificate_notifications.php >> /home/ubuntu/gestion_empresas_logs/send_certificate_notifications.log 2>&1
+</pre>
+
+Explicado simple:
+
+* corre todos los dias
+* se ejecuta a las 08:10 del servidor
+* el servidor trabaja en horario de Uruguay
+* evita ejecuciones duplicadas
+* deja el log en <code>/home/ubuntu/gestion_empresas_logs/send_certificate_notifications.log</code>
+
+== Documentacion local relacionada ==
+
+* <code>README.md</code>
+* <code>RUNBOOK-OPERATIVO.md</code>
+* <code>GUARDRAILS.md</code>
+* <code>docs/INSTRUCTIVO_GENERAL_GESTION_EMPRESAS.md</code>
+* <code>bitacora/</code>
+
+== En que orden conviene leer todo esto ==
+
+Para alguien que entra nuevo al proyecto, este orden funciona bien:
+
+# <code>README.md</code>
+# <code>GUARDRAILS.md</code>
+# <code>RUNBOOK-OPERATIVO.md</code>
+# <code>docs/INSTRUCTIVO_GENERAL_GESTION_EMPRESAS.md</code>
+# la bitacora del tema puntual
+
+Con ese recorrido ya se puede entender el modulo sin tener que reconstruir toda la historia tecnica desde cero.

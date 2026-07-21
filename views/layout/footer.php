@@ -75,6 +75,22 @@
         </div>
     </div>
 </div>
+<div id="busy-overlay" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4">
+    <div class="w-full max-w-sm rounded-2xl border border-white/20 bg-white p-6 shadow-2xl">
+        <div class="flex items-center gap-4">
+            <div class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                <svg class="h-6 w-6 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" class="opacity-20" stroke="currentColor" stroke-width="3"></circle>
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                </svg>
+            </div>
+            <div>
+                <p class="text-base font-bold text-slate-900">Espere un momento</p>
+                <p id="busy-overlay-message" class="mt-1 text-sm text-slate-500">Estamos gestionando la solicitud.</p>
+            </div>
+        </div>
+    </div>
+</div>
 <?php $jsVersion = @filemtime(__DIR__ . '/../../public/assets/js/app.js') ?: time(); ?>
 <script>
     window.APP_BASE_URL = <?= json_encode(rtrim(APP_BASE_URL, '/'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;

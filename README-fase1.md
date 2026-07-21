@@ -1,5 +1,9 @@
 # Fase 1 - Alta Temporal de Empresas
 
+> Realizado por Leonardo Navarro.
+>
+> Ultima actualizacion documental: 2026-07-02 11:19:17
+
 ## Objetivo
 Implementar el primer tramo del flujo de alta:
 - captura de datos

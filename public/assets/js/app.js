@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var confirmAccept = document.getElementById('confirm-accept');
     var confirmCancel = document.getElementById('confirm-cancel');
     var pendingForm = null;
+    var busyOverlay = document.getElementById('busy-overlay');
+    var busyOverlayMessage = document.getElementById('busy-overlay-message');
 
     var filtroBusqueda = document.getElementById('filtro-busqueda');
     var filtroEstado = document.getElementById('filtro-estado');
@@ -28,8 +30,14 @@ document.addEventListener('DOMContentLoaded', function () {
     var createModalInfoTitle = document.getElementById('modal-create-info-title');
     var createModalInfoText = document.getElementById('modal-create-info-text');
     var createModalSubmitLabel = document.getElementById('modal-create-submit-label');
+    var createModalErrors = document.getElementById('modal-create-errors');
+    var createModalErrorsList = document.getElementById('modal-create-errors-list');
     var infoModalEdit = document.getElementById('modal-info-edit');
     var infoModalCancel = document.getElementById('modal-info-cancel');
+    var createFormDraftKey = 'gestion_empresas_create_form_draft_v1';
+    var serverOldValues = window.CREATE_FORM_OLD || {};
+    var serverFormErrors = Array.isArray(window.CREATE_FORM_ERRORS) ? window.CREATE_FORM_ERRORS : [];
+    var rutValidationTimer = null;
 
     function renderIcons() {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -41,6 +49,26 @@ document.addEventListener('DOMContentLoaded', function () {
         var cleanBase = String(baseUrl).replace(/\/+$/, '');
         var cleanPath = String(path || '').replace(/^\/+/, '');
         return cleanPath ? cleanBase + '/' + cleanPath : cleanBase;
+    }
+
+    function applyInitialListFiltersFromUrl() {
+        if (!filtroEstado && !filtroHito) {
+            return;
+        }
+
+        var params = new URLSearchParams(window.location.search || '');
+        var estadoParam = params.get('estado');
+        var hitoParam = params.get('hito');
+
+        if (filtroEstado && estadoParam) {
+            filtroEstado.value = estadoParam;
+            filtroEstado.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (filtroHito && hitoParam) {
+            filtroHito.value = hitoParam;
+            filtroHito.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     function persistSidebarState(isCollapsed) {
@@ -74,6 +102,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         appShell.classList.remove('is-mobile-nav-open');
+    }
+
+    function isDesktopViewport() {
+        return window.innerWidth >= 1024;
     }
 
     function toggleUserMenu(forceOpen) {
@@ -141,6 +173,48 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function isPersistentModal(modal) {
+        return !!(modal && modal.getAttribute('data-persistent-modal') === '1');
+    }
+
+    function showBusyOverlay(message) {
+        if (!busyOverlay) {
+            return;
+        }
+
+        if (busyOverlayMessage) {
+            busyOverlayMessage.textContent = message || 'Estamos gestionando la solicitud.';
+        }
+
+        busyOverlay.classList.remove('hidden');
+        busyOverlay.classList.add('flex');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function getBusyMessageForForm(form) {
+        if (!form) {
+            return 'Estamos gestionando la solicitud.';
+        }
+
+        return form.getAttribute('data-busy-text')
+            || (form.action && form.action.indexOf('run-migrate') !== -1 ? 'Espere un momento, por favor. Estamos gestionando Migrate.' : '')
+            || (form.action && form.action.indexOf('approve') !== -1 ? 'Espere un momento, por favor. Estamos aprobando el registro.' : '')
+            || 'Espere un momento, por favor. Estamos gestionando la solicitud.';
+    }
+
+    function disableFormSubmitButtons(form) {
+        if (!form) {
+            return;
+        }
+
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function (button) {
+            button.disabled = true;
+        });
+    }
+
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+
     function getRowElement(id) {
         return document.querySelector('tr.row-registro[data-id="' + id + '"]');
     }
@@ -181,6 +255,48 @@ document.addEventListener('DOMContentLoaded', function () {
         field.value = value == null ? '' : value;
     }
 
+    function saveCreateFormDraft() {
+        if (!createForm) {
+            return;
+        }
+
+        var payload = {};
+        createForm.querySelectorAll('input, select, textarea').forEach(function (field) {
+            if (!field.name || field.disabled || field.type === 'file') {
+                return;
+            }
+
+            if (field.type === 'radio') {
+                if (field.checked) {
+                    payload[field.name] = field.value;
+                }
+                return;
+            }
+
+            payload[field.name] = field.value;
+        });
+
+        try {
+            window.localStorage.setItem(createFormDraftKey, JSON.stringify(payload));
+        } catch (error) {
+            // Ignorado: la UI sigue funcionando sin borrador local.
+        }
+    }
+
+    function loadCreateFormDraft() {
+        try {
+            var raw = window.localStorage.getItem(createFormDraftKey);
+            if (!raw) {
+                return {};
+            }
+
+            var parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
     function applySelectValue(name, value) {
         var field = document.getElementById(name) || document.querySelector('[name="' + name + '"]');
         var normalizedValue = value == null ? '' : String(value);
@@ -194,21 +310,386 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         field.value = normalizedValue;
+        if (field.tomselect) {
+            field.tomselect.setValue(normalizedValue, true);
+            field.tomselect.refreshItems();
+            field.tomselect.refreshOptions(false);
+        }
         field.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    function toggleFileRequirements(required) {
+    function setupSearchableSelects() {
+        if (typeof window.TomSelect !== 'function') {
+            return;
+        }
+
+        document.querySelectorAll('select[data-searchable-select="1"]').forEach(function (select) {
+            if (select.tomselect) {
+                return;
+            }
+
+            var instance = new window.TomSelect(select, {
+                create: false,
+                allowEmptyOption: true,
+                maxOptions: 500,
+                hidePlaceholder: false,
+                placeholder: select.getAttribute('data-searchable-placeholder') || 'Buscar...',
+                plugins: ['dropdown_input'],
+                render: {
+                    no_results: function () {
+                        return '<div class="no-results">Sin resultados</div>';
+                    }
+                }
+            });
+
+            if (instance.wrapper) {
+                instance.wrapper.classList.remove(
+                    'px-3',
+                    'py-2',
+                    'border',
+                    'border-slate-200',
+                    'rounded-lg',
+                    'focus:outline-none',
+                    'focus:ring-2',
+                    'focus:ring-indigo-500/20',
+                    'focus:border-indigo-500',
+                    'transition'
+                );
+                instance.wrapper.classList.add('searchable-select-wrapper');
+            }
+
+            if (instance.control) {
+                instance.control.classList.add('searchable-select-control');
+            }
+        });
+    }
+
+    function clearSearchableSelect(select) {
+        if (!select) {
+            return;
+        }
+
+        select.value = '';
+
+        if (select.tomselect) {
+            select.tomselect.clear(true);
+            if (select.tomselect.input) {
+                select.tomselect.input.value = '';
+            }
+            if (typeof select.tomselect.setTextboxValue === 'function') {
+                select.tomselect.setTextboxValue('');
+            }
+            select.tomselect.refreshItems();
+        }
+    }
+
+    function updateCityDependency(scope) {
+        var root = scope || document;
+
+        root.querySelectorAll('select[name="departamento"]').forEach(function (departamentoSelect) {
+            var selectId = departamentoSelect.id || '';
+            var prefix = selectId.replace(/departamento$/, '');
+            var ciudadSelect = document.getElementById(prefix + 'ciudad');
+            var ciudadHelp = document.getElementById(prefix + 'ciudad_help');
+            var hasDepartamento = String(departamentoSelect.value || '').trim() !== '';
+
+            if (!ciudadSelect) {
+                return;
+            }
+
+            ciudadSelect.disabled = !hasDepartamento;
+
+            if (!hasDepartamento) {
+                clearSearchableSelect(ciudadSelect);
+                if (ciudadSelect.tomselect) {
+                    ciudadSelect.tomselect.disable();
+                }
+                if (ciudadHelp) {
+                    ciudadHelp.textContent = 'Seleccione primero un departamento para habilitar la ciudad.';
+                }
+                return;
+            }
+
+            if (ciudadSelect.tomselect) {
+                ciudadSelect.tomselect.enable();
+                ciudadSelect.tomselect.refreshOptions(false);
+            }
+
+            if (ciudadHelp) {
+                ciudadHelp.textContent = 'Busque la ciudad dentro del catalogo disponible.';
+            }
+        });
+    }
+
+    function updateConditionalFileRequirements() {
         if (!createForm) {
             return;
         }
 
-        createForm.querySelectorAll('input[type="file"]').forEach(function (field) {
-            if (required) {
-                field.setAttribute('required', 'required');
+        var certificado = createForm.querySelector('select[name="alta_certificado_digital"]');
+        var credito = createForm.querySelector('input[name="alta_credito_fiscal"]:checked');
+        var importe = createForm.querySelector('input[name="cliente_abonado_importe"]');
+        var pfx = createForm.querySelector('input[name="archivo_pfx"]');
+        var creditoFiscal = createForm.querySelector('input[name="archivo_credito_fiscal"]');
+        var contrato = createForm.querySelector('input[name="archivo_contrato"]');
+        var f6906 = createForm.querySelector('input[name="archivo_6906"]');
+
+        var requierePfx = certificado && certificado.value === 'ADJUNTO';
+        var requiereCreditoFiscal = credito && credito.value !== 'NO';
+        var requiereContrato = importe && Number(importe.value || 0) > 1000;
+
+        if (pfx) {
+            if (requierePfx) {
+                pfx.setAttribute('required', 'required');
             } else {
-                field.removeAttribute('required');
+                pfx.removeAttribute('required');
             }
+        }
+
+        if (creditoFiscal) {
+            if (requiereCreditoFiscal) {
+                creditoFiscal.setAttribute('required', 'required');
+            } else {
+                creditoFiscal.removeAttribute('required');
+            }
+        }
+
+        if (contrato) {
+            if (requiereContrato) {
+                contrato.setAttribute('required', 'required');
+            } else {
+                contrato.removeAttribute('required');
+            }
+        }
+
+        if (f6906) {
+            f6906.removeAttribute('required');
+        }
+    }
+
+    function getCreditFiscalAnnualAmount(scope) {
+        var helper = (scope || createForm || document).querySelector('[data-credito-fiscal-anual]');
+        var value = Number(helper ? helper.getAttribute('data-credito-fiscal-anual') : 0);
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    function setRadioValue(scope, name, value) {
+        (scope || document).querySelectorAll('input[name="' + name + '"]').forEach(function (radio) {
+            radio.checked = radio.value === String(value || '');
         });
+    }
+
+    function getRadioValue(scope, name, fallback) {
+        var selected = (scope || document).querySelector('input[name="' + name + '"]:checked');
+        return selected ? String(selected.value || '') : String(fallback || '');
+    }
+
+    function setFieldReadonlyState(field, locked) {
+        if (!field) {
+            return;
+        }
+
+        if (field.tagName === 'SELECT') {
+            if (field.tomselect) {
+                if (locked) {
+                    field.tomselect.lock();
+                } else {
+                    field.tomselect.unlock();
+                }
+            }
+            return;
+        }
+
+        if (locked) {
+            field.setAttribute('readonly', 'readonly');
+        } else {
+            field.removeAttribute('readonly');
+        }
+    }
+
+    function setSelectValue(field, value) {
+        if (!field) {
+            return;
+        }
+
+        field.value = String(value == null ? '' : value);
+        if (field.tomselect) {
+            field.tomselect.setValue(String(value == null ? '' : value), true);
+        }
+    }
+
+    function applyBusinessRules(scope) {
+        var form = scope || createForm;
+        if (!form) {
+            return;
+        }
+
+        var annualAmount = getCreditFiscalAnnualAmount(form);
+        var tributarioField = form.querySelector('select[name="alta_tributario"]');
+        var normaField = form.querySelector('input[name="alta_exonerado_norma"]');
+        var normaHelp = form.querySelector('[id$="alta_exonerado_norma_help"]');
+        var normaWrapper = form.querySelector('[data-exonerado-norma-wrapper]');
+        var creditoHelp = form.querySelector('[id$="alta_credito_fiscal_help"]');
+        var licenciaField = form.querySelector('select[name="licencia"]');
+        var importeField = form.querySelector('input[name="cliente_abonado_importe"]');
+        var importeHelp = form.querySelector('[id$="cliente_abonado_importe_help"]');
+        var monedaField = form.querySelector('select[name="cliente_abonado_moneda"]');
+        var periodoField = form.querySelector('select[name="cliente_abonado_periodo"]');
+        var productoField = form.querySelector('input[name="cliente_abonado_id_producto"]');
+        var formaPagoField = form.querySelector('input[name="cliente_id_formapago"]');
+        var medioPagoField = form.querySelector('input[name="cliente_id_medio_pago"]');
+        var pnCreditoField = form.querySelector('input[name="cliente_pn_credito_fiscal"]');
+        var pnMontoField = form.querySelector('input[name="cliente_pn_monto"]');
+        var tvField = form.querySelector('input[name="cliente_abonado_tv"]');
+        var grupoField = form.querySelector('input[name="cliente_abonado_grupo"]');
+        var licencia = licenciaField ? parseInt(String(licenciaField.value || '0'), 10) : 0;
+        var productByLicense = {
+            0: 333892,
+            2: 333893,
+            3: 333894,
+            10: 333895,
+            12: 235239,
+            14: 333896
+        };
+
+        var tributario = tributarioField ? String(tributarioField.value || 'GENERAL') : 'GENERAL';
+        var autoNorma = '';
+
+        if (tributario === 'IVA MINIMO') {
+            autoNorma = 'CONTRIBUYENTE IVA MINIMO';
+            setRadioValue(form, 'alta_credito_fiscal', 'LITERAL E');
+        } else if (tributario === 'MONOTRIBUTO') {
+            autoNorma = 'CONTRIBUYENTE MONOTRIBUTO';
+        } else if (tributario === 'MONOTRIBUTO MIDES') {
+            autoNorma = 'CONTRIBUYENTE MONOTRIBUTO MIDES';
+        }
+
+        if (normaField) {
+            if (normaWrapper) {
+                normaWrapper.style.display = tributario === 'EXONERADO' ? '' : 'none';
+            }
+            if (tributario === 'EXONERADO') {
+                normaField.required = true;
+                normaField.removeAttribute('readonly');
+                normaField.placeholder = 'LEY 17400 ARTICULO ...';
+                if (normaHelp) {
+                    normaHelp.textContent = 'Debe digitar la norma aplicable para regimen EXONERADO.';
+                }
+            } else if (autoNorma !== '') {
+                normaField.value = autoNorma;
+                normaField.required = false;
+                normaField.setAttribute('readonly', 'readonly');
+                normaField.placeholder = '';
+                if (normaHelp) {
+                    normaHelp.textContent = 'Este valor se completa autom\u00e1ticamente seg\u00fan el r\u00e9gimen.';
+                }
+            } else {
+                normaField.value = '';
+                normaField.required = false;
+                normaField.removeAttribute('readonly');
+                normaField.placeholder = '';
+                if (normaHelp) {
+                    normaHelp.textContent = 'Se completa autom\u00e1ticamente seg\u00fan el r\u00e9gimen, salvo EXONERADO.';
+                }
+            }
+        }
+
+        var creditoFiscal = getRadioValue(form, 'alta_credito_fiscal', 'NO');
+        var importeActual = Number(importeField ? (importeField.value || 0) : 0);
+        var lockCreditFields = creditoFiscal !== 'NO';
+
+        if (productoField) {
+            productoField.value = String(productByLicense[licencia] || 0);
+        }
+
+        if (creditoFiscal === 'LITERAL E') {
+            if (importeField) {
+                importeField.value = annualAmount.toFixed(2);
+            }
+            setSelectValue(monedaField, 'UYU');
+            setSelectValue(periodoField, 'MENSUAL');
+            if (formaPagoField) {
+                formaPagoField.value = '444';
+            }
+            if (medioPagoField) {
+                medioPagoField.value = '820';
+            }
+            if (pnCreditoField) {
+                pnCreditoField.value = 'NO';
+            }
+            if (pnMontoField) {
+                pnMontoField.value = '0';
+            }
+            if (tvField) {
+                tvField.value = 'CONTADO';
+            }
+            if (grupoField) {
+                grupoField.value = 'MENSUAL';
+            }
+            if (creditoHelp) {
+                creditoHelp.textContent = 'Literal E fija monto, moneda, per\u00edodo y medio de pago con el tope anual configurado.';
+            }
+        } else if (creditoFiscal === 'RESGUARDO') {
+            setSelectValue(periodoField, 'MENSUAL');
+            if (formaPagoField) {
+                formaPagoField.value = '444';
+            }
+            if (medioPagoField) {
+                medioPagoField.value = '0';
+            }
+            if (pnCreditoField) {
+                pnCreditoField.value = 'SI';
+            }
+            if (pnMontoField) {
+                pnMontoField.value = Math.min(importeActual, annualAmount).toFixed(2);
+            }
+            if (tvField) {
+                tvField.value = 'CREDITO';
+            }
+            if (grupoField) {
+                grupoField.value = 'MENSUAL';
+            }
+            if (creditoHelp) {
+                creditoHelp.textContent = 'Resguardo calcula pnMonto hasta el tope anual configurado.';
+            }
+        } else {
+            if (formaPagoField) {
+                formaPagoField.value = '444';
+            }
+            if (medioPagoField) {
+                medioPagoField.value = '0';
+            }
+            if (pnCreditoField) {
+                pnCreditoField.value = 'NO';
+            }
+            if (pnMontoField) {
+                pnMontoField.value = '0';
+            }
+            if (tvField) {
+                tvField.value = 'CREDITO';
+            }
+            if (grupoField) {
+                grupoField.value = periodoField && String(periodoField.value || 'MENSUAL') === 'ANUAL' ? getCurrentBillingMonth() : 'MENSUAL';
+            }
+            if (creditoHelp) {
+                creditoHelp.textContent = 'Tope anual de cr\u00e9dito fiscal: ' + annualAmount.toFixed(2);
+            }
+        }
+
+        setFieldReadonlyState(importeField, lockCreditFields);
+        setFieldReadonlyState(monedaField, lockCreditFields);
+        setFieldReadonlyState(periodoField, lockCreditFields);
+
+        if (importeHelp) {
+            importeHelp.textContent = lockCreditFields
+                ? 'Monto fijado autom\u00e1ticamente por Literal E.'
+                : 'El monto puede ajustarse autom\u00e1ticamente seg\u00fan cr\u00e9dito fiscal.';
+        }
+    }
+
+    function getCurrentBillingMonth() {
+        var months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+        return months[new Date().getMonth()] || 'MENSUAL';
     }
 
     function resetCreateModal() {
@@ -219,7 +700,8 @@ document.addEventListener('DOMContentLoaded', function () {
         createForm.reset();
         createForm.action = appUrl('index.php?action=store');
         createForm.dataset.demoMode = '0';
-        toggleFileRequirements(true);
+        applyBusinessRules(createForm);
+        updateConditionalFileRequirements();
 
         if (createModalBadge) {
             createModalBadge.textContent = 'Nueva Alta';
@@ -239,6 +721,153 @@ document.addEventListener('DOMContentLoaded', function () {
         if (createModalSubmitLabel) {
             createModalSubmitLabel.textContent = 'Guardar e Iniciar Automatizacion';
         }
+
+        if (createModalErrors) {
+            createModalErrors.classList.add('hidden');
+        }
+        if (createModalErrorsList) {
+            createModalErrorsList.innerHTML = '';
+        }
+
+        updateCityDependency(createForm);
+        applyBusinessRules(createForm);
+    }
+
+    function applyFormSnapshot(snapshot) {
+        if (!createForm || !snapshot || typeof snapshot !== 'object') {
+            return;
+        }
+
+        Object.keys(snapshot).forEach(function (key) {
+            var value = snapshot[key];
+
+            if (key === 'alta_es_emisor' || key === 'alta_credito_fiscal') {
+                document.querySelectorAll('[name="' + key + '"]').forEach(function (radio) {
+                    radio.checked = radio.value === String(value || '');
+                });
+                return;
+            }
+
+            setFieldValue(key, value);
+        });
+
+        [
+            'ciudad',
+            'departamento',
+            'cliente_id_giro',
+            'cliente_id_vendedor',
+            'cliente_id_fidelizacion',
+            'licencia',
+            'cliente_id_formapago',
+            'cliente_abonado_moneda',
+            'cliente_abonado_periodo',
+            'alta_tipoempresa',
+            'alta_tributario',
+            'alta_certificado_digital'
+        ].forEach(function (name) {
+            if (Object.prototype.hasOwnProperty.call(snapshot, name)) {
+                applySelectValue(name, snapshot[name]);
+            }
+        });
+
+        updateCityDependency(createForm);
+        applyBusinessRules(createForm);
+        updateConditionalFileRequirements();
+    }
+
+    function setRutValidationMessage(message, severity) {
+        var field = document.getElementById('rut_validation_msg');
+        if (!field) {
+            return;
+        }
+
+        field.textContent = message || 'Ingrese 12 digitos numericos. Se validara si ya existe en Empresas o en Clientes (397).';
+        field.className = 'mt-1 text-[11px] ';
+
+        if (severity === 'error') {
+            field.className += 'text-rose-600';
+            return;
+        }
+
+        if (severity === 'warning') {
+            field.className += 'text-amber-600';
+            return;
+        }
+
+        if (severity === 'success') {
+            field.className += 'text-emerald-600';
+            return;
+        }
+
+        field.className += 'text-slate-500';
+    }
+
+    function validateRutLive(force) {
+        if (!createForm) {
+            return;
+        }
+
+        var rutField = createForm.querySelector('input[name="rut"]');
+        if (!rutField) {
+            return;
+        }
+
+        var rut = String(rutField.value || '').trim();
+        createForm.dataset.rutExistsEmpresa = '0';
+        createForm.dataset.rutExistsCliente = '0';
+
+        if (rut === '') {
+            setRutValidationMessage('Ingrese 12 digitos numericos. Largo actual: 0/12.', 'neutral');
+            return;
+        }
+
+        if (!/^[0-9]{12}$/.test(rut)) {
+            setRutValidationMessage('El RUT debe tener 12 digitos numericos consecutivos. Largo actual: ' + rut.length + '/12.', 'warning');
+            return;
+        }
+
+        var recordId = '0';
+        var action = createForm.getAttribute('action') || '';
+        var match = action.match(/[?&]id=(\d+)/);
+        if (match) {
+            recordId = match[1];
+        }
+
+        fetch(appUrl('index.php?action=validate-rut&rut=' + encodeURIComponent(rut) + '&id=' + encodeURIComponent(recordId)), {
+            credentials: 'same-origin'
+        })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (payload) {
+                if (String((createForm.querySelector('input[name="rut"]') || {}).value || '').trim() !== rut) {
+                    return;
+                }
+
+                createForm.dataset.rutExistsEmpresa = payload.empresa_exists ? '1' : '0';
+                createForm.dataset.rutExistsCliente = payload.cliente_exists ? '1' : '0';
+
+                if (payload.empresa_exists) {
+                    var empresaId = payload.empresa && payload.empresa.IdEmpresa ? payload.empresa.IdEmpresa : '-';
+                    var razonSocial = payload.empresa && payload.empresa.RazonSocial ? payload.empresa.RazonSocial : '-';
+                    setRutValidationMessage('Este RUT ya existe como empresa en Dynamica. IdEmpresa: ' + empresaId + '. Raz\u00f3n Social: ' + razonSocial + '.', 'error');
+                    return;
+                }
+
+                if (payload.cliente_exists) {
+                    var clienteId = payload.cliente && payload.cliente.IdCliente ? payload.cliente.IdCliente : '-';
+                    var clienteRazon = payload.cliente && payload.cliente.razonsocial ? payload.cliente.razonsocial : '-';
+                    setRutValidationMessage('Este RUT ya existe como cliente en la empresa 397, pero no como empresa. IdCliente: ' + clienteId + '. Raz\u00f3n Social: ' + clienteRazon + '.', 'warning');
+                    return;
+                }
+
+                setRutValidationMessage('RUT disponible para continuar. Largo actual: 12/12.', 'success');
+            })
+            .catch(function () {
+                if (force) {
+                    setRutValidationMessage('No fue posible validar el RUT en este momento.', 'warning');
+                }
+            });
     }
 
     function prepareEditModal(id, row) {
@@ -248,7 +877,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         createForm.action = row && !row.is_demo ? appUrl('index.php?action=update&id=' + id) : '#';
         createForm.dataset.demoMode = row && row.is_demo ? '1' : '0';
-        toggleFileRequirements(false);
+        updateConditionalFileRequirements();
 
         if (createModalBadge) {
             createModalBadge.textContent = 'Edicion';
@@ -270,6 +899,116 @@ document.addEventListener('DOMContentLoaded', function () {
         if (createModalSubmitLabel) {
             createModalSubmitLabel.textContent = row && row.is_demo ? 'Guardar vista demo' : 'Guardar cambios';
         }
+    }
+
+    function getFieldLabel(field) {
+        if (!field) {
+            return 'Campo obligatorio';
+        }
+
+        var fieldId = field.id || '';
+        var explicitLabel = fieldId ? document.querySelector('label[for="' + fieldId + '"]') : null;
+        if (explicitLabel) {
+            return String(explicitLabel.textContent || '').replace(/\*/g, '').trim();
+        }
+
+        var container = field.closest('div, section');
+        if (container) {
+            var label = container.querySelector('label');
+            if (label) {
+                return String(label.textContent || '').replace(/\*/g, '').trim();
+            }
+        }
+
+        return field.name || 'Campo obligatorio';
+    }
+
+    function showCreateFormErrors(errors) {
+        if (!createModalErrors || !createModalErrorsList) {
+            return;
+        }
+
+        createModalErrorsList.innerHTML = '';
+        errors.forEach(function (errorText) {
+            var li = document.createElement('li');
+            li.textContent = errorText;
+            createModalErrorsList.appendChild(li);
+        });
+        createModalErrors.classList.remove('hidden');
+        createModalErrors.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function collectCreateFormErrors(form) {
+        var errors = [];
+        var seen = {};
+
+        function pushError(label) {
+            if (!label || seen[label]) {
+                return;
+            }
+            seen[label] = true;
+            errors.push(label);
+        }
+
+        form.querySelectorAll('input, select, textarea').forEach(function (field) {
+            if (field.disabled || !field.required) {
+                return;
+            }
+
+            if (field.type === 'radio') {
+                if (seen['radio:' + field.name]) {
+                    return;
+                }
+                seen['radio:' + field.name] = true;
+
+                var checkedRadio = form.querySelector('input[type="radio"][name="' + field.name + '"]:checked');
+                if (!checkedRadio) {
+                    pushError(getFieldLabel(field));
+                }
+                return;
+            }
+
+            if (field.type === 'file') {
+                if (!field.files || field.files.length === 0) {
+                    pushError(getFieldLabel(field));
+                }
+                return;
+            }
+
+            if (typeof field.checkValidity === 'function' && !field.checkValidity()) {
+                pushError(field.validationMessage || getFieldLabel(field));
+                return;
+            }
+
+            if (String(field.value || '').trim() === '') {
+                pushError(getFieldLabel(field));
+            }
+        });
+
+        return errors;
+    }
+
+    function updateEfPasswordState(input) {
+        if (!input) {
+            return true;
+        }
+
+        var help = document.getElementById((input.id || '') + '_help');
+        var value = String(input.value || '');
+        if (/\s/.test(value)) {
+            var compactValue = value.replace(/\s+/g, '');
+            if (compactValue !== value) {
+                input.value = compactValue;
+                value = compactValue;
+            }
+        }
+
+        input.setCustomValidity('');
+        if (help) {
+            help.textContent = 'No se permiten espacios.';
+            help.className = 'mt-1 text-[11px] text-slate-500';
+        }
+        return true;
     }
 
     function fillText(id, value) {
@@ -307,21 +1046,33 @@ document.addEventListener('DOMContentLoaded', function () {
             setFieldValue(key, row[key]);
         });
 
-        applySelectValue('ciudad', row.ciudad);
         applySelectValue('departamento', row.departamento);
+        applySelectValue('ciudad', row.ciudad);
         applySelectValue('cliente_id_giro', row.cliente_id_giro);
+        applySelectValue('cliente_id_vendedor', row.cliente_id_vendedor);
         applySelectValue('cliente_id_fidelizacion', row.cliente_id_fidelizacion);
         applySelectValue('licencia', row.licencia);
         applySelectValue('cliente_abonado_moneda', row.cliente_abonado_moneda || 'UYU');
         applySelectValue('cliente_abonado_periodo', row.cliente_abonado_periodo || 'MENSUAL');
-        applySelectValue('alta_especial', row.alta_especial || 'NO');
+        setFieldValue('cliente_id_formapago', row.cliente_id_formapago || '0');
+        setFieldValue('cliente_id_medio_pago', row.cliente_id_medio_pago || '0');
+        setFieldValue('cliente_pn_credito_fiscal', row.cliente_pn_credito_fiscal || 'NO');
+        setFieldValue('cliente_pn_monto', row.cliente_pn_monto || '0');
+        setFieldValue('cliente_abonado_tv', row.cliente_abonado_tv || 'CONTADO');
+        setFieldValue('cliente_abonado_grupo', row.cliente_abonado_grupo || 'MENSUAL');
+        applySelectValue('alta_tipoempresa', row.alta_tipoempresa || 'UNIPERSONAL');
+        applySelectValue('alta_tributario', row.alta_tributario || row.alta_especial || 'GENERAL');
         applySelectValue('alta_certificado_digital', row.alta_certificado_digital || '');
+        updateCityDependency(createForm || document);
+        applyBusinessRules(createForm || document);
+        updateConditionalFileRequirements();
     }
 
     document.querySelectorAll('[data-open-modal]').forEach(function (trigger) {
         trigger.addEventListener('click', function () {
             if (trigger.getAttribute('data-open-modal') === 'modal-create') {
                 resetCreateModal();
+                applyFormSnapshot(loadCreateFormDraft());
             }
             openModal(trigger.getAttribute('data-open-modal'));
         });
@@ -379,13 +1130,117 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (createForm) {
+        createForm.querySelectorAll('input, select, textarea').forEach(function (field) {
+            if (field.type === 'file') {
+                return;
+            }
+
+            var eventName = field.tagName === 'SELECT' || field.type === 'radio' ? 'change' : 'input';
+            field.addEventListener(eventName, saveCreateFormDraft);
+
+            if (eventName !== 'change') {
+                field.addEventListener('change', saveCreateFormDraft);
+            }
+        });
+
         createForm.addEventListener('submit', function (event) {
             if (createForm.dataset.demoMode === '1') {
                 event.preventDefault();
                 mostrarToast('Modo Demo', 'La fila visual de referencia no genera cambios reales en la base de datos.', 'indigo');
+                return;
             }
+
+            if (createModalErrors) {
+                createModalErrors.classList.add('hidden');
+            }
+            if (createModalErrorsList) {
+                createModalErrorsList.innerHTML = '';
+            }
+
+            var validationErrors = collectCreateFormErrors(createForm);
+            if (createForm.dataset.rutExistsEmpresa === '1') {
+                validationErrors.unshift('El RUT ya esta registrado como empresa en Dynamica.');
+            }
+            if (validationErrors.length > 0) {
+                event.preventDefault();
+                showCreateFormErrors(validationErrors);
+                mostrarToast('Formulario incompleto', 'Complete los campos obligatorios marcados en la alerta.', 'rose');
+                saveCreateFormDraft();
+                return;
+            }
+
+            saveCreateFormDraft();
         });
+
+        var rutField = createForm.querySelector('input[name="rut"]');
+        if (rutField) {
+            rutField.addEventListener('input', function () {
+                var currentRut = String(rutField.value || '').trim();
+                if (!/^[0-9]{12}$/.test(currentRut)) {
+                    setRutValidationMessage('El RUT debe tener 12 digitos numericos consecutivos. Largo actual: ' + currentRut.length + '/12.', currentRut.length === 12 ? 'warning' : 'neutral');
+                }
+                if (rutValidationTimer) {
+                    window.clearTimeout(rutValidationTimer);
+                }
+                rutValidationTimer = window.setTimeout(function () {
+                    validateRutLive(false);
+                }, 450);
+            });
+
+            rutField.addEventListener('blur', function () {
+                validateRutLive(true);
+            });
+        }
+
+        applyBusinessRules(createForm);
     }
+
+    document.querySelectorAll('select[name="departamento"]').forEach(function (select) {
+        select.addEventListener('change', function () {
+            var prefix = (select.id || '').replace(/departamento$/, '');
+            var ciudadSelect = document.getElementById(prefix + 'ciudad');
+            clearSearchableSelect(ciudadSelect);
+            updateCityDependency(select.closest('form') || document);
+        });
+    });
+
+    document.querySelectorAll('select[name="alta_certificado_digital"]').forEach(function (select) {
+        select.addEventListener('change', updateConditionalFileRequirements);
+    });
+
+    document.querySelectorAll('input[data-ef-password="1"]').forEach(function (input) {
+        var refresh = function () {
+            updateEfPasswordState(input);
+        };
+        input.addEventListener('input', refresh);
+        input.addEventListener('blur', refresh);
+        refresh();
+    });
+
+    document.querySelectorAll('input[name="alta_credito_fiscal"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            applyBusinessRules(createForm || document);
+            updateConditionalFileRequirements();
+        });
+    });
+
+    document.querySelectorAll('input[name="cliente_abonado_importe"]').forEach(function (input) {
+        input.addEventListener('input', function () {
+            applyBusinessRules(createForm || document);
+            updateConditionalFileRequirements();
+        });
+        input.addEventListener('change', function () {
+            applyBusinessRules(createForm || document);
+            updateConditionalFileRequirements();
+        });
+    });
+
+    document.querySelectorAll('select[name="alta_tributario"], select[name="cliente_abonado_periodo"], select[name="cliente_abonado_moneda"]').forEach(function (field) {
+        field.addEventListener('change', function () {
+            applyBusinessRules(createForm || document);
+            updateConditionalFileRequirements();
+        });
+    });
 
     if (confirmCancel) {
         confirmCancel.addEventListener('click', function () {
@@ -411,12 +1266,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 overlay.hidden = true;
             }
 
+            disableFormSubmitButtons(formToSubmit);
+            showBusyOverlay(getBusyMessageForForm(formToSubmit));
             formToSubmit.submit();
         });
     }
 
+    document.querySelectorAll('form').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (event.defaultPrevented) {
+                return;
+            }
+
+            if (form.matches('[data-confirm]')) {
+                return;
+            }
+
+            disableFormSubmitButtons(form);
+            showBusyOverlay(getBusyMessageForForm(form));
+        });
+    });
+
     if (navToggle && appShell) {
         navToggle.addEventListener('click', function () {
+            if (isDesktopViewport()) {
+                persistSidebarState(!appShell.classList.contains('is-collapsed'));
+                return;
+            }
+
             appShell.classList.toggle('is-mobile-nav-open');
         });
     }
@@ -436,10 +1313,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('[data-nav-filter-state]').forEach(function (button) {
         button.addEventListener('click', function () {
+            var targetState = button.getAttribute('data-nav-filter-state') || 'todos';
+
             if (filtroEstado) {
-                filtroEstado.value = button.getAttribute('data-nav-filter-state') || 'todos';
+                filtroEstado.value = targetState;
                 filtroEstado.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                window.location.href = appUrl('panel?estado=' + encodeURIComponent(targetState));
+                return;
             }
+
             var table = document.getElementById('tabla-clientes');
             if (table) {
                 table.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -515,12 +1398,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!filaDetalle.classList.contains('hidden')) {
-            window.setDetailTab(id, 'ruta');
+            window.setDetailTab(id, 'ruta-fiscal');
         }
     };
 
     window.setDetailTab = function (id, tab) {
-        ['ruta', 'fiscal', 'resumen'].forEach(function (pane) {
+        ['ruta-fiscal', 'resumen'].forEach(function (pane) {
             var paneNode = document.getElementById('detalle-pane-' + id + '-' + pane);
             if (!paneNode) {
                 return;
@@ -540,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         fillText('modal-info-title', row.razon_social || 'Detalle del cliente');
-        fillText('modal-info-subtitle', 'RUT ' + (row.rut || '-') + ' · Licencia ' + (row.licencia_texto || row.licencia || '-'));
+        fillText('modal-info-subtitle', 'RUT ' + (row.rut || '-') + ' - Licencia ' + (row.licencia_texto || row.licencia || '-'));
         fillText('modal-info-rut', row.rut);
         fillText('modal-info-estado', row.estado);
         fillText('modal-info-licencia', row.licencia_texto || row.licencia);
@@ -548,7 +1431,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fillText('modal-info-email', row.email_principal);
         fillText('modal-info-telefono', row.telefono);
         fillText('modal-info-domicilio', row.domicilio);
-        fillText('modal-info-ciudad', row.ciudad);
+        fillText('modal-info-ciudad', row.ciudad_nombre || row.ciudad);
         fillText('modal-info-sucursal', row.suc_cod_sucursal);
         fillText('modal-info-certificado', row.alta_certificado_digital);
         fillText('modal-info-observaciones', row.observaciones || row.estado_detalle || row.notas_admin);
@@ -570,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var fullLink = document.getElementById('modal-info-full-link');
         if (fullLink) {
-            fullLink.href = appUrl('registro/' + id);
+            fullLink.href = appUrl('index.php?action=show&id=' + id);
         }
 
         openModal('modal-info');
@@ -655,12 +1538,12 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.innerHTML = '<svg class="animate-spin h-3.5 w-3.5 mr-1" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Reintentando Migrate...';
 
         setTimeout(function () {
-            badgeEstado.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200';
-            badgeEstado.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>En Proceso';
+            badgeEstado.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200';
+            badgeEstado.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>DGI pendiente';
             btn.className = 'inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm';
-            btn.innerHTML = '<i data-lucide="shield" class="w-3.5 h-3.5"></i><span>Aprobacion pendiente (Aprobar)</span>';
-            fila.setAttribute('data-status', 'En Proceso');
-            fila.setAttribute('data-hito', 'Aprobacion pendiente');
+            btn.innerHTML = '<i data-lucide="stamp" class="w-3.5 h-3.5"></i><span>Pendiente DGI (Marcar Alta Pendiente)</span>';
+            fila.setAttribute('data-status', 'DGI pendiente');
+            fila.setAttribute('data-hito', 'Pendiente DGI');
             renderIcons();
             mostrarToast('Alta de Sistema', 'Hito Migrate completado de forma satisfactoria.', 'emerald');
             filtrarTabla();
@@ -851,6 +1734,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             document.querySelectorAll('.modal-shell.is-open').forEach(function (modal) {
+                if (isPersistentModal(modal)) {
+                    return;
+                }
                 modal.classList.remove('is-open');
                 modal.setAttribute('aria-hidden', 'true');
             });
@@ -865,6 +1751,23 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.addEventListener('click', function (event) {
+        var openTrigger = event.target.closest('[data-open-modal]');
+        if (openTrigger) {
+            var modalId = openTrigger.getAttribute('data-open-modal');
+            if (modalId === 'modal-create') {
+                resetCreateModal();
+                applyFormSnapshot(loadCreateFormDraft());
+            }
+            openModal(modalId);
+            return;
+        }
+
+        var closeTrigger = event.target.closest('[data-close-modal]');
+        if (closeTrigger) {
+            closeModal(closeTrigger.getAttribute('data-close-modal'));
+            return;
+        }
+
         if (appShell && appShell.classList.contains('is-mobile-nav-open')) {
             var clickedToggle = navToggle && navToggle.contains(event.target);
             var clickedSidebar = appSidebar && appSidebar.contains(event.target);
@@ -880,6 +1783,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     restoreSidebarState();
     updateInstallCtas();
+    setupSearchableSelects();
+    updateCityDependency(document);
+    updateConditionalFileRequirements();
+    applyInitialListFiltersFromUrl();
+    if (createForm) {
+        if (Object.keys(serverOldValues).length > 0) {
+            resetCreateModal();
+            applyFormSnapshot(serverOldValues);
+            openModal('modal-create');
+            if (serverFormErrors.length > 0) {
+                showCreateFormErrors(serverFormErrors);
+            }
+            saveCreateFormDraft();
+            validateRutLive(false);
+        } else {
+            applyFormSnapshot(loadCreateFormDraft());
+            validateRutLive(false);
+        }
+    }
     renderIcons();
     filtrarTabla();
 });

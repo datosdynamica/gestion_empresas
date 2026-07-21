@@ -5,6 +5,11 @@ function h(?string $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
+function u(string $value): string
+{
+    return html_entity_decode($value, ENT_QUOTES, 'UTF-8');
+}
+
 function demoEmpresasNuevasRows(): array
 {
     return [
@@ -145,48 +150,286 @@ function demoEmpresasNuevasRows(): array
 
 function licenciaEtiqueta(array $item): string
 {
-    if (!empty($item['licencia_texto'])) {
-        return (string) $item['licencia_texto'];
+    $codigo = (int) ($item['licencia'] ?? -1);
+    if ($codigo >= 0 && isset(LICENCIAS_DISPONIBLES[$codigo])) {
+        return LICENCIAS_DISPONIBLES[$codigo];
     }
 
-    switch ((string) ($item['licencia'] ?? '')) {
-        case '8':
-            return 'Enterprise Cloud';
-        case '3':
-            return 'SaaS Standard';
-        case '0':
-            return 'SaaS Professional';
-        default:
-            return 'Sin definir';
-    }
+    return !empty($item['licencia_texto']) ? (string) $item['licencia_texto'] : 'Sin definir';
 }
 
-function buildListMeta(array $item): array
+function workflowEventsMap(array $history): array
+{
+    $mapped = [];
+    foreach ($history as $event) {
+        $mapped[(string) ($event['evento'] ?? '')] = $event;
+    }
+    return $mapped;
+}
+
+function listHistoricalLicenseIssue(array $history): string
+{
+    foreach ($history as $event) {
+        $evento = (string) ($event['evento'] ?? '');
+        $descripcion = trim((string) ($event['descripcion'] ?? ''));
+        if ($evento !== 'HITO_MIGRATE_ERROR' || $descripcion === '') {
+            continue;
+        }
+
+        $normalized = mb_strtolower($descripcion);
+        if (mb_strpos($normalized, 'licenciamiento devolvio novedad') !== false
+            || mb_strpos($normalized, 'licencia rechazada') !== false
+            || mb_strpos($normalized, 'solicitud de licencia rechazada') !== false) {
+            return $descripcion;
+        }
+    }
+
+    return '';
+}
+
+function listMigrateSummary(array $item): array
+{
+    $responseXml = trim((string) ($item['migrate_response_xml'] ?? ''));
+    $summary = [
+        'lic_msg_retorno' => '',
+        'lic_rejected' => false,
+        'base_success' => false,
+        'lic_errors' => [],
+        'user_errors' => [],
+    ];
+
+    if ($responseXml === '') {
+        return $summary;
+    }
+
+    libxml_use_internal_errors(true);
+    $xml = simplexml_load_string($responseXml);
+    libxml_clear_errors();
+
+    if ($xml === false) {
+        return $summary;
+    }
+
+    $empresaNodes = $xml->xpath('//DatosSucursal/EmpCodigo');
+    $claveNodes = $xml->xpath('//DatosSucursal/SucClaveAcceso');
+    $empresaInvoicy = is_array($empresaNodes) && isset($empresaNodes[0]) ? trim((string) $empresaNodes[0]) : '';
+    $claveAcceso = is_array($claveNodes) && isset($claveNodes[0]) ? trim((string) $claveNodes[0]) : '';
+    $summary['base_success'] = $empresaInvoicy !== '' && $claveAcceso !== '';
+
+    $licNodes = $xml->xpath('//LicMsgRetorno');
+    if (is_array($licNodes) && isset($licNodes[0])) {
+        $summary['lic_msg_retorno'] = trim((string) $licNodes[0]);
+        $summary['lic_rejected'] = listIsNegativeMigrateMessage($summary['lic_msg_retorno']);
+        if ($summary['lic_rejected'] && $summary['lic_msg_retorno'] !== '') {
+            $summary['lic_errors'][] = 'Licenciamiento rechazado por Migrate: ' . $summary['lic_msg_retorno'];
+        }
+    }
+
+    $errorNodes = $xml->xpath('//ErrosItem/*[contains(local-name(), "Desc")]');
+    if (is_array($errorNodes)) {
+        foreach ($errorNodes as $node) {
+            $value = trim((string) $node);
+            if ($value === '') {
+                continue;
+            }
+
+            $normalized = mb_strtolower($value);
+            if (mb_strpos($normalized, 'licmodelo') !== false || mb_strpos($normalized, 'modelo comercial') !== false || mb_strpos($normalized, 'licencia') !== false || mb_strpos($normalized, 'licenc') !== false) {
+                $summary['lic_errors'][] = $value;
+            } elseif (mb_strpos($normalized, 'usr') !== false || mb_strpos($normalized, 'usuario') !== false || mb_strpos($normalized, 'perfil') !== false || mb_strpos($normalized, 'contras') !== false || mb_strpos($normalized, 'login') !== false) {
+                $summary['user_errors'][] = $value;
+            }
+        }
+    }
+
+    $summary['lic_errors'] = array_values(array_unique($summary['lic_errors']));
+    $summary['user_errors'] = array_values(array_unique($summary['user_errors']));
+
+    return $summary;
+}
+
+function listIsNegativeMigrateMessage(string $message): bool
+{
+    $normalized = mb_strtolower(trim($message));
+    if ($normalized === '') {
+        return false;
+    }
+
+    foreach (['rechaz', 'error', 'falla', 'fallo', 'inválid', 'invÃ¡lid', 'invalid', 'deneg', 'no autorizado'] as $needle) {
+        if (mb_strpos($normalized, $needle) !== false) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function workflowCurrentKey(array $item, array $history): string
 {
     $estado = (string) ($item['estado'] ?? '');
+    $persisted = trim((string) ($item['hito_actual'] ?? ''));
+    $events = workflowEventsMap($history);
+    $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+    $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+    $migrateSummary = listMigrateSummary($item);
+    $historicalLicenseIssue = listHistoricalLicenseIssue($history);
+
+    if ($estado === ESTADO_ELIMINADO) {
+        return 'CANCELADO';
+    }
+
+    if ($empresaCreada && $clienteCreado && ($migrateSummary['lic_rejected'] || $historicalLicenseIssue !== '')) {
+        return 'MIGRATE_ERROR';
+    }
+
+    if ($persisted === 'ERROR_APROBACION' && !$empresaCreada && !$clienteCreado) {
+        return 'APROBACION_PENDIENTE';
+    }
+
+    if ($persisted !== '') {
+        return $persisted;
+    }
+
+    if (isset($events['HITO_CLIENTE_ACTIVO'])) {
+        return 'CLIENTE_ACTIVO';
+    }
+    if (isset($events['HITO_ALTA_PENDIENTE'])) {
+        return 'ALTA_PENDIENTE';
+    }
+    if (isset($events['HITO_PENDIENTE_DGI'])) {
+        return 'PENDIENTE_DGI';
+    }
+    if (isset($events['HITO_MIGRATE_OK'])) {
+        return 'MIGRATE';
+    }
+    if (isset($events['HITO_DYNAMICA_OK']) || ($empresaCreada && $clienteCreado)) {
+        return 'MIGRATE';
+    }
+    if (isset($events['HITO_EN_PROCESO'])) {
+        return 'DYNAMICA';
+    }
 
     if ($estado === ESTADO_ERROR_APROBACION) {
+        return ($empresaCreada && $clienteCreado) ? 'MIGRATE' : 'APROBACION_PENDIENTE';
+    }
+
+    if ($estado === ESTADO_PENDIENTE_APROBACION) {
+        return 'APROBACION_PENDIENTE';
+    }
+
+    if ($estado === ESTADO_APROBADO) {
+        return ($empresaCreada && $clienteCreado) ? 'MIGRATE' : 'DYNAMICA';
+    }
+
+    return 'APROBACION_PENDIENTE';
+}
+
+function workflowGeneralStatusMeta(array $item, string $current): array
+{
+    $estado = (string) ($item['estado'] ?? '');
+    $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+    $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+
+    if ($estado === ESTADO_ELIMINADO) {
         return [
-            'status_label' => 'Frenado',
-            'status_class' => 'bg-amber-50 text-amber-700 border border-amber-200',
-            'status_dot' => 'bg-amber-500',
+            'label' => 'Cancelado',
+            'class' => 'bg-slate-100 text-slate-700 border border-slate-300',
+            'dot' => 'bg-slate-400',
+        ];
+    }
+
+    if ($estado === ESTADO_ERROR_APROBACION && $empresaCreada && $clienteCreado) {
+        return [
+            'label' => 'Migrate con novedad',
+            'class' => 'bg-rose-50 text-rose-700 border border-rose-200',
+            'dot' => 'bg-rose-500',
+        ];
+    }
+
+    if ($current === 'MIGRATE_ERROR') {
+        return [
+            'label' => 'Migrate con novedad',
+            'class' => 'bg-rose-50 text-rose-700 border border-rose-200',
+            'dot' => 'bg-rose-500',
+        ];
+    }
+
+    if (in_array($current, ['PENDIENTE_DGI', 'ALTA_PENDIENTE'], true)) {
+        return [
+            'label' => 'DGI pendiente',
+            'class' => 'bg-amber-50 text-amber-700 border border-amber-200',
+            'dot' => 'bg-amber-500',
+        ];
+    }
+
+    if ($current === 'CLIENTE_ACTIVO') {
+        return [
+            'label' => 'Completado',
+            'class' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+            'dot' => 'bg-emerald-500',
+        ];
+    }
+
+    if (in_array($current, ['EN_PROCESO', 'DYNAMICA', 'MIGRATE'], true)) {
+        return [
+            'label' => 'Generacion en proceso',
+            'class' => 'bg-blue-50 text-blue-700 border border-blue-200',
+            'dot' => 'bg-blue-500 animate-pulse',
+        ];
+    }
+
+    return [
+        'label' => u('Aprobaci&oacute;n pendiente'),
+        'class' => 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+        'dot' => 'bg-indigo-500',
+    ];
+}
+
+function buildListMeta(array $item, array $history): array
+{
+    $estado = (string) ($item['estado'] ?? '');
+    $current = workflowCurrentKey($item, $history);
+    $generalStatus = workflowGeneralStatusMeta($item, $current);
+    $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+    $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+
+    if ($estado === ESTADO_ERROR_APROBACION && $empresaCreada && $clienteCreado) {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
             'hito_key' => 'Migrate',
             'hito_text' => 'Migrate (Reintentar)',
             'hito_class' => 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 hover:text-rose-800',
             'hito_icon' => 'refresh-cw',
-            'action_mode' => 'retry',
+            'action_mode' => 'migrate',
             'timeline_mode' => 'error',
             'can_cancel' => true,
         ];
     }
 
-    if ($estado === ESTADO_APROBADO) {
+    if ($current === 'MIGRATE_ERROR') {
         return [
-            'status_label' => 'Completado',
-            'status_class' => 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-            'status_dot' => 'bg-emerald-500',
-            'hito_key' => 'Alta Final',
-            'hito_text' => 'Alta Final (Completado)',
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => 'Migrate',
+            'hito_text' => 'Migrate (Reintentar)',
+            'hito_class' => 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 hover:text-rose-800',
+            'hito_icon' => 'refresh-cw',
+            'action_mode' => 'migrate',
+            'timeline_mode' => 'error',
+            'can_cancel' => true,
+        ];
+    }
+
+    if ($current === 'CLIENTE_ACTIVO') {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => 'Cliente Activo',
+            'hito_text' => 'Cliente Activo',
             'hito_class' => 'bg-slate-100 text-slate-700 border border-slate-300',
             'hito_icon' => 'check-circle-2',
             'action_mode' => 'done',
@@ -197,9 +440,9 @@ function buildListMeta(array $item): array
 
     if ($estado === ESTADO_ELIMINADO) {
         return [
-            'status_label' => 'Cancelado',
-            'status_class' => 'bg-slate-100 text-slate-700 border border-slate-300',
-            'status_dot' => 'bg-slate-400',
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
             'hito_key' => 'Cancelado',
             'hito_text' => 'Onboarding Cancelado',
             'hito_class' => 'bg-slate-100 text-slate-400 border border-slate-200',
@@ -210,12 +453,62 @@ function buildListMeta(array $item): array
         ];
     }
 
+    if ($current === 'PENDIENTE_DGI') {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => 'Pendiente DGI',
+            'hito_text' => 'Pendiente DGI (Marcar Alta Pendiente)',
+            'hito_class' => 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800',
+            'hito_icon' => 'stamp',
+            'action_mode' => 'change_hito',
+            'next_hito' => 'ALTA_PENDIENTE',
+            'next_hito_label' => 'Marcar Alta Pendiente',
+            'timeline_mode' => 'progress',
+            'can_cancel' => true,
+        ];
+    }
+
+    if ($current === 'ALTA_PENDIENTE') {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => 'Alta Pendiente',
+            'hito_text' => 'Alta Pendiente (Activar Cliente)',
+            'hito_class' => 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800',
+            'hito_icon' => 'user-check',
+            'action_mode' => 'change_hito',
+            'next_hito' => 'CLIENTE_ACTIVO',
+            'next_hito_label' => 'Marcar Cliente Activo',
+            'timeline_mode' => 'progress',
+            'can_cancel' => true,
+        ];
+    }
+
+    if (in_array($current, ['EN_PROCESO', 'MIGRATE'], true)) {
+        return [
+            'status_label' => $generalStatus['label'],
+            'status_class' => $generalStatus['class'],
+            'status_dot' => $generalStatus['dot'],
+            'hito_key' => 'Migrate',
+            'hito_text' => 'Migrate (Ejecutar)',
+            'hito_class' => 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800',
+            'hito_icon' => 'send',
+            'action_mode' => 'migrate',
+            'next_hito_label' => 'Ejecutar Migrate',
+            'timeline_mode' => 'progress',
+            'can_cancel' => true,
+        ];
+    }
+
     return [
-        'status_label' => 'En Proceso',
-        'status_class' => 'bg-blue-50 text-blue-700 border border-blue-200',
-        'status_dot' => 'bg-blue-500 animate-pulse',
-        'hito_key' => 'Aprobacion pendiente',
-        'hito_text' => 'Aprobacion pendiente (Aprobar)',
+        'status_label' => $generalStatus['label'],
+        'status_class' => $generalStatus['class'],
+        'status_dot' => $generalStatus['dot'],
+        'hito_key' => u('Aprobaci&oacute;n pendiente'),
+        'hito_text' => u('Aprobaci&oacute;n pendiente (Aprobar)'),
         'hito_class' => 'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 hover:text-indigo-800',
         'hito_icon' => 'shield',
         'action_mode' => 'approve',
@@ -224,40 +517,272 @@ function buildListMeta(array $item): array
     ];
 }
 
-function buildTimeline(array $item, array $meta): array
+function formatWorkflowDate(?string $value): string
 {
-    $pending = [
-        ['title' => '1. Aprobacion pendiente', 'type' => 'Manual', 'state' => 'current', 'desc' => 'Esperando revision manual del admin.'],
-        ['title' => '2. Hito Carpeta', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'Se crea al aprobar el registro.'],
-        ['title' => '3. Migrate', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'En espera de paso anterior.'],
-        ['title' => '4. Dynamica', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'En espera de paso anterior.'],
-        ['title' => '5. Certificado Digital', 'type' => 'Manual', 'state' => 'pending', 'desc' => 'Instalacion manual.'],
-        ['title' => '6. Homologacion DGI', 'type' => 'Manual', 'state' => 'pending', 'desc' => 'Tramitacion gubernamental.'],
-        ['title' => '7. Envio de Factura', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'Primera factura de servicio.'],
-        ['title' => '8. Envio de Credenciales', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'Envio de accesos seguros.'],
-        ['title' => '9. Alta Final', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'Activacion final del cliente.'],
-    ];
-
-    if ($meta['timeline_mode'] === 'error') {
-        $pending[0]['state'] = 'done';
-        $pending[0]['desc'] = 'Aprobado por Admin.';
-        $pending[1]['state'] = 'done';
-        $pending[1]['desc'] = 'Directorio de archivos creado.';
-        $pending[2]['state'] = 'error';
-        $pending[2]['desc'] = (string) (($item['estado_detalle'] ?? '') ?: 'Frenado por error tecnico en integracion.');
-    } elseif ($meta['timeline_mode'] === 'done') {
-        foreach ($pending as &$step) {
-            $step['state'] = 'done';
-            $step['desc'] = 'Completado.';
-        }
-        unset($step);
-        $pending[8]['desc'] = 'Cliente activo y provisionado en produccion.';
-    } elseif ($meta['timeline_mode'] === 'cancelled') {
-        $pending[0]['state'] = 'error';
-        $pending[0]['desc'] = (string) (($item['motivo_eliminacion'] ?? '') ?: 'Proceso cancelado por administracion.');
+    if (!$value) {
+        return '';
     }
 
-    return $pending;
+    $ts = strtotime($value);
+    return $ts ? date('d/m/Y H:i', $ts) : (string) $value;
+}
+
+function dynamicaLoginForItem(array $item): string
+{
+    $licencia = (int) ($item['licencia'] ?? 0);
+    if (!WorkflowHelper::licenseCreatesDynamicaUser($licencia)) {
+        return 'No aplica';
+    }
+
+    $rut = preg_replace('/\D+/', '', (string) ($item['rut'] ?? ''));
+    return $rut !== '' ? $rut : '-';
+}
+
+function dynamicaPasswordForItem(array $item): string
+{
+    $licencia = (int) ($item['licencia'] ?? 0);
+    if (!WorkflowHelper::licenseCreatesDynamicaUser($licencia)) {
+        return 'No aplica';
+    }
+
+    $sourceDate = (string) (($item['fecha_aprobacion'] ?? '') ?: ($item['fecha_creacion'] ?? ''));
+    $ts = strtotime($sourceDate);
+    return $ts ? date('dmY', $ts) : '-';
+}
+
+function buildTimeline(array $item, array $meta, array $history): array
+{
+    $events = workflowEventsMap($history);
+    $current = workflowCurrentKey($item, $history);
+    $migrateSummary = listMigrateSummary($item);
+    $historicalLicenseIssue = listHistoricalLicenseIssue($history);
+    $modoCert = strtoupper(trim((string) ($item['alta_certificado_digital'] ?? '')));
+    $certificadoDone = isset($events['HITO_CERTIFICADO_DIGITAL']) || $modoCert === 'ADJUNTO';
+    $steps = [
+        ['key' => 'HITO_CARPETA', 'title' => '1. Hito Carpeta', 'type' => 'Auto', 'state' => 'pending', 'desc' => u('Creaci&oacute;n autom&aacute;tica del directorio de archivos.'), 'substeps' => []],
+        ['key' => 'HITO_EN_PROCESO', 'title' => u('2. Aprobaci&oacute;n pendiente'), 'type' => 'Manual', 'state' => 'pending', 'desc' => u('Pendiente de aprobaci&oacute;n administrativa.'), 'substeps' => []],
+        ['key' => 'HITO_DYNAMICA_OK', 'title' => '3. Dynamica', 'type' => 'Auto', 'state' => 'pending', 'desc' => u('Creaci&oacute;n de empresa, cliente y usuario seg&uacute;n licencia.'), 'substeps' => []],
+        ['key' => 'HITO_MIGRATE_OK', 'title' => '4. Migrate', 'type' => 'Auto', 'state' => 'pending', 'desc' => u('Registro de empresa, sucursal y usuario seg&uacute;n licencia.'), 'substeps' => []],
+        ['key' => 'HITO_CERTIFICADO_DIGITAL', 'title' => '5. Certificado Digital', 'type' => 'Manual', 'state' => 'pending', 'desc' => 'Gestion manual del certificado digital.', 'substeps' => []],
+        ['key' => 'HITO_PENDIENTE_DGI', 'title' => u('6. Homologaci&oacute;n DGI'), 'type' => 'Manual', 'state' => 'pending', 'desc' => u('Tramitaci&oacute;n gubernamental y gesti&oacute;n DGI.'), 'substeps' => []],
+        ['key' => 'HITO_ENVIO_FACTURA', 'title' => u('7. Env&iacute;o de Factura'), 'type' => 'Auto', 'state' => 'pending', 'desc' => u('Primera factura o activaci&oacute;n de facturaci&oacute;n autom&aacute;tica.'), 'substeps' => []],
+        ['key' => 'HITO_ENVIO_CREDENCIALES', 'title' => '8. Envio de Credenciales', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'Envio de credenciales seguras al cliente.', 'substeps' => []],
+        ['key' => 'HITO_CLIENTE_ACTIVO', 'title' => '9. Alta Final', 'type' => 'Auto', 'state' => 'pending', 'desc' => 'Activacion final del cliente en produccion.', 'substeps' => []],
+    ];
+
+    $currentByStep = [
+        'APROBACION_PENDIENTE' => 'HITO_EN_PROCESO',
+        'DYNAMICA' => 'HITO_DYNAMICA_OK',
+        'MIGRATE' => 'HITO_MIGRATE_OK',
+        'EN_PROCESO' => 'HITO_MIGRATE_OK',
+        'PENDIENTE_DGI' => 'HITO_PENDIENTE_DGI',
+        'ALTA_PENDIENTE' => 'HITO_ALTA_PENDIENTE',
+        'CLIENTE_ACTIVO' => 'HITO_CLIENTE_ACTIVO',
+        'ERROR_APROBACION' => 'HITO_MIGRATE_OK',
+        'MIGRATE_ERROR' => 'HITO_MIGRATE_OK',
+    ];
+    $currentStepKey = $currentByStep[$current] ?? 'HITO_EN_PROCESO';
+
+    foreach ($steps as &$step) {
+        if ($step['key'] === 'HITO_CARPETA') {
+            $step['state'] = ((int) ($item['carpeta_creada'] ?? 0) === 1) ? 'done' : 'pending';
+            $step['substeps'] = [
+                $step['state'] === 'done'
+                    ? 'Directorio de archivos creado.'
+                    : u('Pendiente creaci&oacute;n autom&aacute;tica del directorio de archivos.'),
+            ];
+            if ($step['state'] === 'done') {
+                $date = formatWorkflowDate($item['fecha_creacion'] ?? null);
+                $step['desc'] = $date !== '' ? 'Directorio de archivos creado. - ' . $date : 'Directorio de archivos creado.';
+            }
+            continue;
+        }
+
+        if ($step['key'] === 'HITO_DYNAMICA_OK') {
+            $step['state'] = ((int) ($item['empresa_creada'] ?? 0) === 1 && (int) ($item['cliente_creado'] ?? 0) === 1) ? 'done' : 'pending';
+            $step['substeps'] = [
+                $step['state'] === 'done'
+                    ? 'Empresa y cliente creados en tablas Dynamica.'
+                    : u('Pendiente creaci&oacute;n de empresa y cliente en tablas Dynamica.'),
+                WorkflowHelper::licenseCreatesDynamicaUser((int) ($item['licencia'] ?? 0))
+                    ? trim((string) (($events['HITO_DYNAMICA_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Dynamica requerido.'))
+                    : ['state' => 'na', 'text' => WorkflowHelper::dynamicaUserSubstepLabel((int) ($item['licencia'] ?? 0))],
+            ];
+            if ($step['state'] === 'done') {
+                $event = $events['HITO_DYNAMICA_OK'] ?? $events['APROBACION'] ?? null;
+                $step['desc'] = trim((string) (($event['descripcion'] ?? '') ?: 'Empresa y cliente creados en Dynamica.'));
+                $userNote = WorkflowHelper::licenseCreatesDynamicaUser((int) ($item['licencia'] ?? 0))
+                    ? trim((string) (($events['HITO_DYNAMICA_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Dynamica creado.'))
+                    : WorkflowHelper::dynamicaUserSubstepLabel((int) ($item['licencia'] ?? 0));
+                $date = formatWorkflowDate($event['fecha_evento'] ?? ($item['fecha_aprobacion'] ?? null));
+                $step['desc'] .= ' ' . $userNote;
+                if ($date !== '') {
+                    $step['desc'] .= ' - ' . $date;
+                }
+            }
+            continue;
+        }
+
+        if ($step['key'] === 'HITO_CERTIFICADO_DIGITAL') {
+            if ($certificadoDone) {
+                $step['state'] = 'done';
+                $step['desc'] = $modoCert === 'ADJUNTO'
+                    ? 'Certificado digital recibido y cargado.'
+                    : 'Certificado digital gestionado manualmente.';
+            } elseif ($modoCert !== '') {
+                $step['desc'] = 'Modo de certificado definido: ' . trim((string) ($item['alta_certificado_digital'] ?? ''));
+                if ($current === 'PENDIENTE_DGI' && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+                    $step['state'] = 'current';
+                }
+            } elseif ($step['key'] === $currentStepKey && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+                $step['state'] = $meta['timeline_mode'] === 'error' ? 'error' : 'current';
+            }
+            continue;
+        }
+
+        if ($step['key'] === 'HITO_PENDIENTE_DGI') {
+            $done = isset($events['HITO_ALTA_PENDIENTE']) || isset($events['HITO_CLIENTE_ACTIVO']);
+            if ($done) {
+                $step['state'] = 'done';
+            } elseif ($current === 'PENDIENTE_DGI' && $certificadoDone && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+                $step['state'] = 'current';
+            }
+
+            if (isset($events[$step['key']])) {
+                $desc = trim((string) ($events[$step['key']]['descripcion'] ?? $step['desc']));
+                $date = formatWorkflowDate($events[$step['key']]['fecha_evento'] ?? null);
+                $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
+            }
+
+            continue;
+        }
+
+            if (isset($events[$step['key']])) {
+                $step['state'] = 'done';
+                $desc = trim((string) ($events[$step['key']]['descripcion'] ?? 'Completado.'));
+                if ($step['key'] === 'HITO_MIGRATE_OK') {
+                    $step['substeps'] = [
+                        $migrateSummary['base_success']
+                            ? ['state' => 'done', 'text' => 'Empresa y sucursal registradas en Migrate.']
+                            : ['state' => 'error', 'text' => 'No se completo el alta base de empresa y sucursal en Migrate.'],
+                        ($migrateSummary['lic_rejected'] || $migrateSummary['lic_errors'] !== [])
+                            ? ['state' => 'error', 'text' => implode(' | ', array_values(array_unique($migrateSummary['lic_errors'])))]
+                            : ($historicalLicenseIssue !== ''
+                                ? ['state' => 'error', 'text' => 'Licenciamiento rechazado en intento previo. Validar antes de continuar.']
+                                : ['state' => 'done', 'text' => 'Licenciamiento aprobado en Migrate.']),
+                        WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0))
+                        ? ($migrateSummary['user_errors'] !== []
+                            ? ['state' => 'error', 'text' => implode(' | ', $migrateSummary['user_errors'])]
+                            : ['state' => 'warning', 'text' => trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.'))])
+                        : ['state' => 'na', 'text' => WorkflowHelper::migrateUserSubstepLabel((int) ($item['licencia'] ?? 0))],
+                    ];
+                $userNote = WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0))
+                    ? ($migrateSummary['user_errors'] !== []
+                        ? implode(' | ', $migrateSummary['user_errors'])
+                        : trim((string) (($events['HITO_MIGRATE_USUARIO_ENVIADO']['descripcion'] ?? $events['HITO_MIGRATE_USUARIO_OK']['descripcion'] ?? '') ?: 'Usuario Migrate enviado dentro del RegistroEmpresa. Validar alta efectiva en Migrate.')))
+                    : WorkflowHelper::migrateUserSubstepLabel((int) ($item['licencia'] ?? 0));
+                $desc .= ' ' . (($migrateSummary['lic_rejected'] || $migrateSummary['lic_errors'] !== [])
+                    ? 'Licenciamiento con error en Migrate. '
+                    : ($historicalLicenseIssue !== ''
+                        ? 'Licenciamiento rechazado en intento previo. '
+                        : 'Licenciamiento aprobado en Migrate. ')) . $userNote;
+            }
+            $date = formatWorkflowDate($events[$step['key']]['fecha_evento'] ?? null);
+            $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
+        } elseif ($step['key'] === $currentStepKey && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
+            $step['state'] = $meta['timeline_mode'] === 'error' ? 'error' : 'current';
+            if ($meta['timeline_mode'] === 'error') {
+                $step['desc'] = (string) (($item['estado_detalle'] ?? '') ?: 'Frenado por error tecnico en integracion.');
+            }
+            if ($step['key'] === 'HITO_MIGRATE_OK') {
+                $step['substeps'] = [
+                    'Pendiente registro de empresa y sucursal en Migrate.',
+                    'Pendiente envio de licenciamiento a Migrate.',
+                    WorkflowHelper::licenseCreatesMigrateUser((int) ($item['licencia'] ?? 0))
+                        ? 'Usuario Migrate pendiente dentro del RegistroEmpresa.'
+                        : WorkflowHelper::migrateUserSubstepLabel((int) ($item['licencia'] ?? 0)),
+                ];
+            }
+        }
+    }
+
+    unset($step);
+
+    if ($meta['timeline_mode'] === 'cancelled') {
+        $steps[0]['state'] = 'error';
+        $steps[0]['desc'] = (string) (($item['motivo_eliminacion'] ?? '') ?: 'Proceso cancelado por administracion.');
+    }
+
+    return $steps;
+}
+
+function substepMeta(string $stepState, string $substep): array
+{
+    $text = mb_strtolower(trim($substep));
+    $hasText = static function (string $needle) use ($text): bool {
+        return $needle !== '' && mb_strpos($text, $needle) !== false;
+    };
+
+    if ($hasText('rechazad')) {
+        return [
+            'wrapper' => 'bg-rose-50 border-rose-100',
+            'iconWrap' => 'bg-rose-100 text-rose-600',
+            'icon' => 'alert-circle',
+            'text' => 'text-rose-700',
+        ];
+    }
+
+    if ($hasText('validar alta efectiva') || $hasText('usuario migrate enviado')) {
+        return [
+            'wrapper' => 'bg-amber-50 border-amber-100',
+            'iconWrap' => 'bg-amber-100 text-amber-600',
+            'icon' => 'clock-3',
+            'text' => 'text-amber-800',
+        ];
+    }
+
+    if ($stepState === 'na' || $hasText('no aplica')) {
+        return [
+            'wrapper' => 'bg-slate-100 border-slate-200',
+            'iconWrap' => 'bg-slate-200 text-slate-500',
+            'icon' => 'minus',
+            'text' => 'text-slate-700',
+        ];
+    }
+
+    if ($stepState === 'done' || $hasText('incluido') || $hasText('creado') || $hasText('cargado') || $hasText('gestionado')) {
+        return [
+            'wrapper' => 'bg-emerald-50 border-emerald-100',
+            'iconWrap' => 'bg-emerald-100 text-emerald-600',
+            'icon' => 'check',
+            'text' => 'text-emerald-800',
+        ];
+    }
+
+    if ($stepState === 'error') {
+        return [
+            'wrapper' => 'bg-rose-50 border-rose-100',
+            'iconWrap' => 'bg-rose-100 text-rose-600',
+            'icon' => 'alert-circle',
+            'text' => 'text-rose-700',
+        ];
+    }
+
+    if ($stepState === 'current') {
+        return [
+            'wrapper' => 'bg-indigo-50 border-indigo-100',
+            'iconWrap' => 'bg-indigo-100 text-indigo-600',
+            'icon' => 'clock-3',
+            'text' => 'text-indigo-800',
+        ];
+    }
+
+    return [
+        'wrapper' => 'bg-slate-50 border-slate-200',
+        'iconWrap' => 'bg-slate-100 text-slate-400',
+        'icon' => 'circle',
+        'text' => 'text-slate-600',
+    ];
 }
 
 function timelineClasses(string $state): array
@@ -308,6 +833,7 @@ $activeNav = 'panel';
 $pageTitle = $pageTitle ?? 'Altas y Automatizaciones';
 $pageSubtitle = 'Aprovisionamiento, aprobaciones y seguimiento de nuevas empresas.';
 $values = $_SESSION['old'] ?? [];
+$sessionFormErrors = array_values($_SESSION['errors'] ?? []);
 $hasActiveRealRows = count(array_filter($items ?? [], static function (array $item): bool {
     return (string) ($item['estado'] ?? '') !== ESTADO_ELIMINADO;
 })) > 0;
@@ -319,7 +845,13 @@ $totalPages = (int) ($pagination['total_pages'] ?? 1);
 $totalItems = (int) ($pagination['total_items'] ?? count($rows));
 require __DIR__ . '/../layout/header.php';
 unset($_SESSION['old']);
+unset($_SESSION['errors']);
 ?>
+
+<script>
+window.CREATE_FORM_OLD = <?= json_encode($modalValues, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
 
 <div id="toast-notificacion" class="hidden transform translate-y-2 opacity-0 transition-all duration-300 fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3">
     <div class="bg-emerald-500 p-1 rounded-full text-white" id="toast-icon-container">
@@ -342,11 +874,12 @@ unset($_SESSION['old']);
 
         <div class="flex flex-wrap gap-3 w-full lg:w-auto">
             <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
-                <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Estado:</span>
+                <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Estado general:</span>
                 <select id="filtro-estado" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
                     <option value="todos">Todos</option>
-                    <option value="En Proceso">En Proceso</option>
-                    <option value="Frenado">Frenado</option>
+                    <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>"><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
+                    <option value="Generacion en proceso">Generacion en proceso</option>
+                    <option value="DGI pendiente">DGI pendiente</option>
                     <option value="Completado">Completado</option>
                     <option value="Cancelado">Cancelado</option>
                 </select>
@@ -356,9 +889,11 @@ unset($_SESSION['old']);
                 <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Hito Actual:</span>
                 <select id="filtro-hito" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
                     <option value="todos">Todos los hitos</option>
-                    <option value="Aprobacion pendiente">1. Aprobacion pendiente</option>
-                    <option value="Migrate">3. Migrate</option>
-                    <option value="Alta Final">9. Alta Final</option>
+                    <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>"><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
+                    <option value="Migrate">Migrate</option>
+                    <option value="Pendiente DGI">Pendiente DGI</option>
+                    <option value="Alta Pendiente">Alta pendiente</option>
+                    <option value="Cliente Activo">Cliente activo</option>
                     <option value="Cancelado">Cancelado</option>
                 </select>
             </div>
@@ -383,12 +918,14 @@ unset($_SESSION['old']);
                 <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
                     <?php foreach ($rows as $item): ?>
                         <?php
-                        $meta = buildListMeta($item);
-                        $timeline = buildTimeline($item, $meta);
+                        $itemHistory = $workflowHistory[$item['id']] ?? [];
+                        $meta = buildListMeta($item, $itemHistory);
+                        $timeline = buildTimeline($item, $meta, $itemHistory);
                         $itemId = (int) $item['id'];
                         $licencia = licenciaEtiqueta($item);
                         $displayDate = !empty($item['fecha_creacion']) ? date('d/m/Y', strtotime((string) $item['fecha_creacion'])) : '-';
-                        $recordJson = json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                        $recordForJs = $item;
+                        $recordJson = json_encode($recordForJs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                         ?>
                         <tr class="hover:bg-slate-50/70 transition cursor-pointer row-registro" data-id="<?= $itemId ?>" data-status="<?= h($meta['status_label']) ?>" data-hito="<?= h($meta['hito_key']) ?>" data-record='<?= h((string) $recordJson) ?>' onclick="toggleFilaExpandida(<?= $itemId ?>, event)">
                             <td class="py-4 px-5 text-center">
@@ -413,16 +950,38 @@ unset($_SESSION['old']);
                                 <span class="inline-flex items-center justify-center <?= $esEmisor ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500' ?> text-xs font-bold px-2.5 py-0.5 rounded-full"><?= $esEmisor ? 'SI' : 'NO' ?></span>
                             </td>
                             <td class="py-4 px-4" onclick="event.stopPropagation();">
-                                <?php if ($meta['action_mode'] === 'retry'): ?>
+                                <?php if (!empty($item['is_demo']) && $meta['action_mode'] === 'migrate'): ?>
                                     <button id="btn-hito-<?= $itemId ?>" onclick="reintentarHitoAutomatico(<?= $itemId ?>)" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm <?= $meta['hito_class'] ?>" title="Hito automatico fallido. Clic para reintentar">
                                         <i data-lucide="<?= $meta['hito_icon'] ?>" class="w-3.5 h-3.5 text-rose-500"></i>
                                         <span><?= h($meta['hito_text']) ?></span>
                                     </button>
-                                <?php elseif ($meta['action_mode'] === 'approve'): ?>
+                                <?php elseif ($meta['action_mode'] === 'migrate' && empty($item['is_demo'])): ?>
+                                    <form method="post" action="<?= h(app_url('index.php?action=run-migrate&id=' . $itemId)) ?>" data-confirm="Confirme la ejecucion del hito Migrate para este registro." data-busy-text="Espere un momento, por favor. Estamos gestionando Migrate.">
+                                        <button id="btn-hito-<?= $itemId ?>" type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm <?= $meta['hito_class'] ?>">
+                                            <i data-lucide="<?= $meta['hito_icon'] ?>" class="w-3.5 h-3.5 <?= ($item['estado'] ?? '') === ESTADO_ERROR_APROBACION ? 'text-rose-500' : '' ?>"></i>
+                                            <span><?= h($meta['hito_text']) ?></span>
+                                        </button>
+                                    </form>
+                                <?php elseif ($meta['action_mode'] === 'approve' && empty($item['is_demo'])): ?>
+                                    <form method="post" action="<?= h(app_url('index.php?action=approve&id=' . $itemId)) ?>" data-confirm="Esto creara registros reales en Empresas y Clientes y movera el onboarding al siguiente hito." data-busy-text="Espere un momento, por favor. Estamos aprobando el registro.">
+                                        <button id="btn-hito-<?= $itemId ?>" type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm <?= $meta['hito_class'] ?>">
+                                            <i data-lucide="<?= $meta['hito_icon'] ?>" class="w-3.5 h-3.5"></i>
+                                            <span><?= h($meta['hito_text']) ?></span>
+                                        </button>
+                                    </form>
+                                <?php elseif (!empty($item['is_demo']) && $meta['action_mode'] === 'approve'): ?>
                                     <button id="btn-hito-<?= $itemId ?>" onclick="avanzarHitoManual(<?= $itemId ?>)" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm <?= $meta['hito_class'] ?>">
                                         <i data-lucide="<?= $meta['hito_icon'] ?>" class="w-3.5 h-3.5"></i>
                                         <span><?= h($meta['hito_text']) ?></span>
                                     </button>
+                                <?php elseif ($meta['action_mode'] === 'change_hito' && empty($item['is_demo'])): ?>
+                                    <form method="post" action="<?= h(app_url('index.php?action=change-hito&id=' . $itemId)) ?>" data-confirm="Confirme el cambio del hito actual a: <?= h((string) $meta['next_hito_label']) ?>." data-busy-text="Espere un momento, por favor. Estamos actualizando el hito.">
+                                        <input type="hidden" name="target_hito" value="<?= h((string) $meta['next_hito']) ?>">
+                                        <button id="btn-hito-<?= $itemId ?>" type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm <?= $meta['hito_class'] ?>">
+                                            <i data-lucide="<?= $meta['hito_icon'] ?>" class="w-3.5 h-3.5"></i>
+                                            <span><?= h($meta['next_hito_label']) ?></span>
+                                        </button>
+                                    </form>
                                 <?php else: ?>
                                     <span id="btn-hito-<?= $itemId ?>" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold <?= $meta['hito_class'] ?>">
                                         <i data-lucide="<?= $meta['hito_icon'] ?>" class="w-3.5 h-3.5 <?= $meta['action_mode'] === 'done' ? 'text-emerald-500' : 'text-slate-400' ?>"></i>
@@ -451,13 +1010,9 @@ unset($_SESSION['old']);
                             <td colspan="8" class="p-6 border-t border-slate-100">
                                 <div class="space-y-4">
                                     <div class="flex flex-wrap gap-2">
-                                        <button type="button" class="detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm" data-target="ruta" data-id="<?= $itemId ?>" onclick="setDetailTab(<?= $itemId ?>, 'ruta')">
+                                        <button type="button" class="detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm" data-target="ruta-fiscal" data-id="<?= $itemId ?>" onclick="setDetailTab(<?= $itemId ?>, 'ruta-fiscal')">
                                             <i data-lucide="git-commit" class="w-3.5 h-3.5"></i>
-                                            <span>Ruta</span>
-                                        </button>
-                                        <button type="button" class="detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-target="fiscal" data-id="<?= $itemId ?>" onclick="setDetailTab(<?= $itemId ?>, 'fiscal')">
-                                            <i data-lucide="database" class="w-3.5 h-3.5"></i>
-                                            <span>Fiscal</span>
+                                            <span>Ruta y Fiscal</span>
                                         </button>
                                         <button type="button" class="detalle-tab-btn inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-target="resumen" data-id="<?= $itemId ?>" onclick="setDetailTab(<?= $itemId ?>, 'resumen')">
                                             <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
@@ -465,39 +1020,59 @@ unset($_SESSION['old']);
                                         </button>
                                     </div>
 
-                                    <div id="detalle-pane-<?= $itemId ?>-ruta" class="detalle-pane">
-                                        <div class="space-y-4">
-                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                                                <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i>
-                                                Hoja de Ruta de Onboarding (9 Hitos)
-                                            </h4>
-                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
-                                                <?php foreach ($timeline as $index => $step): ?>
-                                                    <?php $classes = timelineClasses($step['state']); ?>
-                                                    <div class="<?= $classes['wrapper'] ?> <?= $index === 8 ? 'md:col-span-2' : '' ?>">
-                                                        <span class="<?= $classes['iconWrap'] ?>">
-                                                            <i data-lucide="<?= $classes['icon'] ?>" class="w-3.5 h-3.5"></i>
-                                                        </span>
-                                                        <div>
-                                                            <h5 class="<?= $classes['title'] ?>">
-                                                                <?= h($step['title']) ?>
-                                                                <span class="text-[9px] px-1 py-0.2 rounded font-normal <?= $classes['type'] ?>"><?= h($step['type']) ?></span>
-                                                            </h5>
-                                                            <p class="<?= $classes['desc'] ?>"><?= h($step['desc']) ?></p>
+                                    <div id="detalle-pane-<?= $itemId ?>-ruta-fiscal" class="detalle-pane">
+                                        <div class="grid grid-cols-1 xl:grid-cols-[1.2fr,0.8fr] gap-4">
+                                            <div class="space-y-4 bg-white p-4 rounded-xl border border-slate-200">
+                                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                    <i data-lucide="git-commit" class="w-4 h-4 text-indigo-500"></i>
+                                                    Ruta y Fiscal
+                                                </h4>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <?php foreach ($timeline as $index => $step): ?>
+                                                        <?php $classes = timelineClasses($step['state']); ?>
+                                                        <div class="<?= $classes['wrapper'] ?> <?= $index === (count($timeline) - 1) ? 'md:col-span-2' : '' ?>">
+                                                            <span class="<?= $classes['iconWrap'] ?>">
+                                                                <i data-lucide="<?= $classes['icon'] ?>" class="w-3.5 h-3.5"></i>
+                                                            </span>
+                                                            <div>
+                                                                <h5 class="<?= $classes['title'] ?>">
+                                                                    <?= h($step['title']) ?>
+                                                                    <span class="text-[9px] px-1 py-0.2 rounded font-normal <?= $classes['type'] ?>"><?= h($step['type']) ?></span>
+                                                                </h5>
+                                                                <p class="<?= $classes['desc'] ?>"><?= h($step['desc']) ?></p>
+                                                                <?php if (!empty($step['substeps'])): ?>
+                                                                    <div class="mt-2 rounded-lg border border-slate-200 bg-white/90 p-2 space-y-1.5">
+                                                                        <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Subhitos</p>
+                            <?php foreach ($step['substeps'] as $substep): ?>
+                                <?php
+                                $substepText = is_array($substep) ? (string) ($substep['text'] ?? '') : (string) $substep;
+                                $substepState = is_array($substep) ? (string) ($substep['state'] ?? '') : '';
+                                if ($substepState === '') {
+                                    $substepState = $step['state'] ?? 'pending';
+                                }
+                                $substepMeta = substepMeta($substepState, $substepText);
+                                ?>
+                                <div class="flex items-start gap-2 rounded-md border px-2 py-1.5 <?= $substepMeta['wrapper'] ?>">
+                                    <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full <?= $substepMeta['iconWrap'] ?>">
+                                        <i data-lucide="<?= $substepMeta['icon'] ?>" class="w-3 h-3"></i>
+                                    </span>
+                                    <p class="text-[10px] leading-4 font-medium <?= $substepMeta['text'] ?>"><?= h($substepText) ?></p>
+                                </div>
+                            <?php endforeach; ?>
+                                                                    </div>
+                                                                <?php endif; ?>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                <?php endforeach; ?>
+                                                    <?php endforeach; ?>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
 
-                                    <div id="detalle-pane-<?= $itemId ?>-fiscal" class="detalle-pane hidden">
-                                        <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
-                                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                                                <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
-                                                Credenciales de Conexion Fiscal
-                                            </h4>
-                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-inner">
+                                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                                    <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+                                                    Credenciales de Conexi&oacute;n Fiscal
+                                                </h4>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
                                                     <span class="block text-[11px] text-slate-400 font-bold uppercase">RUT</span>
                                                     <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
@@ -519,6 +1094,21 @@ unset($_SESSION['old']);
                                                         <button onclick="revelarClave('pass-val-<?= $itemId ?>', this)" class="text-slate-400 hover:text-indigo-600 transition mr-2" title="Revelar"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
                                                         <button onclick="copiarAlPortapapeles('pass-val-<?= $itemId ?>', true)" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
                                                     </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">Login Dynamica</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="dyn-user-val-<?= $itemId ?>"><?= h(dynamicaLoginForItem($item)) ?></code>
+                                                        <button onclick="copiarAlPortapapeles('dyn-user-val-<?= $itemId ?>')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[11px] text-slate-400 font-bold uppercase">Clave Dynamica</span>
+                                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1 text-xs">
+                                                        <code class="font-mono text-slate-800 font-semibold" id="dyn-pass-val-<?= $itemId ?>"><?= h(dynamicaPasswordForItem($item)) ?></code>
+                                                        <button onclick="copiarAlPortapapeles('dyn-pass-val-<?= $itemId ?>')" class="text-slate-400 hover:text-indigo-600 transition" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
+                                                </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -549,7 +1139,7 @@ unset($_SESSION['old']);
                                                 </div>
                                                 <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                                     <p class="uppercase tracking-wider text-slate-400 font-semibold">Ciudad</p>
-                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h((string) ($item['ciudad'] ?: '-')) ?></p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-800"><?= h((string) (($item['ciudad_nombre'] ?? $item['ciudad']) ?: '-')) ?></p>
                                                 </div>
                                                 <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                                     <p class="uppercase tracking-wider text-slate-400 font-semibold">Sucursal</p>
@@ -563,6 +1153,10 @@ unset($_SESSION['old']);
                                                 <p class="text-xs text-slate-600">Estado detalle: <span class="font-semibold text-slate-800"><?= h((string) ($item['estado_detalle'] ?: '-')) ?></span></p>
                                             </div>
                                             <div class="flex flex-wrap gap-2">
+                                                <a href="<?= htmlspecialchars(app_url('index.php?action=show&id=' . $itemId), ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center gap-2 bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white font-medium px-3 py-2 rounded-lg text-xs transition">
+                                                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                                                    <span>Ver ficha completa</span>
+                                                </a>
                                                 <button type="button" onclick="mostrarMasInfo(<?= $itemId ?>)" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-3 py-2 rounded-lg text-xs transition">
                                                     <i data-lucide="panel-right-open" class="w-3.5 h-3.5"></i>
                                                     <span>Mas info</span>
@@ -726,8 +1320,8 @@ unset($_SESSION['old']);
     </div>
 </div>
 
-<div class="modal-shell" id="modal-create" aria-hidden="true">
-    <div class="modal-backdrop" data-close-modal="modal-create"></div>
+<div class="modal-shell" id="modal-create" aria-hidden="true" data-persistent-modal="1">
+    <div class="modal-backdrop"></div>
     <div class="modal-panel modal-xl">
         <div class="flex items-start justify-between gap-4 mb-4">
             <div>
@@ -739,12 +1333,22 @@ unset($_SESSION['old']);
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
-        <form id="modal-create-form" method="post" action="index.php?action=store" enctype="multipart/form-data" class="space-y-6">
+        <form id="modal-create-form" method="post" action="index.php?action=store" enctype="multipart/form-data" class="space-y-6" data-busy-text="Espere un momento, por favor. Estamos guardando el registro.">
             <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-indigo-800 flex items-start gap-3">
                 <i data-lucide="info" class="w-5 h-5 text-indigo-500 shrink-0 mt-0.5"></i>
                 <div>
                     <h4 id="modal-create-info-title" class="font-bold text-sm">Informacion del Onboarding</h4>
                     <p id="modal-create-info-text" class="text-xs text-indigo-700 mt-0.5">La correcta recopilacion de estos campos deja el registro listo para aprobacion y posterior automatizacion.</p>
+                </div>
+            </div>
+            <div id="modal-create-errors" class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-rose-800 shadow-sm">
+                <div class="flex items-start gap-3">
+                    <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500 shrink-0 mt-0.5"></i>
+                    <div>
+                        <h4 class="font-bold text-sm">Faltan datos obligatorios</h4>
+                        <p class="mt-1 text-xs text-rose-700">Revise y complete los siguientes campos antes de guardar.</p>
+                        <ul id="modal-create-errors-list" class="mt-3 list-disc pl-5 space-y-1 text-sm"></ul>
+                    </div>
                 </div>
             </div>
             <?php $values = $modalValues; require __DIR__ . '/_form_sections.php'; ?>
@@ -760,3 +1364,4 @@ unset($_SESSION['old']);
 </div>
 
 <?php require __DIR__ . '/../layout/footer.php'; ?>
+

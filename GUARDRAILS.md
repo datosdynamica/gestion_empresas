@@ -16,8 +16,8 @@
 - Produccion MySQL: nunca hacer `UPDATE`, `DELETE`, `DROP`, `ALTER` fuera de cambios aprobados y acotados.
 - Estructuras existentes de `Empresas` y `Clientes`: no renombrar ni cambiar columnas sin validacion explicita.
 - Ruta de despliegue en servidor: `/var/www/plugin/gestion_empresas`
-- Adjuntos: guardar en disco, no en blob. Ruta inicial propuesta:
-  `/var/www/plugin/gestion_empresas/uploads/nuevas_empresas/{id}/`
+- Adjuntos: guardar en disco, no en blob. Ruta vigente:
+  `/var/www/dynamica_archivos/Clientes_Doc/R_<RUT>/`
 
 ## Reglas operativas
 - No borrar nada existente en el servidor.
@@ -73,6 +73,6 @@
 - Cuando aparezca un problema repetible de PowerShell, quoting, SSH o despliegue, debe quedar documentado de inmediato en el proyecto antes de seguir.
 
 ## Pendientes marcados
-- Confirmar si la ruta de adjuntos queda fija o luego sera dinamica.
+- La ruta de adjuntos queda fuera del plugin, en `/var/www/dynamica_archivos/Clientes_Doc`, con subcarpeta por cliente `R_<RUT>`.
 - Confirmar valor final de `IdVendedor`; por ahora usar `admin`.
 - Confirmar origen final de `IdGiro`, `IdFidelizacion`, `abonado_IdProducto`, `idFormapago`, `abonado_IdMedioPago`.

@@ -33,7 +33,7 @@ require __DIR__ . '/../layout/header.php';
             </div>
         </div>
 
-        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=store'), ENT_QUOTES, 'UTF-8') ?>" enctype="multipart/form-data" class="space-y-6 p-6">
+        <form method="post" action="<?= htmlspecialchars(app_url('index.php?action=store'), ENT_QUOTES, 'UTF-8') ?>" enctype="multipart/form-data" class="space-y-6 p-6" data-busy-text="Espere un momento, por favor. Estamos guardando el registro.">
             <?php require __DIR__ . '/_form_sections.php'; ?>
 
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">

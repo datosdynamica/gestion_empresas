@@ -4,18 +4,41 @@ declare(strict_types=1);
 
 class FileStorage
 {
-    public static function absoluteBaseFolder(int $nuevaEmpresaId): string
+    private const ONBOARDING_LOG_FILE = 'onboarding_trace.log';
+
+    private static function normalizeRut(string $rut): string
     {
-        return rtrim((string) BASE_PATH, '\\/') . '/uploads/nuevas_empresas/' . $nuevaEmpresaId;
+        return preg_replace('/[^0-9A-Za-z]/', '', strtoupper(trim($rut))) ?: 'SIN_RUT';
     }
 
-    public static function createFolder(int $nuevaEmpresaId): array
+    public static function folderNameFromRut(string $rut): string
     {
-        $relative = UPLOAD_BASE_RELATIVE . '/' . $nuevaEmpresaId;
-        $absolute = self::absoluteBaseFolder($nuevaEmpresaId);
+        return 'R_' . self::normalizeRut($rut);
+    }
+
+    public static function temporaryFolderName(int $nuevaEmpresaId): string
+    {
+        return 'TMP_ONB_' . max(1, $nuevaEmpresaId);
+    }
+
+    public static function absoluteBaseFolder(string $rut): string
+    {
+        return rtrim((string) UPLOAD_BASE_DIR, '\\/') . '/' . self::folderNameFromRut($rut);
+    }
+
+    public static function absoluteTemporaryFolder(int $nuevaEmpresaId): string
+    {
+        return rtrim((string) UPLOAD_TEMP_BASE_DIR, '\\/') . '/' . self::temporaryFolderName($nuevaEmpresaId);
+    }
+
+    public static function createTemporaryFolder(int $nuevaEmpresaId): array
+    {
+        $folderName = self::temporaryFolderName($nuevaEmpresaId);
+        $relative = rtrim((string) UPLOAD_TEMP_BASE_RELATIVE, '\\/') . '/' . $folderName;
+        $absolute = self::absoluteTemporaryFolder($nuevaEmpresaId);
 
         if (!is_dir($absolute) && !mkdir($absolute, 0775, true) && !is_dir($absolute)) {
-            throw new RuntimeException('No fue posible crear la carpeta de adjuntos.');
+            throw new RuntimeException('No fue posible crear la carpeta temporal de adjuntos.');
         }
 
         return [
@@ -24,7 +47,60 @@ class FileStorage
         ];
     }
 
-    public static function storeUploadedFile(array $file, string $tipo, int $nuevaEmpresaId): array
+    public static function ensureFolderForRutChange(string $currentRelativePath, string $oldRut, string $newRut): array
+    {
+        $currentRelativePath = trim($currentRelativePath);
+        if (self::isTemporaryRelative($currentRelativePath)) {
+            $absolute = self::absoluteFromRelative($currentRelativePath);
+            if (!is_dir($absolute) && !mkdir($absolute, 0775, true) && !is_dir($absolute)) {
+                throw new RuntimeException('No fue posible asegurar la carpeta temporal de adjuntos.');
+            }
+
+            return [
+                'relative' => $currentRelativePath,
+                'absolute' => $absolute,
+            ];
+        }
+
+        $oldAbsolute = $currentRelativePath !== ''
+            ? self::absoluteFromRelative($currentRelativePath)
+            : self::absoluteBaseFolder($oldRut);
+        $newAbsolute = self::absoluteBaseFolder($newRut);
+        $newRelative = rtrim((string) UPLOAD_BASE_RELATIVE, '\\/') . '/' . self::folderNameFromRut($newRut);
+
+        if ($oldAbsolute === $newAbsolute) {
+            if (!is_dir($newAbsolute) && !mkdir($newAbsolute, 0775, true) && !is_dir($newAbsolute)) {
+                throw new RuntimeException('No fue posible asegurar la carpeta de adjuntos del nuevo RUT.');
+            }
+
+            return [
+                'relative' => $newRelative,
+                'absolute' => $newAbsolute,
+            ];
+        }
+
+        if (is_dir($oldAbsolute)) {
+            if (!is_dir($newAbsolute)) {
+                if (!@rename($oldAbsolute, $newAbsolute)) {
+                    throw new RuntimeException('No fue posible renombrar la carpeta del cliente al nuevo RUT.');
+                }
+            } else {
+                self::mergeFolderContents($oldAbsolute, $newAbsolute);
+                self::deleteFolderPath($oldAbsolute);
+            }
+        } else {
+            if (!is_dir($newAbsolute) && !mkdir($newAbsolute, 0775, true) && !is_dir($newAbsolute)) {
+                throw new RuntimeException('No fue posible crear la carpeta de adjuntos del nuevo RUT.');
+            }
+        }
+
+        return [
+            'relative' => $newRelative,
+            'absolute' => $newAbsolute,
+        ];
+    }
+
+    public static function storeUploadedFileInFolder(array $file, string $tipo, string $folderRelative): array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             throw new RuntimeException("Error al subir archivo {$tipo}.");
@@ -32,8 +108,15 @@ class FileStorage
 
         $ext = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
         $storedName = $tipo . '_' . uniqid('', true) . '.' . $ext;
-        $relativePath = UPLOAD_BASE_RELATIVE . '/' . $nuevaEmpresaId . '/' . $storedName;
-        $absolutePath = self::absoluteBaseFolder($nuevaEmpresaId) . '/' . $storedName;
+        $folderRelative = rtrim($folderRelative, '\\/');
+        $folderAbsolute = self::absoluteFromRelative($folderRelative);
+
+        if (!is_dir($folderAbsolute) && !mkdir($folderAbsolute, 0775, true) && !is_dir($folderAbsolute)) {
+            throw new RuntimeException("No fue posible preparar la carpeta para archivo {$tipo}.");
+        }
+
+        $relativePath = $folderRelative . '/' . $storedName;
+        $absolutePath = rtrim($folderAbsolute, '\\/') . '/' . $storedName;
 
         if (!move_uploaded_file((string) $file['tmp_name'], $absolutePath)) {
             throw new RuntimeException("No fue posible guardar archivo {$tipo}.");
@@ -49,9 +132,64 @@ class FileStorage
         ];
     }
 
-    public static function deleteFolder(int $nuevaEmpresaId): void
+    public static function moveOnboardingFolderToFinal(string $currentRelativePath, string $rut): array
     {
-        $absolute = self::absoluteBaseFolder($nuevaEmpresaId);
+        $targetRelative = rtrim((string) UPLOAD_BASE_RELATIVE, '\\/') . '/' . self::folderNameFromRut($rut);
+        return self::relocateFolder($currentRelativePath, $targetRelative);
+    }
+
+    public static function relocateFolder(string $currentRelativePath, string $targetRelativePath): array
+    {
+        $currentRelativePath = trim($currentRelativePath);
+        $targetRelativePath = trim($targetRelativePath);
+
+        $currentAbsolute = self::absoluteFromRelative($currentRelativePath);
+        $targetAbsolute = self::absoluteFromRelative($targetRelativePath);
+
+        if ($currentAbsolute === $targetAbsolute) {
+            if (!is_dir($targetAbsolute) && !mkdir($targetAbsolute, 0775, true) && !is_dir($targetAbsolute)) {
+                throw new RuntimeException('No fue posible asegurar la carpeta de adjuntos.');
+            }
+
+            return [
+                'old_relative' => $currentRelativePath,
+                'old_absolute' => $currentAbsolute,
+                'relative' => $targetRelativePath,
+                'absolute' => $targetAbsolute,
+            ];
+        }
+
+        if (is_dir($currentAbsolute)) {
+            if (!is_dir($targetAbsolute)) {
+                if (!@rename($currentAbsolute, $targetAbsolute)) {
+                    throw new RuntimeException('No fue posible mover la carpeta de adjuntos al destino final.');
+                }
+            } else {
+                self::mergeFolderContents($currentAbsolute, $targetAbsolute);
+                self::deleteFolderPath($currentAbsolute);
+            }
+        } else {
+            if (!is_dir($targetAbsolute) && !mkdir($targetAbsolute, 0775, true) && !is_dir($targetAbsolute)) {
+                throw new RuntimeException('No fue posible crear la carpeta de adjuntos en el destino final.');
+            }
+        }
+
+        return [
+            'old_relative' => $currentRelativePath,
+            'old_absolute' => $currentAbsolute,
+            'relative' => $targetRelativePath,
+            'absolute' => $targetAbsolute,
+        ];
+    }
+
+    public static function deleteFolderByRelative(string $relativePath): void
+    {
+        $absolute = self::absoluteFromRelative($relativePath);
+        self::deleteFolderPath($absolute);
+    }
+
+    private static function deleteFolderPath(string $absolute): void
+    {
         if (!is_dir($absolute)) {
             return;
         }
@@ -74,7 +212,7 @@ class FileStorage
 
     public static function deleteRelativeFile(string $relativePath): void
     {
-        $absolute = rtrim((string) BASE_PATH, '\\/') . '/' . ltrim($relativePath, '\\/');
+        $absolute = self::absoluteFromRelative($relativePath);
         if (is_file($absolute)) {
             unlink($absolute);
         }
@@ -82,6 +220,98 @@ class FileStorage
 
     public static function absoluteFromRelative(string $relativePath): string
     {
-        return rtrim((string) BASE_PATH, '\\/') . '/' . ltrim($relativePath, '\\/');
+        $normalized = str_replace('\\', '/', trim($relativePath));
+        if ($normalized === '') {
+            return rtrim((string) UPLOAD_BASE_DIR, '\\/');
+        }
+
+        if (preg_match('#^([A-Za-z]:/|/)#', $normalized) === 1) {
+            return $normalized;
+        }
+
+        return rtrim((string) UPLOAD_BASE_DIR, '\\/') . '/' . ltrim($normalized, '\\/');
+    }
+
+    public static function isTemporaryRelative(string $relativePath): bool
+    {
+        $normalized = str_replace('\\', '/', trim($relativePath));
+        if ($normalized === '') {
+            return false;
+        }
+
+        $tempBase = rtrim(str_replace('\\', '/', (string) UPLOAD_TEMP_BASE_RELATIVE), '/');
+        return strpos($normalized, $tempBase . '/') === 0
+            || $normalized === $tempBase
+            || strpos((string) basename($normalized), 'TMP_ONB_') !== false;
+    }
+
+    public static function appendOnboardingLog(string $folderRelative, string $event, array $context = []): ?string
+    {
+        if ($folderRelative === '') {
+            return null;
+        }
+
+        $folderAbsolute = self::absoluteFromRelative($folderRelative);
+        if (!is_dir($folderAbsolute)) {
+            return null;
+        }
+
+        $timestamp = date('Y-m-d H:i:s');
+        $lines = [
+            str_repeat('=', 90),
+            '[' . $timestamp . '] ' . $event,
+            str_repeat('-', 90),
+        ];
+
+        foreach ($context as $key => $value) {
+            if (is_bool($value)) {
+                $value = $value ? 'SI' : 'NO';
+            } elseif (is_array($value)) {
+                $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            } elseif ($value === null) {
+                $value = 'NULL';
+            }
+
+            $lines[] = $key . ': ' . (string) $value;
+        }
+
+        $lines[] = '';
+        $payload = implode(PHP_EOL, $lines) . PHP_EOL;
+        $target = $folderAbsolute . DIRECTORY_SEPARATOR . self::ONBOARDING_LOG_FILE;
+
+        file_put_contents($target, $payload, FILE_APPEND | LOCK_EX);
+
+        return $target;
+    }
+
+    private static function mergeFolderContents(string $source, string $target): void
+    {
+        $iterator = new FilesystemIterator($source, FilesystemIterator::SKIP_DOTS);
+        foreach ($iterator as $fileInfo) {
+            $sourcePath = $fileInfo->getPathname();
+            $targetPath = rtrim($target, '\\/') . DIRECTORY_SEPARATOR . $fileInfo->getBasename();
+
+            if ($fileInfo->isDir()) {
+                if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
+                    throw new RuntimeException('No fue posible crear subcarpetas al reorganizar adjuntos por RUT.');
+                }
+                self::mergeFolderContents($sourcePath, $targetPath);
+                @rmdir($sourcePath);
+                continue;
+            }
+
+            if (is_file($targetPath)) {
+                $pathInfo = pathinfo($targetPath);
+                $targetPath = rtrim((string) ($pathInfo['dirname'] ?? $target), '\\/')
+                    . DIRECTORY_SEPARATOR
+                    . ($pathInfo['filename'] ?? 'archivo')
+                    . '_' . uniqid('', true)
+                    . (!empty($pathInfo['extension']) ? '.' . $pathInfo['extension'] : '');
+            }
+
+            if (!@rename($sourcePath, $targetPath)) {
+                throw new RuntimeException('No fue posible mover los adjuntos al nuevo RUT.');
+            }
+        }
     }
 }

@@ -1,5 +1,9 @@
 # Runbook Operativo
 
+> Realizado por Leonardo Navarro.
+>
+> Ultima actualizacion documental: 2026-07-02 11:19:17
+
 ## Objetivo
 Este archivo existe para que otro chat o una sesion futura no tenga que redescubrir:
 - como conectarse al servidor,
@@ -48,6 +52,15 @@ Este archivo existe para que otro chat o una sesion futura no tenga que redescub
 - Tabla de autenticacion del modulo: `sec_users`
 - Login del modulo: validar `login` + `pswd` de `sec_users` filtrando `IdEmpresa = 397`
 - Solo deben ingresar usuarios activos: `active = 'Y'`
+
+## Adjuntos y carpetas de cliente
+- Los adjuntos del onboarding no deben quedar dentro del plugin.
+- Ruta base vigente en servidor:
+  - `/var/www/dynamica_archivos/Clientes_Doc`
+- La subcarpeta por cliente debe nombrarse usando el RUT con prefijo:
+  - `R_<RUT>`
+- Ejemplo:
+  - `/var/www/dynamica_archivos/Clientes_Doc/R_3213131331`
 
 ## Rutas limpias vigentes del modulo
 - `https://www.datosdynamica.net/administrativo`

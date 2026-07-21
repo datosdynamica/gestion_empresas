@@ -24,6 +24,12 @@ if ($route !== '') {
         case 'trazabilidad':
             $action = 'trace';
             break;
+        case 'configuracion':
+            $action = 'settings';
+            break;
+        case 'certificados-migrate':
+            $action = 'certificates';
+            break;
         case 'show':
             $action = 'show';
             break;
@@ -56,8 +62,32 @@ switch ($action) {
     case 'trace':
         $controller->trace();
         break;
+    case 'settings':
+        $controller->settings();
+        break;
+    case 'certificates':
+        $controller->certificates();
+        break;
+    case 'export-certificates-excel':
+        $controller->exportCertificatesExcel();
+        break;
+    case 'export-certificates-pdf':
+        $controller->exportCertificatesPdf();
+        break;
+    case 'certificate-log-action':
+        $controller->certificateLogAction();
+        break;
+    case 'certificate-upload-digital':
+        $controller->certificateUploadDigital();
+        break;
+    case 'certificate-update-operational':
+        $controller->certificateUpdateOperational();
+        break;
     case 'store':
         $controller->store();
+        break;
+    case 'save-settings':
+        $controller->saveSettings();
         break;
     case 'update':
         $controller->update($id);
@@ -73,6 +103,15 @@ switch ($action) {
         break;
     case 'approve':
         $controller->approve($id);
+        break;
+    case 'validate-rut':
+        $controller->validateRut();
+        break;
+    case 'change-hito':
+        $controller->changeHito($id);
+        break;
+    case 'run-migrate':
+        $controller->runMigrate($id);
         break;
     case 'delete':
         $controller->delete($id);

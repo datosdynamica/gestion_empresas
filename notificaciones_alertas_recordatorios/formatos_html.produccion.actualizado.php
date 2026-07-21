@@ -1,0 +1,828 @@
+﻿<?php
+// Plantilla actualizada desde notificaciones_alertas_recordatorios/2 - aviso_de_deuda_dynamica.html
+$vmensaje_deuda = <<<'HTML'
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Aviso de Deuda - Dynamica</title>
+  <!-- Importación de la fuente Nunito Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..900;1,6..12,300..900&display=swap" rel="stylesheet" />
+  <style type="text/css">
+    /* Estilos de reajuste globales para clientes de correo */
+    body, table, td, a {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    table, td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+    table {
+      border-collapse: collapse !important;
+    }
+    body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background-color: #F4F6F8;
+    }
+
+    /* Fallback de tipografía para clientes que no soportan Web Fonts */
+    body, table, td, p, a {
+      font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Enlaces */
+    a {
+      color: #FF6B35;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline !important;
+    }
+
+    /* Media Queries para optimización responsive */
+    @media screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      .content-block {
+        padding: 30px 20px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F6F8;">
+
+  <!-- Contenedor Principal (Fondo gris claro para dar contraste) -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #F4F6F8;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        
+        <!-- Tabla del Correo (Ancho máximo 600px centrado) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+          
+          <!-- Encabezado / Logo de Dynamica centrado -->
+          <tr>
+            <td align="center" style="padding: 40px 40px 20px 40px; background-color: #FFFFFF; border-bottom: 3px solid #FF6B35;">
+              <table border="0" cellpadding="0" cellspacing="0" align="center">
+                <tr>
+                  <td style="font-size: 28px; font-weight: 800; color: #0F2C59; letter-spacing: -0.5px;">
+                    dynamica<span style="color: #FF6B35;">.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Cuerpo del Mensaje -->
+          <tr>
+            <td class="content-block" style="padding: 40px 40px 30px 40px; background-color: #FFFFFF;">
+              
+              <!-- Título principal de la notificación -->
+              <h1 style="font-size: 24px; font-weight: 800; color: #0F2C59; margin: 0 0 10px 0; text-align: center; letter-spacing: -0.5px;">
+                Aviso de Deuda
+              </h1>
+
+              <!-- Bloque de Datos del Cliente (Variables del sistema) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center" style="font-size: 18px; font-weight: 700; color: #FF6B35; text-transform: uppercase; line-height: 24px;">
+                    vRazonSocial
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="font-size: 14px; color: #777777; line-height: 20px; padding-top: 2px; font-weight: 600;">
+                    RUT: vRut
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Saludo -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Hola,
+              </p>
+
+              <!-- Texto recordatorio principal -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Te escribimos para avisarte que <strong style="color: #0F2C59;">hoy vence uno de tus pagos pendientes</strong>.
+              </p>
+
+              <!-- Condicional de pago -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Si ya lo realizaste, podés ignorar este mensaje.
+              </p>
+
+              <!-- Redacción adaptada para dar sentido al botón activo -->
+              <p style="margin: 0 0 25px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Para regularizar tu cuenta de manera inmediata, podés efectuar el pago de forma rápida, segura y 100% digital a través de nuestro portal:
+              </p>
+
+              <!-- Botón de Pago en Línea (Bulletproof CTA) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center">
+                    <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                      <tr>
+                        <td align="center" bgcolor="#FF6B35" style="border-radius: 6px;">
+                          <a href="https://www.datosdynamica.net/pagarenlinea/" target="_blank" style="font-size: 15px; font-weight: bold; color: #FFFFFF; text-decoration: none; padding: 14px 28px; display: inline-block; border-radius: 6px; border: 1px solid #FF6B35; letter-spacing: 0.5px;">
+                            👉 Pagar factura en línea aquí
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Soporte / Dudas -->
+              <p style="margin: 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Ante cualquier consulta, no dudes en responder este correo.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Bloque de Firma y Contacto -->
+          <tr>
+            <td style="padding: 0 40px 40px 40px; background-color: #FFFFFF;">
+              
+              <!-- Divisor Sutil -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="border-top: 1px solid #E5E7EB; padding-top: 25px;"></td>
+                </tr>
+              </table>
+
+              <!-- Datos de Contacto (Gris suave #777777, limpio y sin iconos) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="font-size: 15px; line-height: 22px; color: #333333; padding-bottom: 8px;">
+                    Saludos,<br />
+                    <strong style="color: #0F2C59;">Equipo de Dynamica</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 14px; line-height: 20px; color: #777777;">
+                    097 471 484<br />
+                    <a href="https://www.dynamica.com.uy" target="_blank" style="color: #777777; text-decoration: none; font-weight: 600;">www.dynamica.com.uy</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Pie de página informativo (Buenas prácticas) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="margin-top: 20px;">
+          <tr>
+            <td align="center" style="font-size: 11px; line-height: 16px; color: #9CA3AF; padding: 0 20px;">
+              Este es un correo automático enviado por Dynamica. Por favor no respondas directamente a este mensaje.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+HTML;
+
+// Plantilla actualizada desde notificaciones_alertas_recordatorios/1 - recordatorio_de_pago_dynamica.html
+$vmensaje_recordatoriopago = <<<'HTML'
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recordatorio de Pago - Dynamica</title>
+  <!-- Importación de la fuente Nunito Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..900;1,6..12,300..900&display=swap" rel="stylesheet" />
+  <style type="text/css">
+    /* Estilos de reajuste globales para clientes de correo */
+    body, table, td, a {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    table, td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+    table {
+      border-collapse: collapse !important;
+    }
+    body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background-color: #F4F6F8;
+    }
+
+    /* Fallback de tipografía para clientes que no soportan Web Fonts */
+    body, table, td, p, a {
+      font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Enlaces */
+    a {
+      color: #FF6B35;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline !important;
+    }
+
+    /* Media Queries para optimización responsive */
+    @media screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      .content-block {
+        padding: 30px 20px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F6F8;">
+
+  <!-- Contenedor Principal (Fondo gris claro para dar contraste) -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #F4F6F8;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        
+        <!-- Tabla del Correo (Ancho máximo 600px centrado) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+          
+          <!-- Encabezado / Logo de Dynamica centrado -->
+          <tr>
+            <td align="center" style="padding: 40px 40px 20px 40px; background-color: #FFFFFF; border-bottom: 3px solid #FF6B35;">
+              <table border="0" cellpadding="0" cellspacing="0" align="center">
+                <tr>
+                  <td style="font-size: 28px; font-weight: 800; color: #0F2C59; letter-spacing: -0.5px;">
+                    dynamica<span style="color: #FF6B35;">.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Cuerpo del Mensaje -->
+          <tr>
+            <td class="content-block" style="padding: 40px 40px 30px 40px; background-color: #FFFFFF;">
+              
+              <!-- Título principal de la notificación -->
+              <h1 style="font-size: 24px; font-weight: 800; color: #0F2C59; margin: 0 0 10px 0; text-align: center; letter-spacing: -0.5px;">
+                Recordatorio de Pago
+              </h1>
+
+              <!-- Bloque de Datos del Cliente (Variables del sistema) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center" style="font-size: 18px; font-weight: 700; color: #FF6B35; text-transform: uppercase; line-height: 24px;">
+                    vRazonSocial
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="font-size: 14px; color: #777777; line-height: 20px; padding-top: 2px; font-weight: 600;">
+                    vRut
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Saludo -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Hola,
+              </p>
+
+              <!-- Texto recordatorio principal -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Queríamos recordarte que <strong style="color: #0F2C59;">se acerca la fecha de vencimiento de tu factura</strong>.
+              </p>
+
+              <!-- Condicional de pago -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Si ya lo tenés previsto, ¡genial! Si no, este es un buen momento para agendarlo.
+              </p>
+
+              <!-- Nueva redacción con sentido para el botón de pago -->
+              <p style="margin: 0 0 25px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Para tu comodidad, ya podés realizar el pago de forma rápida, segura y 100% digital haciendo clic en el siguiente botón:
+              </p>
+
+              <!-- Botón de Pago en Línea (Bulletproof CTA) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center">
+                    <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                      <tr>
+                        <td align="center" bgcolor="#FF6B35" style="border-radius: 6px;">
+                          <a href="https://www.datosdynamica.net/pagarenlinea/" target="_blank" style="font-size: 15px; font-weight: bold; color: #FFFFFF; text-decoration: none; padding: 14px 28px; display: inline-block; border-radius: 6px; border: 1px solid #FF6B35; letter-spacing: 0.5px;">
+                            👉 Pagar factura en línea aquí
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Soporte / Dudas -->
+              <p style="margin: 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Ante cualquier duda, podés responder directamente a este mensaje.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Bloque de Firma y Contacto -->
+          <tr>
+            <td style="padding: 0 40px 40px 40px; background-color: #FFFFFF;">
+              
+              <!-- Divisor Sutil -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="border-top: 1px solid #E5E7EB; padding-top: 25px;"></td>
+                </tr>
+              </table>
+
+              <!-- Datos de Contacto (Gris suave #777777, limpio y sin iconos) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="font-size: 15px; line-height: 22px; color: #333333; padding-bottom: 8px;">
+                    Saludos,<br />
+                    <strong style="color: #0F2C59;">Equipo de Dynamica</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 14px; line-height: 20px; color: #777777;">
+                    097 471 484<br />
+                    <a href="https://www.dynamica.com.uy" target="_blank" style="color: #777777; text-decoration: none; font-weight: 600;">www.dynamica.com.uy</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Pie de página informativo (Buenas prácticas) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="margin-top: 20px;">
+          <tr>
+            <td align="center" style="font-size: 11px; line-height: 16px; color: #9CA3AF; padding: 0 20px;">
+              Este es un correo automático enviado por Dynamica. Por favor no respondas directamente a este mensaje.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+HTML;
+
+// Plantilla actualizada desde notificaciones_alertas_recordatorios/4 - notificaci_n_de_suspensi_n_dynamica.html
+$vmensaje_notificacionsuspension = <<<'HTML'
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Notificación de Suspensión - Dynamica</title>
+  <!-- Importación de la fuente Nunito Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..900;1,6..12,300..900&display=swap" rel="stylesheet" />
+  <style type="text/css">
+    /* Estilos de reajuste globales para clientes de correo */
+    body, table, td, a {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    table, td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+    table {
+      border-collapse: collapse !important;
+    }
+    body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background-color: #F4F6F8;
+    }
+
+    /* Fallback de tipografía para clientes que no soportan Web Fonts */
+    body, table, td, p, a {
+      font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Enlaces */
+    a {
+      color: #FF6B35;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline !important;
+    }
+
+    /* Media Queries para optimización responsive */
+    @media screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      .content-block {
+        padding: 30px 20px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F6F8;">
+
+  <!-- Contenedor Principal (Fondo gris claro para dar contraste) -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #F4F6F8;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        
+        <!-- Tabla del Correo (Ancho máximo 600px centrado) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+          
+          <!-- Encabezado / Logo de Dynamica centrado -->
+          <tr>
+            <td align="center" style="padding: 40px 40px 20px 40px; background-color: #FFFFFF; border-bottom: 3px solid #FF6B35;">
+              <table border="0" cellpadding="0" cellspacing="0" align="center">
+                <tr>
+                  <td style="font-size: 28px; font-weight: 800; color: #0F2C59; letter-spacing: -0.5px;">
+                    dynamica<span style="color: #FF6B35;">.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Cuerpo del Mensaje -->
+          <tr>
+            <td class="content-block" style="padding: 40px 40px 30px 40px; background-color: #FFFFFF;">
+              
+              <!-- Título principal de la notificación -->
+              <h1 style="font-size: 24px; font-weight: 800; color: #0F2C59; margin: 0 0 10px 0; text-align: center; letter-spacing: -0.5px;">
+                Notificación de Suspensión
+              </h1>
+
+              <!-- Bloque de Datos del Cliente (Variables del sistema) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center" style="font-size: 18px; font-weight: 700; color: #FF6B35; text-transform: uppercase; line-height: 24px;">
+                    vRazonSocial
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="font-size: 14px; color: #777777; line-height: 20px; padding-top: 2px; font-weight: 600;">
+                    RUT: vRut
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Saludo -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Hola,
+              </p>
+
+              <!-- Texto de Suspensión con énfasis -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Lamentamos informarte que <strong style="color: #D32F2F;">tu servicio fue suspendido debido a la falta de pago</strong>.
+              </p>
+
+              <!-- Texto de Restablecimiento -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+              </p>
+
+              <!-- Aclaración sobre métodos de pago e impacto en la habilitación del sistema -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Considerá que <strong style="color: #0F2C59;">el sistema se habilita automáticamente</strong> si realizás el pago a través de nuestro link online. En caso de abonar mediante transferencia, la acreditación y el registro manual del pago pueden demorar entre <strong style="color: #0F2C59;">24 y 48 horas hábiles</strong>.
+              </p>
+
+              <!-- Redacción adaptada para el llamado a la acción activo -->
+              <p style="margin: 0 0 25px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Para una <strong style="color: #D32F2F;">habilitación inmediata</strong>, te sugerimos pagar ahora mismo de forma rápida, segura y 100% digital haciendo clic en el siguiente botón:
+              </p>
+
+              <!-- Botón de Pago en Línea (Bulletproof CTA para máxima entregabilidad) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center">
+                    <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                      <tr>
+                        <td align="center" bgcolor="#FF6B35" style="border-radius: 6px;">
+                          <a href="https://www.datosdynamica.net/pagarenlinea/" target="_blank" style="font-size: 15px; font-weight: bold; color: #FFFFFF; text-decoration: none; padding: 14px 28px; display: inline-block; border-radius: 6px; border: 1px solid #FF6B35; letter-spacing: 0.5px;">
+                            👉 Pagar factura en línea aquí
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Soporte / Dudas -->
+              <p style="margin: 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Si tenés dudas o necesitás asistencia, podés responder a este mensaje.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Bloque de Firma y Contacto -->
+          <tr>
+            <td style="padding: 0 40px 40px 40px; background-color: #FFFFFF;">
+              
+              <!-- Divisor Sutil -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="border-top: 1px solid #E5E7EB; padding-top: 25px;"></td>
+                </tr>
+              </table>
+
+              <!-- Datos de Contacto (Gris suave #777777, limpio y sin iconos) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="font-size: 15px; line-height: 22px; color: #333333; padding-bottom: 8px;">
+                    Saludos,<br />
+                    <strong style="color: #0F2C59;">Equipo de Dynamica</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 14px; line-height: 20px; color: #777777;">
+                    097 471 484<br />
+                    <a href="https://www.dynamica.com.uy" target="_blank" style="color: #777777; text-decoration: none; font-weight: 600;">www.dynamica.com.uy</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Pie de página informativo (Buenas prácticas) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="margin-top: 20px;">
+          <tr>
+            <td align="center" style="font-size: 11px; line-height: 16px; color: #9CA3AF; padding: 0 20px;">
+              Este es un correo automático enviado por Dynamica. Por favor no respondas directamente a este mensaje.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+HTML;
+
+// Plantilla actualizada desde notificaciones_alertas_recordatorios/3 - alerta_de_suspensi_n_dynamica.html
+$vmensaje_alertasuspension = <<<'HTML'
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Alerta de Suspensión - Dynamica</title>
+  <!-- Importación de la fuente Nunito Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..900;1,6..12,300..900&display=swap" rel="stylesheet" />
+  <style type="text/css">
+    /* Estilos de reajuste globales para clientes de correo */
+    body, table, td, a {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    table, td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+    table {
+      border-collapse: collapse !important;
+    }
+    body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background-color: #F4F6F8;
+    }
+
+    /* Fallback de tipografía para clientes que no soportan Web Fonts */
+    body, table, td, p, a {
+      font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Enlaces */
+    a {
+      color: #FF6B35;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline !important;
+    }
+
+    /* Media Queries para optimización responsive */
+    @media screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      .content-block {
+        padding: 30px 20px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F6F8;">
+
+  <!-- Contenedor Principal -->
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #F4F6F8;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        
+        <!-- Tabla del Correo (Ancho máximo 600px centrado) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+          
+          <!-- Encabezado / Logo de Dynamica centrado -->
+          <tr>
+            <td align="center" style="padding: 40px 40px 20px 40px; background-color: #FFFFFF; border-bottom: 3px solid #FF6B35;">
+              <table border="0" cellpadding="0" cellspacing="0" align="center">
+                <tr>
+                  <td style="font-size: 28px; font-weight: 800; color: #0F2C59; letter-spacing: -0.5px;">
+                    dynamica<span style="color: #FF6B35;">.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Cuerpo del Mensaje -->
+          <tr>
+            <td class="content-block" style="padding: 40px 40px 30px 40px; background-color: #FFFFFF;">
+              
+              <!-- Título principal de la notificación -->
+              <h1 style="font-size: 24px; font-weight: 800; color: #0F2C59; margin: 0 0 10px 0; text-align: center; letter-spacing: -0.5px;">
+                Alerta de Suspensión
+              </h1>
+
+              <!-- Bloque de Datos del Cliente (Variables del sistema) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center" style="font-size: 18px; font-weight: 700; color: #FF6B35; text-transform: uppercase; line-height: 24px;">
+                    vRazonSocial
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="font-size: 14px; color: #777777; line-height: 20px; padding-top: 2px; font-weight: 600;">
+                    RUT: vRut
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Saludo -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Hola,
+              </p>
+
+              <!-- Texto de Alerta Principal con Fecha Variable -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Queremos informarte que, si no se regulariza la situación de pago, <strong style="color: #D32F2F;">el servicio podría suspenderse a partir del vFechaSuspension</strong>.
+              </p>
+
+              <!-- Texto de Soporte -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Estamos a disposición para ayudarte. Podés responder a este correo si necesitás más información.
+              </p>
+
+              <!-- Redacción adaptada para el llamado a la acción activo -->
+              <p style="margin: 0 0 25px 0; font-size: 15px; line-height: 24px; color: #333333;">
+                Para evitar la interrupción del servicio, podés regularizar tu situación ahora mismo de forma rápida, segura y 100% digital:
+              </p>
+
+              <!-- Botón de Pago en Línea (Bulletproof CTA) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                <tr>
+                  <td align="center">
+                    <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                      <tr>
+                        <td align="center" bgcolor="#FF6B35" style="border-radius: 6px;">
+                          <a href="https://www.datosdynamica.net/pagarenlinea/" target="_blank" style="font-size: 15px; font-weight: bold; color: #FFFFFF; text-decoration: none; padding: 14px 28px; display: inline-block; border-radius: 6px; border: 1px solid #FF6B35; letter-spacing: 0.5px;">
+                            👉 Pagar factura en línea aquí
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Bloque de Firma y Contacto -->
+          <tr>
+            <td style="padding: 0 40px 40px 40px; background-color: #FFFFFF;">
+              
+              <!-- Divisor Sutil -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="border-top: 1px solid #E5E7EB; padding-top: 25px;"></td>
+                </tr>
+              </table>
+
+              <!-- Datos de Contacto (Gris suave #777777, limpio y sin iconos) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="font-size: 15px; line-height: 22px; color: #333333; padding-bottom: 8px;">
+                    Saludos,<br />
+                    <strong style="color: #0F2C59;">Equipo de Dynamica</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size: 14px; line-height: 20px; color: #777777;">
+                    097 471 484<br />
+                    <a href="https://www.dynamica.com.uy" target="_blank" style="color: #777777; text-decoration: none; font-weight: 600;">www.dynamica.com.uy</a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Pie de página informativo (Buenas prácticas) -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="margin-top: 20px;">
+          <tr>
+            <td align="center" style="font-size: 11px; line-height: 16px; color: #9CA3AF; padding: 0 20px;">
+              Este es un correo automático enviado por Dynamica. Por favor no respondas directamente a este mensaje.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+HTML;
+?>

@@ -1,0 +1,108 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recordatorio de Certificado - Dynamica</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..900;1,6..12,300..900&display=swap" rel="stylesheet" />
+  <style type="text/css">
+    body, table, td, a {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    table, td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+    table {
+      border-collapse: collapse !important;
+    }
+    body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background-color: #F4F6F8;
+    }
+    body, table, td, p, a {
+      font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    a {
+      color: #FF6B35;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline !important;
+    }
+    @media screen and (max-width: 600px) {
+      .email-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      .content-block {
+        padding: 30px 20px !important;
+      }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F6F8;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #F4F6F8;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden;">
+          <tr>
+            <td align="center" style="padding: 40px 40px 20px 40px; background-color: #FFFFFF; border-bottom: 3px solid #FF6B35;">
+              <img src="https://a629153717.imgdist.com/pub/bfra/sedzd0jp/qp0/4js/txc/IsoLogotipo_Dynamica.png" alt="Dynamica" width="220" style="display: block; max-width: 220px; width: 100%; height: auto;" />
+            </td>
+          </tr>
+          <tr>
+            <td class="content-block" style="padding: 40px 40px 32px 40px;">
+              <h1 style="margin: 0 0 12px; color: #1E293B; font-size: 30px; line-height: 1.2; font-weight: 800;">Recordatorio de vencimiento de certificado</h1>
+              <p style="margin: 0 0 22px; color: #475569; font-size: 16px; line-height: 1.7;">
+                Le escribimos para recordarle que el certificado digital asociado a su empresa está próximo a vencer.
+              </p>
+
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FFF7ED; border: 1px solid #FED7AA; border-radius: 10px;">
+                <tr>
+                  <td style="padding: 22px 24px;">
+                    <p style="margin: 0 0 12px; color: #9A3412; font-size: 18px; font-weight: 800;">Faltan {{DIAS_RESTANTES}} día(s)</p>
+                    <p style="margin: 0 0 8px; color: #334155; font-size: 15px; line-height: 1.6;"><strong>Razón social:</strong> {{RAZON_SOCIAL}}</p>
+                    <p style="margin: 0 0 8px; color: #334155; font-size: 15px; line-height: 1.6;"><strong>RUT:</strong> {{RUT}}</p>
+                    <p style="margin: 0 0 8px; color: #334155; font-size: 15px; line-height: 1.6;"><strong>Certificado:</strong> {{APODO_CERTIFICADO}}</p>
+                    <p style="margin: 0; color: #334155; font-size: 15px; line-height: 1.6;"><strong>Fecha de vencimiento:</strong> {{FECHA_VENCIMIENTO}}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 24px 0 16px; color: #475569; font-size: 16px; line-height: 1.7;">
+                Le recomendamos gestionar la renovación con anticipación para evitar interrupciones en la operación.
+              </p>
+              <p style="margin: 0; color: #475569; font-size: 16px; line-height: 1.7;">
+                Si necesita apoyo, puede responder a este mensaje o escribir a <a href="mailto:{{EMAIL_RESPUESTA}}" style="color: #FF6B35;">{{EMAIL_RESPUESTA}}</a>.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding: 24px 32px 36px; border-top: 1px solid #E2E8F0;">
+              <p style="margin: 0; color: #94A3B8; font-size: 13px; line-height: 1.6;">
+                Notificaciones Dynamica<br/>
+                Recordatorio automático de seguimiento de certificados digitales.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

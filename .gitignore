@@ -3,3 +3,28 @@
 *.log
 Thumbs.db
 Desktop.ini
+node_modules/
+vendor/
+outputs/
+_backups/
+.codex/
+.agents/
+.codex-remote-attachments/
+config/runtime.php
+datos github.txt
+datos de conexion al servidor.txt
+datos de conexion al servidor de desarrollo.txt
+*.ppk
+*.pem
+*.key
+~$*
+tmp_*
+_tmp_*
+*.tar
+*.tar.b64
+*.zip
+*.mp4
+*.wav
+*.bin
+*.bak_*
+sincronizar_recibidos_script/

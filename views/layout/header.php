@@ -13,7 +13,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
     <?php $cssVersion = @filemtime(__DIR__ . '/../../public/assets/css/app.css') ?: time(); ?>
     <?php $logoVersion = @filemtime(__DIR__ . '/../../public/assets/img/logo-dynamica.jpeg') ?: time(); ?>
     <?php $manifestVersion = @filemtime(__DIR__ . '/../../manifest.webmanifest') ?: time(); ?>
@@ -50,30 +52,38 @@ if (is_array($authUser)) {
             <div class="app-sidebar__section">
                 <p class="app-sidebar__section-title">Navegaci&oacute;n</p>
                 <nav class="app-nav">
-                    <a href="<?= htmlspecialchars(app_url('panel'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'panel' ? ' is-active' : '' ?>">
+                    <a href="<?= htmlspecialchars(app_url('panel'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'panel' ? ' is-active' : '' ?>" title="Inicio">
                         <i data-lucide="house" class="w-5 h-5"></i>
                         <span class="app-nav__label">Inicio</span>
                     </a>
                     <?php if (!empty($enableCreateModal)): ?>
-                        <button type="button" class="app-nav__item" data-open-modal="modal-create">
+                        <button type="button" class="app-nav__item" data-open-modal="modal-create" title="Nuevo registro cliente">
                             <i data-lucide="plus-circle" class="w-5 h-5"></i>
                             <span class="app-nav__label">Nuevo registro cliente</span>
                         </button>
                     <?php else: ?>
-                        <a href="<?= htmlspecialchars(app_url('index.php?action=create'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'nuevo' ? ' is-active' : '' ?>">
+                        <a href="<?= htmlspecialchars(app_url('index.php?action=create'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'nuevo' ? ' is-active' : '' ?>" title="Nuevo registro cliente">
                             <i data-lucide="plus-circle" class="w-5 h-5"></i>
                             <span class="app-nav__label">Nuevo registro cliente</span>
                         </a>
                     <?php endif; ?>
-                    <button type="button" class="app-nav__item" data-nav-filter-state="En Proceso">
+                    <a href="<?= htmlspecialchars(app_url('panel?estado=' . rawurlencode('En Proceso')), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'aprobaciones' ? ' is-active' : '' ?>" title="Aprobaciones">
                         <i data-lucide="badge-check" class="w-5 h-5"></i>
                         <span class="app-nav__label">Aprobaciones</span>
-                    </button>
-                    <a href="<?= htmlspecialchars(app_url('trazabilidad'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'trazabilidad' ? ' is-active' : '' ?>">
+                    </a>
+                    <a href="<?= htmlspecialchars(app_url('trazabilidad'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'trazabilidad' ? ' is-active' : '' ?>" title="Trazabilidad">
                         <i data-lucide="history" class="w-5 h-5"></i>
                         <span class="app-nav__label">Trazabilidad</span>
                     </a>
-                    <button type="button" class="app-nav__item" id="install-app-button">
+                    <a href="<?= htmlspecialchars(app_url('configuracion'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'configuracion' ? ' is-active' : '' ?>" title="Configuraci&oacute;n">
+                        <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Configuracion</span>
+                    </a>
+                    <a href="<?= htmlspecialchars(app_url('certificados-migrate'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'certificados-migrate' ? ' is-active' : '' ?>" title="Certificados Migrate">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Certificados Migrate</span>
+                    </a>
+                    <button type="button" class="app-nav__item" id="install-app-button" title="Instalar app">
                         <i data-lucide="download" class="w-5 h-5"></i>
                         <span class="app-nav__label">Instalar app</span>
                     </button>
@@ -109,7 +119,7 @@ if (is_array($authUser)) {
     <div class="app-main">
         <header class="app-topbar">
             <div class="app-topbar__left">
-                <button type="button" class="app-topbar__hamburger" data-app-nav-toggle aria-label="Abrir menu">
+                <button type="button" class="app-topbar__hamburger" data-app-nav-toggle aria-label="Men&uacute; lateral" title="Men&uacute; lateral">
                     <i data-lucide="menu" class="w-5 h-5"></i>
                 </button>
                 <div>
@@ -135,7 +145,7 @@ if (is_array($authUser)) {
                             </span>
                             <span class="app-user-menu__copy">
                                 <strong><?= htmlspecialchars($userDisplayName, ENT_QUOTES, 'UTF-8') ?></strong>
-                                <small>Sesion activa</small>
+                                <small>Sesi&oacute;n activa</small>
                             </span>
                             <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
                         </button>
