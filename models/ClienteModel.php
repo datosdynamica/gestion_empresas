@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// Maneja la creacion y sincronizacion del cliente definitivo a partir del
+// registro temporal del onboarding.
 class ClienteModel extends BaseModel
 {
     private const BILLING_MONTHS = [
@@ -36,6 +38,8 @@ class ClienteModel extends BaseModel
 
     public function createFromNuevaEmpresa(array $item, int $idEmpresaMaster): int
     {
+        // El alta del cliente sale ya con los defaults comerciales esperados
+        // para no depender de correcciones manuales posteriores.
         $sql = "INSERT INTO Clientes (
                     nCliente, nombrefantasia, razonsocial, direccion, Documento, TipoDoc,
                     email, emailEnvioFE, Tel, IdGiro, IdCiudad, Departamento, fechanacimiento,
@@ -70,6 +74,8 @@ class ClienteModel extends BaseModel
 
     public function syncExistingFromNuevaEmpresa(int $clienteId, array $item, int $idEmpresaMaster): void
     {
+        // Cuando el cliente ya existe se pisan los campos controlados por el
+        // onboarding, manteniendo el mismo idcliente.
         $sql = "UPDATE Clientes SET
                     nCliente = 0,
                     nombrefantasia = :nombrefantasia,
@@ -142,6 +148,8 @@ class ClienteModel extends BaseModel
 
     public function activateForOnboarding(int $clienteId, array $item): array
     {
+        // Alta final: el cliente pasa a abonado=SI y, si corresponde, se marca
+        // credito fiscal para que el flujo comercial quede activo.
         $billingStartDate = $this->resolveBillingStartDate((string) ($item['cliente_abonado_periodo'] ?? 'MENSUAL'));
         $pnMonto = (float) ($item['cliente_pn_monto'] ?? 0);
         $pnCreditoFiscal = $pnMonto > 0
@@ -166,6 +174,7 @@ class ClienteModel extends BaseModel
 
     public function previewBillingStartDate(string $periodo): string
     {
+        // Se usa para mostrar la fecha calculada sin tocar todavia la base.
         return $this->resolveBillingStartDate($periodo);
     }
 
@@ -181,6 +190,8 @@ class ClienteModel extends BaseModel
 
     private function buildClienteParamsFromNuevaEmpresa(array $item, int $idEmpresaMaster): array
     {
+        // Convierte el registro temporal en la estructura exacta que espera la
+        // tabla Clientes, incluyendo defaults que el usuario no elige en la UI.
         $periodo = $item['cliente_abonado_periodo'] ?: 'MENSUAL';
         $grupo = trim((string) ($item['cliente_abonado_grupo'] ?? '')) !== ''
             ? (string) $item['cliente_abonado_grupo']

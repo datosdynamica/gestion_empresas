@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// Crea o sincroniza la empresa definitiva tomando como base los defaults del
+// registro plantilla y los datos capturados en onboarding.
 class EmpresaModel extends BaseModel
 {
     private const TEMPLATE_EMPRESA_ID = 1175;
@@ -131,6 +133,8 @@ class EmpresaModel extends BaseModel
 
     public function createFromNuevaEmpresa(array $item): int
     {
+        // Se inserta solo sobre columnas reales de la tabla actual para que el
+        // mismo codigo soporte ambientes con ligeras diferencias de esquema.
         $columns = $this->listEmpresaColumns();
         $data = $this->buildEmpresaDataFromNuevaEmpresa($item, $columns);
 
@@ -159,6 +163,8 @@ class EmpresaModel extends BaseModel
 
     public function syncExistingFromNuevaEmpresa(int $empresaId, array $item): void
     {
+        // Reusa la misma transformacion del alta nueva, pero aplicada como update
+        // sobre una empresa ya existente.
         $columns = $this->listEmpresaColumns();
         $data = $this->buildEmpresaDataFromNuevaEmpresa($item, $columns);
 
@@ -188,6 +194,8 @@ class EmpresaModel extends BaseModel
 
     public function updateOperationalFields(int $empresaId, string $altaTipoEmpresa, string $altaTributario): void
     {
+        // Estos dos campos se ajustan desde el panel de certificados para casos
+        // historicos que no nacieron en la tabla temporal nueva.
         $columns = $this->listEmpresaColumns();
         $updates = [];
         $params = [];
@@ -214,6 +222,8 @@ class EmpresaModel extends BaseModel
 
     private function listEmpresaColumns(): array
     {
+        // Se consulta el esquema real para no asumir campos que pueden faltar en
+        // algun ambiente clonado o viejo.
         $stmt = $this->db->query('SHOW COLUMNS FROM Empresas');
         $columns = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {

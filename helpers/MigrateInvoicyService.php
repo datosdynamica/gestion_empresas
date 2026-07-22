@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+// Encapsula todo el intercambio XML/SOAP con Migrate para registro de empresa,
+// consulta de certificados e instalacion de certificado digital.
 class MigrateInvoicyService
 {
     private const SOAP_METHOD = 'Execute';
 
     public function resolveExpectedMigrateUserCredentials(array $item): array
     {
+        // La clave esperada del usuario de Migrate se arma siempre desde el RUT
+        // para que el sistema pueda mostrarla y compararla luego.
         $rut = preg_replace('/\D+/', '', (string) ($item['rut'] ?? ''));
 
         return [
@@ -18,6 +22,7 @@ class MigrateInvoicyService
 
     public function registerCompany(array $item, array $archivos, array $references, array $userContext = []): array
     {
+        // El alta principal viaja en un unico XML RegistroEmpresa.
         $requestXml = $this->buildRegistroEmpresaXml($item, $archivos, $references, $userContext);
         $wsdl = (string) MIGRATE_REGISTROEMPRESA_WSDL;
         $environment = defined('MIGRATE_ENVIRONMENT') ? (string) MIGRATE_ENVIRONMENT : 'production';
@@ -34,6 +39,8 @@ class MigrateInvoicyService
 
         $responseXml = (string) ($response->Xmlretorno ?? '');
 
+        // Siempre devolvemos tambien el WSDL y el ambiente para que queden en log
+        // y se puedan auditar las pruebas sin volver a abrir codigo.
         $result = $this->parseRegistroEmpresaResponse($requestXml, $responseXml);
         $result['wsdl'] = $wsdl;
         $result['environment'] = $environment;
@@ -43,6 +50,8 @@ class MigrateInvoicyService
 
     public function queryCertificates(array $filters): array
     {
+        // Esta consulta alimenta tanto el panel manual como la cache incremental
+        // de vencimientos de certificados.
         $requestXml = $this->buildConsultaCertificadoXml($filters);
         $wsdl = (string) MIGRATE_CONSULTAEMPRESAS_WSDL;
         $environment = defined('MIGRATE_ENVIRONMENT') ? (string) MIGRATE_ENVIRONMENT : 'production';
@@ -68,6 +77,8 @@ class MigrateInvoicyService
 
     public function installCertificate(array $empresa, array $certificatePayload): array
     {
+        // La carga del certificado reutiliza RegistroEmpresa en modo edicion
+        // para no alterar datos operativos no relacionados.
         $requestXml = $this->buildCertificateInstallXml($empresa, $certificatePayload);
         $wsdl = (string) MIGRATE_REGISTROEMPRESA_WSDL;
         $environment = defined('MIGRATE_ENVIRONMENT') ? (string) MIGRATE_ENVIRONMENT : 'production';
@@ -92,6 +103,8 @@ class MigrateInvoicyService
 
     private function buildRegistroEmpresaXml(array $item, array $archivos, array $references, array $userContext): string
     {
+        // Primero resolvemos todos los textos externos para no depender de ids
+        // dentro del XML que se envia a Migrate.
         $giro = trim((string) ($references['giro_nombre'] ?? ''));
         $ciudad = trim((string) ($references['ciudad_nombre'] ?? ($item['ciudad'] ?? '')));
         $departamento = trim((string) ($references['departamento_nombre'] ?? ($item['departamento'] ?? '')));
@@ -144,6 +157,8 @@ class MigrateInvoicyService
         $includeMigrateUser = WorkflowHelper::licenseCreatesMigrateUser($licencia);
         $usuariosXml = '';
         if ($includeMigrateUser) {
+            // El usuario de Migrate solo se incluye en las licencias donde la
+            // operativa realmente lo necesita.
             $migrateUserCredentials = $this->resolveExpectedMigrateUserCredentials($item);
             $usuariosXml = '<Usuarios>'
                 . '<UsuarioItem>'
@@ -160,6 +175,7 @@ class MigrateInvoicyService
 
         [$emiDigitacion, $emiWebService] = $this->resolveTipoEmisionByLicense($licencia);
 
+        // Este bloque replica la estructura oficial esperada por RegistroEmpresa.
         $content = '<Empresa>'
             . '<DatosEmpresa>'
                 . '<EmpAccion>1</EmpAccion>'
@@ -229,6 +245,7 @@ class MigrateInvoicyService
 
         $ck = md5(MIGRATE_PARTNER_KEY . $content);
 
+        // El hash EmpCK se recalcula con el contenido final exacto que viaja.
         return '<RegistroEmpresa>'
             . '<Encabezado>'
                 . $this->tag('EmpPK', MIGRATE_PARTNER_KEY)
@@ -240,6 +257,8 @@ class MigrateInvoicyService
 
     private function buildConsultaCertificadoXml(array $filters): string
     {
+        // La consulta puede ir por EmpCodigo puntual o por varios RUT, segun el
+        // modo elegido en el panel de certificados.
         $empCodigo = preg_replace('/\D+/', '', (string) ($filters['emp_codigo'] ?? ''));
         $hashKey = trim((string) ($filters['hash_key'] ?? MIGRATE_PARTNER_KEY));
         $publicKey = trim((string) ($filters['emp_pk'] ?? MIGRATE_CERT_PUBLIC_KEY));
@@ -701,7 +720,7 @@ class MigrateInvoicyService
             return false;
         }
 
-        foreach (['rechaz', 'error', 'falla', 'fallo', 'inv·lid', 'invalid', 'deneg', 'no autorizado'] as $needle) {
+        foreach (['rechaz', 'error', 'falla', 'fallo', 'inv√°lid', 'invalid', 'deneg', 'no autorizado'] as $needle) {
             if (mb_strpos($normalized, $needle) !== false) {
                 return true;
             }

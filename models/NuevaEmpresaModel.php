@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// Modelo principal de la tabla temporal del onboarding. Desde aqui se lee y se
+// persiste el estado operativo que usa todo el panel administrativo.
 class NuevaEmpresaModel extends BaseModel
 {
     private const SELECT_ALIASES = "
@@ -77,6 +79,7 @@ class NuevaEmpresaModel extends BaseModel
 
     public function listAll(): array
     {
+        // La lista principal siempre muestra lo mas reciente primero.
         return $this->fetchAll('SELECT ' . self::SELECT_ALIASES . ' FROM ' . TABLA_EMPRESAS_NUEVAS . ' ORDER BY FechaCreacion DESC');
     }
 
@@ -88,6 +91,7 @@ class NuevaEmpresaModel extends BaseModel
 
     public function listPage(int $limit, int $offset): array
     {
+        // El paginado real se hace en SQL para evitar cargar toda la tabla.
         $limit = max(1, $limit);
         $offset = max(0, $offset);
 
@@ -105,6 +109,8 @@ class NuevaEmpresaModel extends BaseModel
 
     public function findByIdForUpdate(int $id): ?array
     {
+        // Se usa en cambios de hito para bloquear el registro mientras se decide
+        // el siguiente paso del flujo.
         return $this->fetchOne('SELECT ' . self::SELECT_ALIASES . ' FROM ' . TABLA_EMPRESAS_NUEVAS . ' WHERE Id = ? FOR UPDATE', [$id]);
     }
 
@@ -123,6 +129,8 @@ class NuevaEmpresaModel extends BaseModel
 
     public function create(array $data): int
     {
+        // Solo se insertan los campos operativos que nacen en el formulario;
+        // el resto del workflow se completa luego por hitos.
         $sql = "INSERT INTO " . TABLA_EMPRESAS_NUEVAS . " (
                     Estado, UsuarioCreacion, RazonSocial, NombreFantasia, Domicilio,
                     HitoActual,
@@ -159,12 +167,15 @@ class NuevaEmpresaModel extends BaseModel
 
     public function updateFolder(int $id, string $relativePath, int $created): void
     {
+        // Guarda la carpeta base del caso para reusar la misma ruta en adjuntos,
+        // certificados y reemplazos posteriores.
         $stmt = $this->db->prepare('UPDATE ' . TABLA_EMPRESAS_NUEVAS . ' SET CarpetaBase = ?, CarpetaCreada = ? WHERE Id = ?');
         $stmt->execute([$relativePath, $created, $id]);
     }
 
     public function updateTemp(int $id, array $data): void
     {
+        // Edicion completa del registro temporal desde el formulario principal.
         $sql = "UPDATE " . TABLA_EMPRESAS_NUEVAS . " SET
                     RazonSocial = :razon_social,
                     NombreFantasia = :nombre_fantasia,
@@ -218,6 +229,8 @@ class NuevaEmpresaModel extends BaseModel
 
     private function filterParamsForSql(string $sql, array $data): array
     {
+        // Arma solo los parametros realmente usados por el SQL para que una
+        // misma bolsa de datos sirva en inserts y updates parciales.
         preg_match_all('/:([a-zA-Z0-9_]+)/', $sql, $matches);
         $params = [];
 
@@ -230,6 +243,8 @@ class NuevaEmpresaModel extends BaseModel
 
     public function markApproved(int $id, int $empresaId, int $clienteId, string $usuario): void
     {
+        // Aprobar deja creada la base en Dynamica y mueve el caso al hito de
+        // Migrate, no al final del proceso.
         $stmt = $this->db->prepare("
             UPDATE " . TABLA_EMPRESAS_NUEVAS . "
             SET Estado = ?,
@@ -250,6 +265,7 @@ class NuevaEmpresaModel extends BaseModel
 
     public function markDeleted(int $id, string $usuario, string $motivo): void
     {
+        // La eliminacion conserva el motivo y el usuario para auditoria.
         $stmt = $this->db->prepare("
             UPDATE " . TABLA_EMPRESAS_NUEVAS . "
             SET Estado = ?,

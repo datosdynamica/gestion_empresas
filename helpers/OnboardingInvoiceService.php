@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+// Este servicio se encarga de construir y emitir la factura real del
+// onboarding. La idea es encapsular aqui toda la logica de cliente, producto,
+// impuestos y envio a la API para que el controlador no cargue con ese detalle.
 class OnboardingInvoiceService
 {
     private $db;
@@ -13,6 +16,8 @@ class OnboardingInvoiceService
 
     public function emitInvoice(array $item): array
     {
+        // La empresa facturadora cambia segun el entorno. En desarrollo se
+        // usa la referencia de pruebas y en produccion la empresa operativa.
         $empresaId = (int) ONBOARDING_FACTURACION_EMPRESA_ID;
         $clienteOriginalId = (int) ($item['cliente_id_creado'] ?? 0);
         $productoOriginalId = (int) ($item['cliente_abonado_id_producto'] ?? 0);
@@ -34,6 +39,8 @@ class OnboardingInvoiceService
             throw new RuntimeException('El importe del abono es invalido para emitir la factura del onboarding.');
         }
 
+        // A partir del registro del onboarding se resuelven los ids reales
+        // contra la empresa que va a facturar.
         $clienteId = $this->resolveBillingClientId($empresaId, $clienteOriginalId);
         $idVendedor = $this->resolveVendedorId($empresaId, (string) ($item['cliente_id_vendedor'] ?? ''));
         $idSucursal = $this->resolveSucursalId($empresaId);
@@ -46,6 +53,8 @@ class OnboardingInvoiceService
         $breakdown = $this->buildTaxBreakdown($importe, $taxPercent);
         $today = (new DateTimeImmutable('today'))->format('Y-m-d');
 
+        // Se arma el payload de la venta con el formato esperado por la API
+        // que crea la factura y luego la concluye en InvoiCy.
         $payload = [
             'fecha' => $today,
             'fechavto' => $today,
@@ -102,6 +111,8 @@ class OnboardingInvoiceService
             throw new RuntimeException('La API de crear factura no devolvio idventa. Respuesta: ' . $this->compactJson($createBody));
         }
 
+        // La segunda llamada es la que realmente intenta concluir el documento
+        // y devolver la respuesta operativa de InvoiCy.
         $sendPayload = ['idventa' => $idVenta];
         $sendResult = $this->postJson(
             rtrim((string) ONBOARDING_FACTURACION_API_BASE, '/') . '/enviarfactura/',
@@ -160,6 +171,8 @@ class OnboardingInvoiceService
         $grossAmount = round($grossAmount, 2);
         $taxPercent = max(0, round($taxPercent, 2));
 
+        // Si la tasa llega en cero, se trata como no gravado para no inventar
+        // IVA. Los casos especiales se corrigen antes en resolveEffectiveTaxPercent().
         if ($taxPercent <= 0) {
             return [
                 'subtotal' => $grossAmount,
@@ -205,9 +218,9 @@ class OnboardingInvoiceService
         $productName = strtoupper(trim((string) ($product['nombre'] ?? '')));
         $creditoFiscal = strtoupper(trim((string) ($item['alta_credito_fiscal'] ?? '')));
 
-        // En desarrollo hay productos espejo cuyo IdIva quedo cruzado o sin la tasa
-        // correcta. Para no emitir facturas de onboarding como no gravadas cuando el
-        // servicio corresponde a tasa basica, se fuerza 22% en los productos del flujo.
+        // En algunos entornos de prueba hubo productos espejo con IVA mal
+        // configurado. Este refuerzo evita que el onboarding termine como
+        // no gravado cuando el servicio deberia salir con tasa basica.
         $shouldUseBasicRate = in_array($licenseText, [
             'DYNAMICA ERP',
             'LITE',

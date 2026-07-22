@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+// Este archivo solo resuelve la accion pedida y la deriva al controlador
+// correcto. La logica de negocio queda concentrada en las clases.
 $route = trim((string) ($_GET['route'] ?? ''), '/');
 $authController = new AuthController();
 $controller = new NuevasEmpresasController();
@@ -11,6 +13,7 @@ $action = (string) ($_GET['action'] ?? 'index');
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
 if ($route !== '') {
+    // Alias cortos para rutas amigables del panel.
     switch ($route) {
         case 'login':
             $action = 'login';
@@ -38,6 +41,7 @@ if ($route !== '') {
 
 $publicActions = ['login', 'authenticate', 'logout'];
 
+// Todo lo demas exige sesion valida.
 if (!in_array($action, $publicActions, true)) {
     Auth::requireLogin();
 }
@@ -46,6 +50,7 @@ if (Auth::check() && in_array($action, ['login', 'authenticate'], true)) {
     Response::redirect('panel');
 }
 
+// Ruteo final de acciones del modulo.
 switch ($action) {
     case 'login':
         $authController->login();

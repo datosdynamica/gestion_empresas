@@ -2,10 +2,15 @@
 
 declare(strict_types=1);
 
+// Esta tabla funciona como una cola simple de tareas automaticas del
+// onboarding. Se usa para separar lo que el usuario marca manualmente de lo
+// que debe correr despues por proceso diferido.
 class EmpresaNuevaHitoAutoModel extends BaseModel
 {
     public function ensureTable(): void
     {
+        // La tabla se crea a demanda para simplificar despliegues en entornos
+        // donde todavia no exista este bloque.
         $sql = "
             CREATE TABLE IF NOT EXISTS " . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . " (
                 Id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -33,6 +38,7 @@ class EmpresaNuevaHitoAutoModel extends BaseModel
     {
         $this->ensureTable();
 
+        // Si el caso ya tiene una tarea viva, se recicla en vez de duplicarla.
         $existing = $this->fetchOne(
             'SELECT Id FROM ' . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . " WHERE NuevaEmpresaId = ? AND TareaCodigo = 'ENVIO_CREDENCIALES' AND Estado IN ('PENDIENTE','PROCESANDO','ERROR') ORDER BY Id DESC LIMIT 1",
             [$nuevaEmpresaId]
@@ -69,6 +75,8 @@ class EmpresaNuevaHitoAutoModel extends BaseModel
         $this->ensureTable();
         $limit = max(1, $limit);
 
+        // Se listan solo tareas vencidas y aun pendientes, respetando orden de
+        // programacion para no adelantar casos mas nuevos.
         $sql = 'SELECT *
                 FROM ' . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . "
                 WHERE TareaCodigo = ?
@@ -84,6 +92,8 @@ class EmpresaNuevaHitoAutoModel extends BaseModel
     {
         $this->ensureTable();
 
+        // Este cambio de estado evita que dos procesos tomen la misma tarea al
+        // mismo tiempo.
         $stmt = $this->db->prepare(
             'UPDATE ' . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . "
              SET Estado = 'PROCESANDO',
@@ -101,6 +111,8 @@ class EmpresaNuevaHitoAutoModel extends BaseModel
     {
         $this->ensureTable();
 
+        // Se guarda un resumen del resultado para poder auditar despues que
+        // paso con el envio automatico.
         $stmt = $this->db->prepare(
             'UPDATE ' . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . "
              SET Estado = 'OK',
@@ -119,6 +131,8 @@ class EmpresaNuevaHitoAutoModel extends BaseModel
     {
         $this->ensureTable();
 
+        // El contexto del error ayuda a reintentar con criterio sin perder el
+        // motivo exacto de la falla.
         $stmt = $this->db->prepare(
             'UPDATE ' . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . "
              SET Estado = 'ERROR',
@@ -137,6 +151,8 @@ class EmpresaNuevaHitoAutoModel extends BaseModel
     {
         $this->ensureTable();
 
+        // En la grilla solo interesa la ultima tarea conocida de cada caso
+        // para decidir si ya se envio, si quedo programada o si fallo.
         $ids = array_values(array_filter(array_map('intval', $nuevaEmpresaIds), static function (int $id): bool {
             return $id > 0;
         }));

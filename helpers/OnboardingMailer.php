@@ -5,6 +5,8 @@ declare(strict_types=1);
 use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\PHPMailer;
 
+// Centraliza el envio de correos del onboarding: aviso administrativo de
+// factura, credenciales y mensajes derivados del flujo.
 class OnboardingMailer
 {
     private const SMTP_HOST = 'mail.dynamica.com.uy';
@@ -21,6 +23,7 @@ class OnboardingMailer
 
     public function sendInvoiceNotice(array $item, array $options = []): array
     {
+        // La plantilla administrativa cambia segun licencia y credito fiscal.
         $template = $this->resolveInvoiceTemplate($item);
         $subject = $this->resolveInvoiceSubject($item);
         $razonSocial = trim((string) ($item['razon_social'] ?? ''));
@@ -41,6 +44,8 @@ class OnboardingMailer
 
     public function sendCredentialsNotice(array $item, array $credentials, array $options = []): array
     {
+        // Algunas licencias no necesitan correo de credenciales y se devuelven
+        // como omitidas para no marcar error operativo.
         $licencia = (int) ($item['licencia'] ?? 0);
         if (in_array($licencia, [12, 13], true)) {
             return [
@@ -77,6 +82,7 @@ class OnboardingMailer
 
     private function resolveInvoiceTemplate(array $item): string
     {
+        // Los cuatro modelos salen del criterio funcional definido por negocio.
         $licencia = (int) ($item['licencia'] ?? 0);
         if ($licencia === 12) {
             return 'aviso_servicio_cumplimiento_dynamica.html';
@@ -95,6 +101,8 @@ class OnboardingMailer
 
     private function resolveInvoiceSubject(array $item): string
     {
+        // El asunto tambien se mantiene alineado con la licencia/beneficio
+        // porque Sebastian lo valida como parte del onboarding.
         $licencia = (int) ($item['licencia'] ?? 0);
         if ($licencia === 12) {
             return 'Onboarding Dynamica | Servicio de cumplimiento';
@@ -113,6 +121,8 @@ class OnboardingMailer
 
     private function resolveRecipients(array $item, array $options): array
     {
+        // En pruebas se puede forzar un correo unico. En uso normal toma
+        // EmailEnvioFE y EmailPrincipal sin duplicar destinos.
         $overrideEmail = strtolower(trim((string) ($options['override_email'] ?? '')));
         if ($overrideEmail !== '') {
             if (!filter_var($overrideEmail, FILTER_VALIDATE_EMAIL)) {
@@ -147,6 +157,8 @@ class OnboardingMailer
 
     private function renderTemplate(string $relativePath, array $replacements): string
     {
+        // Las plantillas viven por fuera del codigo para que el equipo pueda
+        // reemplazarlas sin tocar la logica del envio.
         $templatePath = ONBOARDING_TEMPLATE_DIR . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
         if (!is_file($templatePath)) {
             throw new RuntimeException('No se encontro la plantilla de onboarding: ' . $relativePath);
@@ -162,6 +174,8 @@ class OnboardingMailer
 
     private function deliver(array $recipients, string $subject, string $bodyHtml, string $plainText): array
     {
+        // Toda la configuracion SMTP sale por el correo de notificaciones para
+        // mantener el mismo origen operativo del resto de la plataforma.
         if (!class_exists(PHPMailer::class)) {
             throw new RuntimeException('PHPMailer no esta disponible en el modulo.');
         }
