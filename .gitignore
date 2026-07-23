@@ -8,3 +8,5 @@ tmp_*
 config/runtime.php
 Thumbs.db
 desktop.ini
+
+BITACORA_*.md

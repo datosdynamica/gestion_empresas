@@ -54,6 +54,7 @@ if ($companyMap === []) {
 
 $statusMap = $cacheModel->listStatusMap(array_keys($companyMap), (string) MIGRATE_ENVIRONMENT);
 $staleCompanies = [];
+$todayDate = (new DateTimeImmutable('today'))->format('Y-m-d');
 $freshCutoff = (new DateTimeImmutable('now'))->modify('-' . max(1, (int) MIGRATE_CERT_CACHE_HOURS) . ' hours');
 foreach ($companyMap as $empresaId => $companyData) {
     if ($force) {
@@ -68,7 +69,8 @@ foreach ($companyMap as $empresaId => $companyData) {
     }
 
     $lastCheckDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $lastCheck) ?: new DateTimeImmutable($lastCheck);
-    if ($lastCheckDt < $freshCutoff) {
+    $lastCheckDate = $lastCheckDt->format('Y-m-d');
+    if ($lastCheckDate !== $todayDate || $lastCheckDt < $freshCutoff) {
         $staleCompanies[$companyData['rut']] = $companyData;
     }
 }
