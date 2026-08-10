@@ -101,6 +101,33 @@ class MigrateInvoicyService
         return $result;
     }
 
+    public function updateCompanyData(array $item, array $references): array
+    {
+        // Cuando el onboarding ya creo la empresa, las correcciones del
+        // formulario deben reflejarse tambien en Migrate para no dejar ambos
+        // lados desalineados.
+        $requestXml = $this->buildCompanyUpdateXml($item, $references);
+        $wsdl = (string) MIGRATE_REGISTROEMPRESA_WSDL;
+        $environment = defined('MIGRATE_ENVIRONMENT') ? (string) MIGRATE_ENVIRONMENT : 'production';
+
+        $client = new SoapClient($wsdl, [
+            'trace' => true,
+            'exceptions' => true,
+            'cache_wsdl' => WSDL_CACHE_NONE,
+        ]);
+
+        $response = $client->{self::SOAP_METHOD}([
+            'Xmlenvio' => $requestXml,
+        ]);
+
+        $responseXml = (string) ($response->Xmlretorno ?? '');
+        $result = $this->parseRegistroEmpresaResponse($requestXml, $responseXml, false);
+        $result['wsdl'] = $wsdl;
+        $result['environment'] = $environment;
+
+        return $result;
+    }
+
     private function buildRegistroEmpresaXml(array $item, array $archivos, array $references, array $userContext): string
     {
         // Primero resolvemos todos los textos externos para no depender de ids
@@ -370,6 +397,79 @@ class MigrateInvoicyService
         . '</RegistroEmpresa>';
     }
 
+    private function buildCompanyUpdateXml(array $item, array $references): string
+    {
+        // La edicion replica solo los datos operativos que el usuario puede
+        // corregir desde onboarding, sin relanzar licenciamiento ni usuarios.
+        $giro = trim((string) ($references['giro_nombre'] ?? ''));
+        $empresaInvoicy = preg_replace('/\D+/', '', (string) ($references['empresa_invoicy'] ?? ''));
+        $ciudad = trim((string) ($references['ciudad_nombre'] ?? ($item['ciudad'] ?? '')));
+        $departamento = trim((string) ($references['departamento_nombre'] ?? ($item['departamento'] ?? '')));
+        $rut = preg_replace('/\D+/', '', (string) ($item['rut'] ?? ''));
+        $razonSocial = trim((string) ($item['razon_social'] ?? ''));
+        $nombreFantasia = trim((string) (($item['nombre_fantasia'] ?? '') ?: $razonSocial));
+        $domicilio = trim((string) ($item['domicilio'] ?? ''));
+        $telefono = trim((string) ($item['telefono'] ?? ''));
+        $emailPrincipal = trim((string) ($item['email_principal'] ?? ''));
+        $codigoSucursal = preg_replace('/\D+/', '', (string) ($item['suc_cod_sucursal'] ?? ''));
+        $normaExoneracion = trim((string) ($item['alta_exonerado_norma'] ?? ''));
+        $exonerado = $this->resolveExoneradoFlag($item, $normaExoneracion);
+        [$emiDigitacion, $emiWebService] = $this->resolveTipoEmisionByLicense((int) ($item['licencia'] ?? 0));
+
+        if ($rut === '') {
+            throw new RuntimeException('No se encontro el RUT para actualizar la empresa en Migrate.');
+        }
+        if ($codigoSucursal === '') {
+            throw new RuntimeException('No se encontro el codigo de sucursal para actualizar la empresa en Migrate.');
+        }
+        if ($empresaInvoicy === '') {
+            throw new RuntimeException('No se encontro el EmpCodigo de Migrate para actualizar la sucursal.');
+        }
+
+        $content = '<Empresa>'
+            . '<DatosEmpresa>'
+                . '<EmpAccion>2</EmpAccion>'
+                . $this->tag('EmpRUT', $rut)
+                . $this->tag('EmpRazonSocial', $razonSocial)
+                . $this->optionalTag('EmpGiro', $giro)
+                . $this->optionalTag('EmpCorreoRespEmpresa', $emailPrincipal)
+                . $this->tag('EmpContriExonerado', $exonerado)
+                . $this->optionalTag('EmpNormaExoneracion', $normaExoneracion)
+            . '</DatosEmpresa>'
+            . '<TipoEmision>'
+                . $this->tag('EmiDigitacion', $emiDigitacion)
+                . $this->tag('EmiWebService', $emiWebService)
+                . '<EmiConector>N</EmiConector>'
+                . '<EmiCBD>N</EmiCBD>'
+            . '</TipoEmision>'
+            . '<Sucursales>'
+                . '<DatosSucursal>'
+                    . '<SucAccion>2</SucAccion>'
+                    . $this->tag('EmpCodigo', $empresaInvoicy)
+                    . $this->tag('SucCodSucursal', $codigoSucursal)
+                    . $this->tag('SucNomComercial', $nombreFantasia)
+                    . $this->tag('SucApodo', $nombreFantasia)
+                    . $this->tag('SucDomFiscal', $domicilio)
+                    . $this->tag('SucDepartamento', $departamento)
+                    . $this->tag('SucCiudad', $ciudad)
+                    . $this->optionalTag('SucTelefono', $telefono)
+                    . $this->optionalTag('SucCorreoRespSucursal', $emailPrincipal)
+                    . $this->optionalTag('SucCorreoRepImpresa', $emailPrincipal)
+                . '</DatosSucursal>'
+            . '</Sucursales>'
+        . '</Empresa>';
+
+        $ck = md5(MIGRATE_PARTNER_KEY . $content);
+
+        return '<RegistroEmpresa>'
+            . '<Encabezado>'
+                . $this->tag('EmpPK', MIGRATE_PARTNER_KEY)
+                . $this->tag('EmpCK', $ck)
+            . '</Encabezado>'
+            . $content
+        . '</RegistroEmpresa>';
+    }
+
     private function resolveTipoEmisionByLicense(int $licencia): array
     {
         if ($licencia === 14) {
@@ -406,7 +506,7 @@ class MigrateInvoicyService
         return 'Dy' . $suffix . 'Aa';
     }
 
-    private function parseRegistroEmpresaResponse(string $requestXml, string $responseXml): array
+    private function parseRegistroEmpresaResponse(string $requestXml, string $responseXml, bool $requireCredentials = true): array
     {
         $result = [
             'success' => false,
@@ -450,7 +550,9 @@ class MigrateInvoicyService
             $result['empresa_invoicy'] = trim((string) ($empresaNodes[0]->EmpCodigo ?? ''));
             $result['suc_clave_acceso'] = trim((string) ($empresaNodes[0]->SucClaveAcceso ?? ''));
         }
-        $result['base_success'] = $result['empresa_invoicy'] !== '' && $result['suc_clave_acceso'] !== '';
+        $result['base_success'] = $requireCredentials
+            ? ($result['empresa_invoicy'] !== '' && $result['suc_clave_acceso'] !== '')
+            : ($result['msg_code'] === '100');
 
         $licMsgRetornoNodes = $xml->xpath('//LicMsgRetorno') ?: [];
         if (!empty($licMsgRetornoNodes)) {
@@ -687,9 +789,15 @@ class MigrateInvoicyService
             return '';
         }
 
+        $certificatePassword = trim((string) ($item['certificado_contrasena'] ?? ''));
+        if ($certificatePassword === '') {
+            throw new RuntimeException('No se encontro la contrasena del certificado adjunto para enviar a Migrate.');
+        }
+
         return '<CertificadoDigital>'
             . '<CerAccion>1</CerAccion>'
             . $this->tag('CerApodo', $apodo)
+            . $this->tag('CerContrasena', $certificatePassword)
             . '</CertificadoDigital>';
     }
 

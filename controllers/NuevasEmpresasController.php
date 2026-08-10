@@ -11,6 +11,7 @@ class NuevasEmpresasController
     private $migrateService;
     private $certificateCacheModel;
     private $certificateActionModel;
+    private $certificateHistoryModel;
     private $localModel;
     private $secUserModel;
     private $provisioningModel;
@@ -39,8 +40,37 @@ class NuevasEmpresasController
     public function index(): void
     {
         $page = max(1, (int) ($_GET['page'] ?? 1));
-        $perPage = 10;
-        $totalItems = $this->model->countAll();
+        $perPageOptions = [10, 20, 50, 100, 300, 500];
+        $perPageRequested = trim((string) ($_GET['per_page'] ?? '10'));
+        $estadoFilter = trim((string) ($_GET['estado'] ?? 'todos'));
+        $hitoFilter = trim((string) ($_GET['hito'] ?? 'todos'));
+
+        if ($perPageRequested !== 'todos') {
+            $perPage = (int) $perPageRequested;
+            if (!in_array($perPage, $perPageOptions, true)) {
+                $perPage = 10;
+                $perPageRequested = '10';
+            }
+        } else {
+            $perPage = 10;
+        }
+
+        $allItems = $this->model->listAll();
+        $allItemIds = array_values(array_filter(array_map(static function (array $item): int {
+            return (int) ($item['id'] ?? 0);
+        }, $allItems)));
+        $allWorkflowHistory = $this->historialModel->listWorkflowEventsByNuevaEmpresaIds($allItemIds);
+        $filteredItems = array_values(array_filter($allItems, function (array $item) use ($allWorkflowHistory, $estadoFilter, $hitoFilter): bool {
+            $itemId = (int) ($item['id'] ?? 0);
+            $history = $allWorkflowHistory[$itemId] ?? [];
+            return $this->matchesPanelListFilters($item, $history, $estadoFilter, $hitoFilter);
+        }));
+        $totalItems = count($filteredItems);
+
+        if ($perPageRequested === 'todos') {
+            $perPage = max(1, $totalItems);
+        }
+
         $totalPages = max(1, (int) ceil($totalItems / $perPage));
 
         if ($page > $totalPages) {
@@ -48,7 +78,7 @@ class NuevasEmpresasController
         }
 
         $offset = ($page - 1) * $perPage;
-        $items = $this->model->listPage($perPage, $offset);
+        $items = array_slice($filteredItems, $offset, $perPage);
         $itemIds = array_values(array_filter(array_map(static function (array $item): int {
             return (int) ($item['id'] ?? 0);
         }, $items)));
@@ -74,8 +104,12 @@ class NuevasEmpresasController
         $pagination = [
             'page' => $page,
             'per_page' => $perPage,
+            'per_page_requested' => $perPageRequested,
+            'per_page_options' => $perPageOptions,
             'total_items' => $totalItems,
             'total_pages' => $totalPages,
+            'estado' => $estadoFilter,
+            'hito' => $hitoFilter,
             'has_prev' => $page > 1,
             'has_next' => $page < $totalPages,
             'prev_page' => $page > 1 ? $page - 1 : 1,
@@ -126,6 +160,234 @@ class NuevasEmpresasController
         ];
 
         require __DIR__ . '/../views/settings/index.php';
+    }
+
+    public function clients(): void
+    {
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $perPageOptions = [10, 25, 50, 100];
+        $perPage = (int) ($_GET['per_page'] ?? 25);
+        if (!in_array($perPage, $perPageOptions, true)) {
+            $perPage = 25;
+        }
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $statusFilter = trim((string) ($_GET['status'] ?? 'habilitadas'));
+        if ($statusFilter === 'todas') {
+            $statusFilter = 'todos';
+        }
+        if (!in_array($statusFilter, ['habilitadas', 'no_habilitadas', 'todos'], true)) {
+            $statusFilter = 'habilitadas';
+        }
+        $habFilter = trim((string) ($_GET['hab'] ?? ''));
+        if (!in_array($habFilter, ['', 'baja_logica', 'en_certificacion', 'si', 'suspendida'], true)) {
+            $habFilter = '';
+        }
+        $licenseFilter = trim((string) ($_GET['license'] ?? ''));
+        if ($licenseFilter !== '' && !ctype_digit($licenseFilter)) {
+            $licenseFilter = '';
+        }
+        $usersFilter = trim((string) ($_GET['users'] ?? ''));
+        if (!in_array($usersFilter, ['', '0', '1', '2_5', '6_10', '11_plus'], true)) {
+            $usersFilter = '';
+        }
+        $certificateFilter = trim((string) ($_GET['cert'] ?? ''));
+        if (!in_array($certificateFilter, ['', 'con_empcodigo', 'sin_empcodigo', 'con_cliente', 'sin_cliente'], true)) {
+            $certificateFilter = '';
+        }
+        $debtNotificationFilter = trim((string) ($_GET['debt'] ?? ''));
+        if ($debtNotificationFilter !== '' && !ctype_digit($debtNotificationFilter)) {
+            $debtNotificationFilter = '';
+        }
+        $suspensionNotificationFilter = trim((string) ($_GET['notif_susp'] ?? ''));
+        if ($suspensionNotificationFilter !== '' && !ctype_digit($suspensionNotificationFilter)) {
+            $suspensionNotificationFilter = '';
+        }
+        $suspensionFilter = trim((string) ($_GET['susp'] ?? ''));
+        if ($suspensionFilter !== '' && !ctype_digit($suspensionFilter)) {
+            $suspensionFilter = '';
+        }
+
+        $sortBy = trim((string) ($_GET['sort'] ?? 'idempresa'));
+        if (!in_array($sortBy, ['idempresa', 'razonsocial', 'rut', 'habilitada'], true)) {
+            $sortBy = 'idempresa';
+        }
+
+        $sortDirection = strtolower(trim((string) ($_GET['dir'] ?? 'desc')));
+        if (!in_array($sortDirection, ['asc', 'desc'], true)) {
+            $sortDirection = 'desc';
+        }
+
+        $empresaModel = new EmpresaModel();
+        $filteredUniverse = $empresaModel->listClientPanelItems(
+            $search,
+            $statusFilter,
+            $sortBy,
+            $sortDirection,
+            $habFilter,
+            $licenseFilter,
+            $usersFilter,
+            $certificateFilter,
+            $debtNotificationFilter,
+            $suspensionNotificationFilter,
+            $suspensionFilter
+        );
+        $totalItems = count($filteredUniverse);
+        $totalPages = max(1, (int) ceil($totalItems / $perPage));
+
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+
+        $offset = ($page - 1) * $perPage;
+        $items = $empresaModel->listClientPanelPage(
+            $perPage,
+            $offset,
+            $search,
+            $statusFilter,
+            $sortBy,
+            $sortDirection,
+            $habFilter,
+            $licenseFilter,
+            $usersFilter,
+            $certificateFilter,
+            $debtNotificationFilter,
+            $suspensionNotificationFilter,
+            $suspensionFilter
+        );
+        $empresaIds = array_values(array_filter(array_map(static function (array $item): int {
+            return (int) ($item['IdEmpresa'] ?? 0);
+        }, $items)));
+
+        $certificateSnapshots = $this->certificateCacheModel->listLatestSnapshotMap($empresaIds, (string) MIGRATE_ENVIRONMENT);
+        $certificateActions = $this->certificateActionModel->listByEmpresaIds($empresaIds, 8);
+        $latestOnboardingByRut = [];
+        $onboardingLogoByRut = [];
+
+        foreach ($items as $item) {
+            $rut = trim((string) ($item['Rut'] ?? ''));
+            if ($rut === '' || isset($latestOnboardingByRut[$rut])) {
+                continue;
+            }
+
+            $latestOnboardingByRut[$rut] = $this->model->findLatestByRut($rut);
+            $onboarding = $latestOnboardingByRut[$rut];
+            if (!is_array($onboarding) || empty($onboarding['id'])) {
+                continue;
+            }
+
+            foreach ($this->archivoModel->listByNuevaEmpresaId((int) $onboarding['id']) as $archivo) {
+                if ((string) ($archivo['tipo_archivo'] ?? '') !== 'logo') {
+                    continue;
+                }
+
+                $relativePath = trim((string) ($archivo['ruta_archivo'] ?? ''));
+                if ($relativePath === '') {
+                    continue;
+                }
+
+                $onboardingLogoByRut[$rut] = [
+                    'relative_path' => $relativePath,
+                    'original_name' => (string) ($archivo['nombre_original'] ?? ''),
+                    'mime_type' => (string) ($archivo['mime_type'] ?? ''),
+                ];
+                break;
+            }
+        }
+
+        $facetCounts = $this->buildClientPanelFacetCounts($filteredUniverse);
+
+        $pagination = [
+            'page' => $page,
+            'per_page' => $perPage,
+            'per_page_options' => $perPageOptions,
+            'total_items' => $totalItems,
+            'total_pages' => $totalPages,
+            'has_prev' => $page > 1,
+            'has_next' => $page < $totalPages,
+            'prev_page' => $page > 1 ? $page - 1 : 1,
+            'next_page' => $page < $totalPages ? $page + 1 : $totalPages,
+        ];
+
+        $pageTitle = 'Clientes';
+        require __DIR__ . '/../views/clientes/index.php';
+    }
+
+    public function clientShow(int $empresaId): void
+    {
+        $context = $this->buildClientPanelContext($empresaId);
+        if ($context === null) {
+            Response::flash('error', 'No se encontro el cliente solicitado.');
+            Response::redirect('index.php?route=clientes');
+        }
+
+        $pageTitle = 'Cliente';
+        $formOptions = $this->loadFormOptions();
+        require __DIR__ . '/../views/clientes/show.php';
+    }
+
+    public function clientUpdate(int $empresaId): void
+    {
+        $embeddedView = isset($_REQUEST['embed']) && (string) $_REQUEST['embed'] === '1';
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+        }
+
+        $context = $this->buildClientPanelContext($empresaId);
+        if ($context === null) {
+            Response::flash('error', 'No se encontro el cliente solicitado.');
+            Response::redirect('index.php?route=clientes');
+        }
+
+        $formOptions = $this->loadFormOptions();
+        $payload = $this->normalizeClientPanelInput($_POST, $formOptions, $context);
+        $usuarioLogin = (string) ($_SESSION['usuario'] ?? 'admin');
+        $logoUpload = $_FILES['archivo_logo'] ?? [];
+        unset($_SESSION['client_panel_conflicts']);
+
+        $conflicts = $this->detectClientPanelDirectConflicts($context, $payload);
+        if ($conflicts !== []) {
+            $_SESSION['client_panel_old_input'] = $payload;
+            $_SESSION['client_panel_conflicts'] = $conflicts;
+            $_SESSION['errors'] = array_map(static function (array $conflict): string {
+                return $conflict['message'];
+            }, $conflicts);
+            Response::flash('error', 'Se detectaron diferencias entre fuentes para algunos campos. Revise el detalle antes de guardar.');
+            Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+        }
+
+        if (is_array($logoUpload) && (($logoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE)) {
+            $errors = Validator::validateReplacementUpload($logoUpload, 'logo');
+            if (!empty($errors)) {
+                $_SESSION['client_panel_old_input'] = $payload;
+                Response::flash('error', (string) reset($errors));
+                Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+            }
+        }
+
+        try {
+            $this->syncClientPanelEdit($context, $payload, $usuarioLogin, is_array($logoUpload) ? $logoUpload : []);
+        } catch (Throwable $e) {
+            $_SESSION['client_panel_old_input'] = $payload;
+            Response::flash('error', 'Los cambios locales quedaron guardados, pero no se completo toda la sincronizacion: ' . $e->getMessage());
+            Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+        }
+
+        unset($_SESSION['client_panel_old_input']);
+        unset($_SESSION['client_panel_conflicts']);
+        Response::flash('success', 'Cliente actualizado correctamente.');
+        Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView, ['updated' => '1']));
+    }
+
+    public function clientCertificates(int $empresaId): void
+    {
+        $context = $this->buildClientPanelContext($empresaId);
+        if ($context === null) {
+            Response::flash('error', 'No se encontro el cliente solicitado.');
+            Response::redirect('index.php?route=clientes');
+        }
+
+        $pageTitle = 'Certificados del cliente';
+        require __DIR__ . '/../views/clientes/certificates.php';
     }
 
     public function certificates(): void
@@ -794,6 +1056,28 @@ class NuevasEmpresasController
                 );
             }
 
+            $latestOnboarding = $this->model->findLatestByRut($rut);
+            $certificateHistoryModel = $this->getCertificateHistoryModel();
+            if ($certificateHistoryModel !== null) {
+                $certificateHistoryModel->upsertByEmpresaAndPath([
+                    'empresa_id' => $empresaId,
+                    'rut' => $rut,
+                    'nueva_empresa_id' => (int) ($latestOnboarding['id'] ?? 0),
+                    'origen_carga' => 'CERTIFICADOS',
+                    'nombre_original' => (string) ($stored['original_name'] ?? ''),
+                    'nombre_guardado' => (string) ($stored['stored_name'] ?? ''),
+                    'ruta_archivo' => (string) ($stored['relative_path'] ?? ''),
+                    'password_certificado' => $certificatePassword,
+                    'alias_certificado' => (string) (($certificateMeta['common_name'] ?? '') !== '' ? $certificateMeta['common_name'] : ($certificateBinaryData['source_name'] ?? $stored['original_name'] ?? '')),
+                    'fecha_vencimiento' => (string) ($certificateMeta['valid_to_date'] ?? ''),
+                    'dias_restantes' => isset($daysRemaining) ? $daysRemaining : null,
+                    'usuario_login' => $usuarioLogin,
+                    'usuario_nombre' => $usuarioNombre,
+                    'estado_carga' => !empty($migrateCertificateResult['success']) ? 'MIGRATE_OK' : 'MIGRATE_ERROR',
+                    'detalle' => (string) ($migrateCertificateResult['msg_desc'] ?? 'Certificado cargado manualmente.'),
+                ]);
+            }
+
             $row = $this->certificateActionModel->findById($actionId);
             if ($row === null) {
                 throw new RuntimeException('Se cargo el certificado, pero no fue posible recuperar el evento en historial.');
@@ -1261,6 +1545,7 @@ class NuevasEmpresasController
             'alta_es_emisor' => trim($_POST['alta_es_emisor'] ?? 'NO'),
             'alta_credito_fiscal' => trim($_POST['alta_credito_fiscal'] ?? 'NO'),
             'alta_certificado_digital' => trim($_POST['alta_certificado_digital'] ?? ''),
+            'certificado_contrasena' => trim($_POST['certificado_contrasena'] ?? ''),
             'nombre_completo_firmante' => trim($_POST['nombre_completo_firmante'] ?? ''),
             'ci_firmante' => trim($_POST['ci_firmante'] ?? ''),
             'observaciones' => trim($_POST['observaciones'] ?? ''),
@@ -1537,12 +1822,37 @@ class NuevasEmpresasController
             'alta_es_emisor' => trim($_POST['alta_es_emisor'] ?? 'NO'),
             'alta_credito_fiscal' => trim($_POST['alta_credito_fiscal'] ?? 'NO'),
             'alta_certificado_digital' => trim($_POST['alta_certificado_digital'] ?? ''),
+            'certificado_contrasena' => trim($_POST['certificado_contrasena'] ?? ''),
             'nombre_completo_firmante' => trim($_POST['nombre_completo_firmante'] ?? ''),
             'ci_firmante' => trim($_POST['ci_firmante'] ?? ''),
             'observaciones' => trim($_POST['observaciones'] ?? ''),
             'notas_admin' => trim($_POST['notas_admin'] ?? ''),
         ];
+
+        // Si el nombre comercial venia calcado de la razon social anterior,
+        // y el usuario corrige solo la razon social, reflejamos el mismo cambio
+        // para no dejar Migrate con empresa actualizada pero sucursal vieja.
+        $razonSocialAnterior = mb_strtoupper(trim((string) ($item['razon_social'] ?? '')));
+        $nombreFantasiaAnterior = trim((string) ($item['nombre_fantasia'] ?? ''));
+        $razonSocialNueva = mb_strtoupper(trim((string) ($data['razon_social'] ?? '')));
+        $nombreFantasiaNueva = trim((string) ($data['nombre_fantasia'] ?? ''));
+        if (
+            $razonSocialNueva !== ''
+            && $razonSocialNueva !== $razonSocialAnterior
+            && $nombreFantasiaAnterior !== ''
+            && $nombreFantasiaNueva === $nombreFantasiaAnterior
+            && mb_strtoupper($nombreFantasiaAnterior) === $razonSocialAnterior
+        ) {
+            $data['nombre_fantasia'] = $razonSocialNueva;
+        }
+
         $data = self::applyConditionalBusinessRules($data);
+
+        if ($data['certificado_contrasena'] === '' && !empty($item['certificado_contrasena'])) {
+            // En edicion se conserva la contrasena ya cargada mientras el
+            // usuario no la cambie explicitamente.
+            $data['certificado_contrasena'] = trim((string) $item['certificado_contrasena']);
+        }
 
         $errors = Validator::validateNuevaEmpresa(array_merge($item, $data), []);
         $empresaModel = new EmpresaModel();
@@ -1662,6 +1972,17 @@ class NuevasEmpresasController
             'cliente_abonado_id_producto' => $data['cliente_abonado_id_producto'],
             'carpeta_base' => $folderInfo['relative'],
         ]);
+
+        try {
+            $updatedItem = $this->model->findById($id) ?? array_merge($item, $data, [
+                'id' => $id,
+                'carpeta_base' => $folderInfo['relative'],
+            ]);
+            $this->syncApprovedRecordAfterEdit($updatedItem, (string) ($_SESSION['usuario'] ?? 'admin'));
+        } catch (Throwable $e) {
+            Response::flash('error', 'El registro se actualizo en Dynamica, pero no fue posible reflejar la correccion completa: ' . $e->getMessage());
+            Response::redirect('index.php?action=show&id=' . $id);
+        }
 
         Response::flash('success', 'Registro actualizado correctamente.');
         Response::redirect('index.php?action=show&id=' . $id);
@@ -1899,6 +2220,13 @@ class NuevasEmpresasController
             $this->archivoModel->rebasePathsForNuevaEmpresa($id, (string) $folderMigration['relative']);
             $this->model->updateFolder($id, (string) $folderMigration['relative'], 1);
             $this->model->markApproved($id, $empresaId, $clienteId, $usuarioAprobacion);
+            $approvedItem = $this->model->findById($id) ?? array_merge($item, [
+                'id' => $id,
+                'empresa_id_creada' => $empresaId,
+                'cliente_id_creado' => $clienteId,
+                'carpeta_base' => (string) ($folderMigration['relative'] ?? ($item['carpeta_base'] ?? '')),
+            ]);
+            $this->syncOnboardingCertificateHistory($approvedItem, $usuarioAprobacion);
 
             $this->historialModel->create([
                 'nueva_empresa_id' => $id,
@@ -2049,6 +2377,12 @@ class NuevasEmpresasController
                 Response::flash('error', 'El caso no esta habilitado para marcar Homologacion DGI en este momento.');
                 Response::redirect('index.php?action=show&id=' . $id);
             }
+            $this->appendAutomationAuditLog('ONBOARDING_HOMOLOGACION_CONFIRMADA', [
+                'nueva_empresa_id' => $id,
+                'usuario' => $usuario,
+                'current_workflow' => $currentHito,
+                'next_expected_step' => 'ALTA_FINAL',
+            ]);
             $this->completeHomologacionDgiStep($id, $item, $usuario);
             Response::flash('success', 'Homologacion DGI marcada correctamente. El caso quedo listo para Alta Final.');
             Response::redirect('index.php?action=show&id=' . $id);
@@ -2059,28 +2393,17 @@ class NuevasEmpresasController
                 Response::flash('error', 'El caso no esta habilitado para ejecutar Alta Final en este momento.');
                 Response::redirect('index.php?action=show&id=' . $id);
             }
+            $this->appendAutomationAuditLog('ONBOARDING_ALTA_FINAL_DISPARADA', [
+                'nueva_empresa_id' => $id,
+                'usuario' => $usuario,
+                'current_workflow' => $currentHito,
+                'carpeta_base' => (string) ($item['carpeta_base'] ?? ''),
+            ]);
             try {
                 $result = $this->completeAltaFinalAndAutoStages($id, $item, $usuario);
                 Response::flash('success', $result['message']);
             } catch (Throwable $e) {
-                try {
-                    $restoreHito = 'ALTA_PENDIENTE';
-                    $restoreDetail = trim((string) ($item['estado_detalle'] ?? ''));
-                    if ($restoreDetail === '') {
-                        $restoreDetail = 'Alta final pendiente por novedad al procesar la factura automatica.';
-                    }
-                    $this->model->updateHitoActual($id, $restoreHito, $restoreDetail);
-                    $this->model->updateErrorProceso($id, $e->getMessage());
-                    $this->appendRecordLog((string) ($item['carpeta_base'] ?? ''), 'ERROR_ALTA_FINAL', [
-                        'nueva_empresa_id' => $id,
-                        'usuario' => $usuario,
-                        'error' => $e->getMessage(),
-                        'target_hito' => $normalizedTarget,
-                    ]);
-                } catch (Throwable $restoreError) {
-                    // Intencional: no ocultar el error principal si falla la restauracion del estado.
-                }
-
+                $this->handleAltaFinalFailure($id, $item, $usuario, $normalizedTarget, $e);
                 Response::flash('error', 'No fue posible completar el Alta Final: ' . $e->getMessage());
             }
             Response::redirect('index.php?action=show&id=' . $id);
@@ -2206,6 +2529,192 @@ class NuevasEmpresasController
         return $estado === ESTADO_PENDIENTE_APROBACION ? 'APROBACION_PENDIENTE' : 'DYNAMICA';
     }
 
+    private function matchesPanelListFilters(array $item, array $history, string $estadoFilter, string $hitoFilter): bool
+    {
+        $estadoFilter = trim($estadoFilter) !== '' ? trim($estadoFilter) : 'todos';
+        $hitoFilter = trim($hitoFilter) !== '' ? trim($hitoFilter) : 'todos';
+        $current = $this->resolveCurrentWorkflowForList($item, $history);
+        $statusLabel = $this->resolveGeneralStatusLabelForList($item, $current);
+        $hitoLabel = $this->resolveCurrentHitoLabelForList($item, $current);
+
+        $estadoMatches = $estadoFilter === 'todos' || $statusLabel === $estadoFilter;
+        if ($estadoFilter === 'EN_PROCESO_RAPIDO') {
+            $estadoMatches = !in_array($statusLabel, ['Cliente activo', 'Cancelado'], true);
+        }
+
+        $hitoMatches = $hitoFilter === 'todos' || $hitoLabel === $hitoFilter;
+        return $estadoMatches && $hitoMatches;
+    }
+
+    private function resolveCurrentWorkflowForList(array $item, array $history): string
+    {
+        $estado = (string) ($item['estado'] ?? '');
+        $persisted = trim((string) ($item['hito_actual'] ?? ''));
+        $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+        $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+        $events = [];
+
+        foreach ($history as $event) {
+            $events[(string) ($event['evento'] ?? '')] = $event;
+        }
+
+        if ($estado === ESTADO_ELIMINADO) {
+            return 'CANCELADO';
+        }
+
+        if ($empresaCreada && $clienteCreado && $this->hasHistoricalMigrateIssueForList($item, $history)) {
+            return 'MIGRATE_ERROR';
+        }
+
+        if (isset($events['HITO_CLIENTE_ACTIVO'])) {
+            return 'CLIENTE_ACTIVO';
+        }
+        if (isset($events['HITO_ENVIO_CREDENCIALES'])) {
+            return 'ALTA_FINAL';
+        }
+        if (isset($events['HITO_ENVIO_FACTURA'])) {
+            return 'ENVIO_CREDENCIALES';
+        }
+        if (isset($events['HITO_ALTA_PENDIENTE'])) {
+            return 'ALTA_PENDIENTE';
+        }
+        if (isset($events['HITO_HOMOLOGACION_DGI'])) {
+            return 'ENVIO_FACTURA';
+        }
+        if (isset($events['HITO_CERTIFICADO_DIGITAL']) || isset($events['HITO_PENDIENTE_DGI'])) {
+            return 'HOMOLOGACION_DGI';
+        }
+        if (isset($events['HITO_MIGRATE_OK'])) {
+            return 'CERTIFICADO_DIGITAL';
+        }
+        if (isset($events['HITO_DYNAMICA_OK']) || ($empresaCreada && $clienteCreado)) {
+            return 'MIGRATE';
+        }
+        if (isset($events['HITO_EN_PROCESO'])) {
+            return 'DYNAMICA';
+        }
+        if ($persisted === 'ERROR_APROBACION' && !$empresaCreada && !$clienteCreado) {
+            return 'APROBACION_PENDIENTE';
+        }
+        if ($persisted !== '') {
+            return $persisted === 'PENDIENTE_DGI' ? 'HOMOLOGACION_DGI' : $persisted;
+        }
+        if ($estado === ESTADO_ERROR_APROBACION) {
+            return ($empresaCreada && $clienteCreado) ? 'MIGRATE' : 'APROBACION_PENDIENTE';
+        }
+        if ($estado === ESTADO_APROBADO) {
+            return ($empresaCreada && $clienteCreado) ? 'CERTIFICADO_DIGITAL' : 'DYNAMICA';
+        }
+
+        return 'APROBACION_PENDIENTE';
+    }
+
+    private function resolveGeneralStatusLabelForList(array $item, string $current): string
+    {
+        $estado = (string) ($item['estado'] ?? '');
+        $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+        $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+
+        if ($estado === ESTADO_ELIMINADO) {
+            return 'Cancelado';
+        }
+        if (($estado === ESTADO_ERROR_APROBACION && $empresaCreada && $clienteCreado) || $current === 'MIGRATE_ERROR') {
+            return 'Migrate con novedad';
+        }
+        if ($current === 'CERTIFICADO_DIGITAL') {
+            return 'Certificado digital';
+        }
+        if ($current === 'HOMOLOGACION_DGI') {
+            return 'Homologación DGI';
+        }
+        if (in_array($current, ['ALTA_PENDIENTE', 'ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_FINAL'], true)) {
+            return 'Alta pendiente';
+        }
+        if ($current === 'CLIENTE_ACTIVO') {
+            return 'Cliente activo';
+        }
+        if ($current === 'DYNAMICA') {
+            return 'Dynamica';
+        }
+        if (in_array($current, ['EN_PROCESO', 'MIGRATE'], true)) {
+            return 'Migrate';
+        }
+
+        return 'Aprobación pendiente';
+    }
+
+    private function resolveCurrentHitoLabelForList(array $item, string $current): string
+    {
+        $estado = (string) ($item['estado'] ?? '');
+        $empresaCreada = (int) ($item['empresa_creada'] ?? 0) === 1;
+        $clienteCreado = (int) ($item['cliente_creado'] ?? 0) === 1;
+
+        if (($estado === ESTADO_ERROR_APROBACION && $empresaCreada && $clienteCreado) || $current === 'MIGRATE_ERROR') {
+            return 'Migrate';
+        }
+        if ($current === 'CLIENTE_ACTIVO') {
+            return 'Cliente Activo';
+        }
+        if ($estado === ESTADO_ELIMINADO) {
+            return 'Cancelado';
+        }
+        if ($current === 'CERTIFICADO_DIGITAL') {
+            return 'Certificado Digital';
+        }
+        if ($current === 'HOMOLOGACION_DGI') {
+            return 'Homologación DGI';
+        }
+        if (in_array($current, ['ENVIO_FACTURA', 'ENVIO_CREDENCIALES', 'ALTA_PENDIENTE', 'ALTA_FINAL'], true)) {
+            return 'Alta Pendiente';
+        }
+        if (in_array($current, ['EN_PROCESO', 'MIGRATE'], true)) {
+            return 'Migrate';
+        }
+        if ($current === 'DYNAMICA') {
+            return 'Dynamica';
+        }
+
+        return 'Aprobación pendiente';
+    }
+
+    private function hasHistoricalMigrateIssueForList(array $item, array $history): bool
+    {
+        $responseXml = trim((string) ($item['migrate_response_xml'] ?? ''));
+        if ($responseXml !== '') {
+            libxml_use_internal_errors(true);
+            $xml = simplexml_load_string($responseXml);
+            libxml_clear_errors();
+
+            if ($xml !== false) {
+                $licNodes = $xml->xpath('//LicMsgRetorno');
+                if (is_array($licNodes) && isset($licNodes[0])) {
+                    $message = mb_strtolower(trim((string) $licNodes[0]));
+                    foreach (['rechaz', 'error', 'falla', 'fallo', 'invalid', 'deneg', 'no autorizado'] as $needle) {
+                        if ($message !== '' && mb_strpos($message, $needle) !== false) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($history as $event) {
+            $evento = (string) ($event['evento'] ?? '');
+            $descripcion = mb_strtolower(trim((string) ($event['descripcion'] ?? '')));
+            if ($evento !== 'HITO_MIGRATE_ERROR' || $descripcion === '') {
+                continue;
+            }
+
+            foreach (['licenciamiento devolvio novedad', 'licencia rechazada', 'solicitud de licencia rechazada'] as $needle) {
+                if (mb_strpos($descripcion, $needle) !== false) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private function completeCertificateDigitalStep(int $id, array $item, string $usuario): void
     {
         $this->registerWorkflowEvent(
@@ -2255,6 +2764,13 @@ class NuevasEmpresasController
         $events = $this->loadWorkflowEventMap($id);
         $invoiceAlreadyDone = isset($events['HITO_ENVIO_FACTURA']);
 
+        $this->appendAutomationAuditLog('ONBOARDING_AUTO_CIERRE_INICIO', [
+            'nueva_empresa_id' => $id,
+            'usuario' => $usuario,
+            'invoice_already_done' => $invoiceAlreadyDone,
+            'folder_base' => $folderBase,
+        ]);
+
         if ($invoiceAlreadyDone) {
             $invoiceInfo = [
                 'mode_label' => 'ya emitida previamente',
@@ -2283,6 +2799,22 @@ class NuevasEmpresasController
                 : 'Factura automatizada (' . $invoiceInfo['mode_label'] . ').',
             'Credenciales programadas para el siguiente ciclo automatico.',
         ];
+
+        $this->appendRecordLog($folderBase, 'AUTO_ENVIO_CREDENCIALES_PROGRAMADO', [
+            'nueva_empresa_id' => $id,
+            'usuario' => $usuario,
+            'task_id' => $taskId,
+            'scheduled_at' => $scheduledAt,
+            'invoice_already_done' => $invoiceAlreadyDone,
+        ]);
+        $this->appendAutomationAuditLog('ONBOARDING_AUTO_CIERRE_PROGRAMADO', [
+            'nueva_empresa_id' => $id,
+            'usuario' => $usuario,
+            'task_id' => $taskId,
+            'scheduled_at' => $scheduledAt,
+            'invoice_already_done' => $invoiceAlreadyDone,
+            'invoice_mode' => (string) ($invoiceInfo['mode_label'] ?? ''),
+        ]);
 
         return [
             'message' => implode(' ', $summary),
@@ -2504,6 +3036,11 @@ class NuevasEmpresasController
         $errors = 0;
         $skipped = 0;
 
+        $this->appendAutomationAuditLog('ONBOARDING_AUTO_RUNNER_INICIO', [
+            'limit' => $limit,
+            'environment' => (string) MIGRATE_ENVIRONMENT,
+        ]);
+
         foreach ($this->hitoAutoModel->listDueTasks('ENVIO_CREDENCIALES', $limit) as $task) {
             $read++;
             $taskId = (int) ($task['Id'] ?? 0);
@@ -2544,6 +3081,21 @@ class NuevasEmpresasController
                 }
 
                 $folderBase = (string) ($item['carpeta_base'] ?? '');
+                $this->appendRecordLog($folderBase, 'AUTO_HITOS_DIFERIDOS_TAREA_INICIO', [
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                    'task_id' => $taskId,
+                    'task_code' => (string) ($task['TareaCodigo'] ?? ''),
+                    'task_state' => (string) ($task['Estado'] ?? ''),
+                    'scheduled_at' => (string) ($task['ProgramadoPara'] ?? ''),
+                    'attempts' => (int) ($task['Intentos'] ?? 0),
+                ]);
+                $this->appendAutomationAuditLog('ONBOARDING_AUTO_RUNNER_TAREA_INICIO', [
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                    'task_id' => $taskId,
+                    'task_code' => (string) ($task['TareaCodigo'] ?? ''),
+                    'scheduled_at' => (string) ($task['ProgramadoPara'] ?? ''),
+                    'attempts' => (int) ($task['Intentos'] ?? 0),
+                ]);
                 $overrideEmail = $this->resolveOnboardingOverrideEmail();
                 $credentialsInfo = $this->processCredentialsStage($item, 'sistema', $folderBase, $overrideEmail);
 
@@ -2554,6 +3106,18 @@ class NuevasEmpresasController
                 $this->hitoAutoModel->markSuccess($taskId, [
                     'credentials' => $credentialsInfo,
                     'activation' => $activationInfo,
+                ]);
+                $this->appendRecordLog($folderBase, 'AUTO_HITOS_DIFERIDOS_TAREA_OK', [
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                    'task_id' => $taskId,
+                    'credentials_user' => (string) (($credentialsInfo['credentials']['user'] ?? '')),
+                    'activation_date' => (string) ($activationInfo['billing_start_date'] ?? ''),
+                ]);
+                $this->appendAutomationAuditLog('ONBOARDING_AUTO_RUNNER_TAREA_OK', [
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                    'task_id' => $taskId,
+                    'credentials_user' => (string) (($credentialsInfo['credentials']['user'] ?? '')),
+                    'activation_date' => (string) ($activationInfo['billing_start_date'] ?? ''),
                 ]);
 
                 $messages[] = '[OK] #' . $nuevaEmpresaId . ' credenciales y alta final completadas.';
@@ -2572,11 +3136,24 @@ class NuevasEmpresasController
                     'error' => $e->getMessage(),
                     'task_id' => $taskId,
                 ]);
+                $this->appendAutomationAuditLog('ONBOARDING_AUTO_RUNNER_TAREA_ERROR', [
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                    'task_id' => $taskId,
+                    'error' => $e->getMessage(),
+                ]);
 
                 $messages[] = '[ERROR] #' . $nuevaEmpresaId . ': ' . $e->getMessage();
                 $errors++;
             }
         }
+
+        $this->appendAutomationAuditLog('ONBOARDING_AUTO_RUNNER_FIN', [
+            'limit' => $limit,
+            'read' => $read,
+            'success' => $success,
+            'errors' => $errors,
+            'skipped' => $skipped,
+        ]);
 
         return [
             'read' => $read,
@@ -2585,6 +3162,47 @@ class NuevasEmpresasController
             'skipped' => $skipped,
             'messages' => $messages,
         ];
+    }
+
+    private function handleAltaFinalFailure(int $id, array $item, string $usuario, string $targetHito, Throwable $e): void
+    {
+        try {
+            $restoreHito = 'ALTA_PENDIENTE';
+            $restoreDetail = trim((string) ($item['estado_detalle'] ?? ''));
+            if ($restoreDetail === '') {
+                $restoreDetail = 'Alta final pendiente por novedad al procesar la factura automatica.';
+            }
+            $this->model->updateHitoActual($id, $restoreHito, $restoreDetail);
+            $this->model->updateErrorProceso($id, $e->getMessage());
+            $this->appendRecordLog((string) ($item['carpeta_base'] ?? ''), 'ERROR_ALTA_FINAL', [
+                'nueva_empresa_id' => $id,
+                'usuario' => $usuario,
+                'error' => $e->getMessage(),
+                'target_hito' => $targetHito,
+            ]);
+            $this->appendAutomationAuditLog('ONBOARDING_ALTA_FINAL_ERROR', [
+                'nueva_empresa_id' => $id,
+                'usuario' => $usuario,
+                'target_hito' => $targetHito,
+                'error' => $e->getMessage(),
+            ]);
+        } catch (Throwable $restoreError) {
+            // Intencional: no ocultar el error principal si falla la restauracion del estado.
+        }
+    }
+
+    private function getCertificateHistoryModel()
+    {
+        if ($this->certificateHistoryModel !== null) {
+            return $this->certificateHistoryModel;
+        }
+
+        if (!class_exists('CertificateHistoryModel')) {
+            return null;
+        }
+
+        $this->certificateHistoryModel = new CertificateHistoryModel();
+        return $this->certificateHistoryModel;
     }
 
     private function resolveDynamicaPassword(array $item): string
@@ -2889,6 +3507,896 @@ class NuevasEmpresasController
         ];
     }
 
+    private function buildClientPanelContext(int $empresaId): ?array
+    {
+        $empresaModel = new EmpresaModel();
+        $item = $empresaModel->findClientPanelItemByEmpresaId($empresaId);
+        if (!is_array($item)) {
+            return null;
+        }
+
+        $rut = trim((string) ($item['Rut'] ?? ''));
+        $onboarding = $rut !== '' ? $this->model->findLatestByRut($rut) : null;
+        $snapshot = $this->certificateCacheModel->listLatestSnapshotMap([$empresaId], (string) MIGRATE_ENVIRONMENT)[$empresaId] ?? null;
+        $snapshotRows = $this->certificateCacheModel->listCachedRows([$empresaId], (string) MIGRATE_ENVIRONMENT, false);
+        $actions = $this->certificateActionModel->listByEmpresaIds([$empresaId], 8)[$empresaId] ?? [];
+        $certificateHistoryModel = $this->getCertificateHistoryModel();
+        $certificateHistory = $certificateHistoryModel !== null
+            ? $certificateHistoryModel->listByEmpresaId($empresaId, 40)
+            : [];
+        $certificateNotifications = (new CertificateNotificationModel())->listByEmpresaId($empresaId, 40);
+        $logo = null;
+        $files = [];
+        $certificateFiles = [];
+
+        if (is_array($onboarding) && (int) ($onboarding['id'] ?? 0) > 0) {
+            foreach ($this->archivoModel->listByNuevaEmpresaId((int) $onboarding['id']) as $archivo) {
+                $relativePath = trim((string) ($archivo['ruta_archivo'] ?? ''));
+                $normalized = [
+                    'id' => (int) ($archivo['id'] ?? 0),
+                    'tipo_archivo' => (string) ($archivo['tipo_archivo'] ?? ''),
+                    'nombre_original' => (string) ($archivo['nombre_original'] ?? ''),
+                    'nombre_guardado' => (string) ($archivo['nombre_guardado'] ?? ''),
+                    'ruta_archivo' => $relativePath,
+                    'mime_type' => (string) ($archivo['mime_type'] ?? ''),
+                    'fecha_subida' => (string) ($archivo['fecha_subida'] ?? ''),
+                    'download_url' => ((int) ($archivo['id'] ?? 0) > 0 && $relativePath !== '')
+                        ? app_url('index.php?action=download-file&id=' . (int) ($archivo['id'] ?? 0))
+                        : '',
+                ];
+
+                $files[] = $normalized;
+
+                $tipo = strtolower(trim((string) ($archivo['tipo_archivo'] ?? '')));
+                if ($logo === null && $tipo === 'logo' && $relativePath !== '') {
+                    $logo = [
+                        'relative_path' => $relativePath,
+                        'original_name' => (string) ($archivo['nombre_original'] ?? ''),
+                        'mime_type' => (string) ($archivo['mime_type'] ?? ''),
+                    ];
+                }
+
+                if (
+                    $relativePath !== ''
+                    && (
+                        strpos($tipo, 'pfx') !== false
+                        || strpos($tipo, 'cert') !== false
+                    )
+                ) {
+                    $certificateFiles[] = $normalized;
+                }
+            }
+        }
+
+        return [
+            'item' => $item,
+            'onboarding' => $onboarding,
+            'snapshot' => $snapshot,
+            'snapshot_rows' => $snapshotRows,
+            'actions' => $actions,
+            'certificate_history' => $certificateHistory,
+            'certificate_notifications' => $certificateNotifications,
+            'logo' => $logo,
+            'files' => $files,
+            'certificate_files' => $certificateFiles,
+            'admin_users' => $this->catalogoModel->listAdminUsersByEmpresa($empresaId),
+        ];
+    }
+
+    private function buildClientShowUrl(int $empresaId, bool $embeddedView = false, array $extra = []): string
+    {
+        $params = array_merge([
+            'action' => 'client-show',
+            'id' => $empresaId,
+        ], $extra);
+
+        if ($embeddedView) {
+            $params['embed'] = '1';
+        }
+
+        return 'index.php?' . http_build_query($params);
+    }
+
+    private function detectClientPanelDirectConflicts(array $context, array $payload): array
+    {
+        $fieldMap = $this->clientPanelDirectConflictFieldMap();
+        $baseline = $this->buildClientPanelDisplayBaseline($context);
+        $sources = $this->buildClientPanelDirectConflictSources($context);
+        $conflicts = [];
+
+        foreach ($fieldMap as $field => $definition) {
+            $newValue = $this->normalizeClientConflictValue($field, $payload[$field] ?? null);
+            $baselineValue = $this->normalizeClientConflictValue($field, $baseline[$field] ?? null);
+            if ($newValue === $baselineValue) {
+                continue;
+            }
+
+            $sourceValues = [];
+            $sourceDisplays = [];
+            foreach ($definition['sources'] as $sourceName) {
+                $sourceRaw = $sources[$sourceName][$field] ?? null;
+                $sourceValue = $this->normalizeClientConflictValue($field, $sourceRaw);
+                if ($sourceValue === '') {
+                    continue;
+                }
+
+                $sourceValues[$sourceName] = $sourceValue;
+                $sourceDisplays[$sourceName] = $this->formatClientConflictDisplayValue($field, $sourceRaw);
+            }
+
+            $uniqueSourceValues = array_values(array_unique(array_values($sourceValues)));
+            if (count($uniqueSourceValues) <= 1) {
+                continue;
+            }
+
+            $conflicts[] = [
+                'field' => $field,
+                'label' => $definition['label'],
+                'panel_display' => $this->formatClientConflictDisplayValue($field, $payload[$field] ?? null),
+                'message' => $this->formatClientConflictMessage(
+                    $definition['label'],
+                    $this->formatClientConflictDisplayValue($field, $payload[$field] ?? null),
+                    $sourceDisplays
+                ),
+                'sources' => $sourceDisplays,
+            ];
+        }
+
+        return $conflicts;
+    }
+
+    private function buildClientPanelDisplayBaseline(array $context): array
+    {
+        $item = $context['item'];
+        $formOptions = $this->loadFormOptions();
+        $ciudadActual = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['ciudades'] ?? [],
+            'id',
+            'nombre',
+            (string) (($item['Ciudad'] ?? '') !== '' ? $item['Ciudad'] : ($item['ClienteIdCiudad'] ?? ''))
+        );
+        $departamentoActual = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['departamentos'] ?? [],
+            'id',
+            'nombre',
+            (string) ($item['Departamento'] ?? '')
+        );
+
+        return [
+            'rut' => (string) ($item['Rut'] ?? ''),
+            'razon_social' => (string) ($item['RazonSocial'] ?? ''),
+            'nombre_fantasia' => (string) ($item['NombreFantasia'] ?? ''),
+            'domicilio' => (string) ($item['Domicilio'] ?? ''),
+            'ciudad_nombre' => $ciudadActual['label'],
+            'departamento_nombre' => $departamentoActual['label'],
+            'email_principal' => (string) (($item['ClienteEmail'] ?? '') !== '' ? $item['ClienteEmail'] : ($item['EmpresaEmail'] ?? '')),
+            'email_envio_fe' => (string) (($item['emailEnvioFE'] ?? '') !== '' ? $item['emailEnvioFE'] : ($item['cUsuarioEmailInv'] ?? '')),
+            'telefono' => (string) ($item['Tel'] ?? ''),
+            'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
+            'licencia_codigo' => (string) ($item['LicenciaCodigo'] ?? ''),
+            'usuario_ef' => (string) ($item['UsuarioEF'] ?? ''),
+            'clave_usuario_ef' => (string) ($item['ClaveUsuarioEF'] ?? ''),
+            'id_usuario_ad' => (string) ($item['IdUsuarioAD'] ?? ''),
+            'alta_tipoempresa' => (string) ($item['AltaTipoEmpresa'] ?? ''),
+            'alta_tributario' => (string) ($item['AltaTributario'] ?? ''),
+            'nombre_completo_firmante' => (string) ($item['NombreCompletoFirmante'] ?? ''),
+            'ci_firmante' => (string) ($item['CI_Firmante'] ?? ''),
+            'notas_admin' => (string) ($item['Notas'] ?? ''),
+        ];
+    }
+
+    private function buildClientPanelDirectConflictSources(array $context): array
+    {
+        $item = $context['item'];
+        $onboarding = is_array($context['onboarding'] ?? null) ? $context['onboarding'] : [];
+        $cliente = [];
+        $formOptions = $this->loadFormOptions();
+
+        $clienteId = (int) ($item['IdCliente'] ?? 0);
+        if ($clienteId > 0) {
+            $clienteRow = (new ClienteModel())->findById($clienteId);
+            if (is_array($clienteRow)) {
+                $cliente = $clienteRow;
+            }
+        }
+
+        $empresaCiudad = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['ciudades'] ?? [],
+            'id',
+            'nombre',
+            (string) (($item['Ciudad'] ?? '') !== '' ? $item['Ciudad'] : ($item['ClienteIdCiudad'] ?? ''))
+        );
+        $empresaDepartamento = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['departamentos'] ?? [],
+            'id',
+            'nombre',
+            (string) ($item['Departamento'] ?? '')
+        );
+        $clienteCiudad = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['ciudades'] ?? [],
+            'id',
+            'nombre',
+            (string) ($cliente['IdCiudad'] ?? '')
+        );
+        $clienteDepartamento = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['departamentos'] ?? [],
+            'id',
+            'nombre',
+            (string) ($cliente['Departamento'] ?? '')
+        );
+        $onboardingCiudad = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['ciudades'] ?? [],
+            'id',
+            'nombre',
+            (string) ($onboarding['ciudad'] ?? '')
+        );
+        $onboardingDepartamento = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['departamentos'] ?? [],
+            'id',
+            'nombre',
+            (string) ($onboarding['departamento'] ?? '')
+        );
+
+        return [
+            'empresas' => [
+                'rut' => (string) ($item['Rut'] ?? ''),
+                'razon_social' => (string) ($item['RazonSocial'] ?? ''),
+                'nombre_fantasia' => (string) ($item['NombreFantasia'] ?? ''),
+                'domicilio' => (string) ($item['Domicilio'] ?? ''),
+                'ciudad_nombre' => $empresaCiudad['label'],
+                'departamento_nombre' => $empresaDepartamento['label'],
+                'email_principal' => (string) ($item['EmpresaEmail'] ?? ''),
+                'email_envio_fe' => (string) ($item['cUsuarioEmailInv'] ?? ''),
+                'telefono' => '',
+                'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
+                'licencia_codigo' => (string) ($item['LicenciaCodigo'] ?? ''),
+                'usuario_ef' => (string) ($item['UsuarioEF'] ?? ''),
+                'clave_usuario_ef' => (string) ($item['ClaveUsuarioEF'] ?? ''),
+                'id_usuario_ad' => (string) ($item['IdUsuarioAD'] ?? ''),
+                'alta_tipoempresa' => (string) ($item['AltaTipoEmpresa'] ?? ''),
+                'alta_tributario' => (string) ($item['AltaTributario'] ?? ''),
+                'nombre_completo_firmante' => '',
+                'ci_firmante' => '',
+                'notas_admin' => (string) ($item['Notas'] ?? ''),
+            ],
+            'clientes' => [
+                'rut' => (string) ($cliente['Documento'] ?? ''),
+                'razon_social' => (string) ($cliente['razonsocial'] ?? ''),
+                'nombre_fantasia' => (string) ($cliente['nombrefantasia'] ?? ''),
+                'domicilio' => (string) ($cliente['direccion'] ?? ''),
+                'ciudad_nombre' => $clienteCiudad['label'],
+                'departamento_nombre' => $clienteDepartamento['label'],
+                'email_principal' => (string) ($cliente['email'] ?? ''),
+                'email_envio_fe' => (string) ($cliente['emailEnvioFE'] ?? ''),
+                'telefono' => (string) ($cliente['Tel'] ?? ''),
+                'literal_e' => '',
+                'licencia_codigo' => '',
+                'usuario_ef' => '',
+                'clave_usuario_ef' => '',
+                'id_usuario_ad' => '',
+                'alta_tipoempresa' => '',
+                'alta_tributario' => '',
+                'nombre_completo_firmante' => (string) ($cliente['NombreCompletoFirmante'] ?? ''),
+                'ci_firmante' => (string) ($cliente['CI_Firmante'] ?? ''),
+                'notas_admin' => '',
+            ],
+            'onboarding' => [
+                'rut' => (string) ($onboarding['rut'] ?? ''),
+                'razon_social' => (string) ($onboarding['razon_social'] ?? ''),
+                'nombre_fantasia' => (string) ($onboarding['nombre_fantasia'] ?? ''),
+                'domicilio' => (string) ($onboarding['domicilio'] ?? ''),
+                'ciudad_nombre' => $onboardingCiudad['label'],
+                'departamento_nombre' => $onboardingDepartamento['label'],
+                'email_principal' => (string) ($onboarding['email_principal'] ?? ''),
+                'email_envio_fe' => (string) ($onboarding['email_envio_fe'] ?? ''),
+                'telefono' => (string) ($onboarding['telefono'] ?? ''),
+                'literal_e' => (string) ($onboarding['alta_credito_fiscal'] ?? ''),
+                'licencia_codigo' => (string) ($onboarding['licencia'] ?? ''),
+                'usuario_ef' => (string) ($onboarding['usuario_ef'] ?? ''),
+                'clave_usuario_ef' => (string) ($onboarding['clave_usuario_ef'] ?? ''),
+                'id_usuario_ad' => (string) ($onboarding['idusuarioad'] ?? ''),
+                'alta_tipoempresa' => (string) ($onboarding['alta_tipoempresa'] ?? ''),
+                'alta_tributario' => (string) ($onboarding['alta_tributario'] ?? ''),
+                'nombre_completo_firmante' => (string) ($onboarding['nombre_completo_firmante'] ?? ''),
+                'ci_firmante' => (string) ($onboarding['ci_firmante'] ?? ''),
+                'notas_admin' => (string) (($onboarding['notas_admin'] ?? '') !== '' ? $onboarding['notas_admin'] : ($onboarding['observaciones'] ?? '')),
+            ],
+        ];
+    }
+
+    private function clientPanelDirectConflictFieldMap(): array
+    {
+        return [
+            'rut' => ['label' => 'RUT', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'razon_social' => ['label' => 'Razon social', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'nombre_fantasia' => ['label' => 'Nombre fantasia', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'domicilio' => ['label' => 'Domicilio', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'departamento_nombre' => ['label' => 'Departamento', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'ciudad_nombre' => ['label' => 'Ciudad', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'literal_e' => ['label' => 'Credito fiscal / Literal E', 'sources' => ['empresas', 'onboarding']],
+            'email_principal' => ['label' => 'Email principal', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'email_envio_fe' => ['label' => 'Email envio FE', 'sources' => ['empresas', 'clientes', 'onboarding']],
+            'telefono' => ['label' => 'Telefono', 'sources' => ['clientes', 'onboarding']],
+            'licencia_codigo' => ['label' => 'Licencia', 'sources' => ['empresas', 'onboarding']],
+            'usuario_ef' => ['label' => 'Usuario EF', 'sources' => ['empresas', 'onboarding']],
+            'clave_usuario_ef' => ['label' => 'Clave usuario EF', 'sources' => ['empresas', 'onboarding']],
+            'id_usuario_ad' => ['label' => 'Usuario administrador Dynamica', 'sources' => ['empresas', 'onboarding']],
+            'alta_tipoempresa' => ['label' => 'Tipo empresa', 'sources' => ['empresas', 'onboarding']],
+            'alta_tributario' => ['label' => 'Regimen tributario', 'sources' => ['empresas', 'onboarding']],
+            'nombre_completo_firmante' => ['label' => 'Nombre firmante', 'sources' => ['clientes', 'onboarding']],
+            'ci_firmante' => ['label' => 'CI firmante', 'sources' => ['clientes', 'onboarding']],
+            'notas_admin' => ['label' => 'Notas cliente', 'sources' => ['empresas', 'onboarding']],
+        ];
+    }
+
+    private function normalizeClientConflictValue(string $field, $value): string
+    {
+        $text = trim((string) $value);
+        if ($field === 'rut' || $field === 'ci_firmante') {
+            return preg_replace('/\D+/', '', $text);
+        }
+
+        if ($field === 'email_principal' || $field === 'email_envio_fe') {
+            return mb_strtolower($text);
+        }
+
+        if ($field === 'literal_e') {
+            if ($text === '1' || $text === 'SI' || $text === 'S' || $text === 'LITERAL E') {
+                return 'LITERAL_E';
+            }
+
+            if ($text === 'RESGUARDO') {
+                return 'RESGUARDO';
+            }
+
+            return 'NO';
+        }
+
+        return mb_strtoupper($text);
+    }
+
+    private function formatClientConflictMessage(string $label, string $panelValue, array $sourceValues): string
+    {
+        $chunks = ['Panel -> ' . ($panelValue !== '' ? $panelValue : 'Sin dato')];
+        $sourceLabels = [
+            'empresas' => 'Empresas',
+            'clientes' => 'Clientes',
+            'onboarding' => 'EmpresasNuevas',
+        ];
+
+        foreach ($sourceValues as $sourceName => $value) {
+            $chunks[] = ($sourceLabels[$sourceName] ?? $sourceName) . ' -> ' . ($value !== '' ? $value : 'Sin dato');
+        }
+
+        return $label . ': ' . implode(' | ', $chunks);
+    }
+
+    private function formatClientConflictDisplayValue(string $field, $value): string
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return 'Sin dato';
+        }
+
+        if ($field === 'licencia_codigo') {
+            return self::licenseLabel((int) $text);
+        }
+
+        if ($field === 'literal_e') {
+            $normalized = $this->normalizeClientConflictValue($field, $text);
+            if ($normalized === 'LITERAL_E') {
+                return 'Literal E';
+            }
+
+            if ($normalized === 'RESGUARDO') {
+                return 'Resguardo';
+            }
+
+            return 'No';
+        }
+
+        return $text;
+    }
+
+    private function buildClientPanelFacetCounts(array $items): array
+    {
+        $counts = [
+            'hab' => [
+                'baja_logica' => 0,
+                'en_certificacion' => 0,
+                'si' => 0,
+                'suspendida' => 0,
+            ],
+            'licenses' => [],
+            'users' => [
+                '0' => 0,
+                '1' => 0,
+                '2_5' => 0,
+                '6_10' => 0,
+                '11_plus' => 0,
+            ],
+            'cert' => [
+                'con_empcodigo' => 0,
+                'sin_empcodigo' => 0,
+                'con_cliente' => 0,
+                'sin_cliente' => 0,
+            ],
+            'debt' => [],
+            'notif_susp' => [],
+            'suspension' => [],
+        ];
+
+        foreach ($items as $item) {
+            $habilitada = strtoupper(trim((string) ($item['Habilitada'] ?? '')));
+            if (strpos($habilitada, 'NO') === 0 && strpos($habilitada, 'CERTIFIC') !== false) {
+                $counts['hab']['en_certificacion']++;
+            } elseif (strpos($habilitada, 'NO') === 0) {
+                $counts['hab']['baja_logica']++;
+            } elseif (strpos($habilitada, 'SUSPEND') === 0) {
+                $counts['hab']['suspendida']++;
+            } elseif (in_array($habilitada, ['SI', 'S', '1'], true)) {
+                $counts['hab']['si']++;
+            }
+
+            $licenseCode = (string) (int) ($item['LicenciaCodigo'] ?? 0);
+            if (!isset($counts['licenses'][$licenseCode])) {
+                $counts['licenses'][$licenseCode] = 0;
+            }
+            $counts['licenses'][$licenseCode]++;
+
+            $users = (int) ($item['UsuariosLicencia'] ?? 0);
+            if ($users === 0) {
+                $counts['users']['0']++;
+            } elseif ($users === 1) {
+                $counts['users']['1']++;
+            } elseif ($users >= 2 && $users <= 5) {
+                $counts['users']['2_5']++;
+            } elseif ($users >= 6 && $users <= 10) {
+                $counts['users']['6_10']++;
+            } elseif ($users >= 11) {
+                $counts['users']['11_plus']++;
+            }
+
+            $empresaInvoicy = trim((string) ($item['EmpresaInvoicy'] ?? ''));
+            if ($empresaInvoicy !== '' && $empresaInvoicy !== '0') {
+                $counts['cert']['con_empcodigo']++;
+            } else {
+                $counts['cert']['sin_empcodigo']++;
+            }
+
+            if ((int) ($item['IdCliente'] ?? 0) > 0) {
+                $counts['cert']['con_cliente']++;
+            } else {
+                $counts['cert']['sin_cliente']++;
+            }
+
+            $debtKey = (string) (int) ($item['Notificar'] ?? 0);
+            $suspNotifKey = (string) (int) ($item['NotificarSuspension'] ?? 0);
+            $suspensionKey = (string) (int) ($item['Suspension'] ?? 0);
+
+            if (!isset($counts['debt'][$debtKey])) {
+                $counts['debt'][$debtKey] = 0;
+            }
+            if (!isset($counts['notif_susp'][$suspNotifKey])) {
+                $counts['notif_susp'][$suspNotifKey] = 0;
+            }
+            if (!isset($counts['suspension'][$suspensionKey])) {
+                $counts['suspension'][$suspensionKey] = 0;
+            }
+
+            $counts['debt'][$debtKey]++;
+            $counts['notif_susp'][$suspNotifKey]++;
+            $counts['suspension'][$suspensionKey]++;
+        }
+
+        ksort($counts['licenses'], SORT_NATURAL);
+        uksort($counts['debt'], static function (string $left, string $right): int {
+            return ((int) $left) <=> ((int) $right);
+        });
+        uksort($counts['notif_susp'], static function (string $left, string $right): int {
+            return ((int) $left) <=> ((int) $right);
+        });
+        uksort($counts['suspension'], static function (string $left, string $right): int {
+            return ((int) $left) <=> ((int) $right);
+        });
+
+        return $counts;
+    }
+
+    private function normalizeClientPanelInput(array $post, array $formOptions, array $context): array
+    {
+        $item = $context['item'];
+        $ciudadOption = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['ciudades'] ?? [],
+            'id',
+            'nombre',
+            trim((string) ($post['ciudad_id'] ?? ''))
+        );
+        $departamentoOption = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['departamentos'] ?? [],
+            'id',
+            'nombre',
+            trim((string) ($post['departamento_id'] ?? ''))
+        );
+        $notificarActual = (string) (int) ($item['Notificar'] ?? 20);
+        $notificarSuspensionActual = (string) (int) ($item['NotificarSuspension'] ?? 20);
+        $suspensionActual = (string) (int) ($item['Suspension'] ?? 30);
+        $modulePayload = [
+            'module_ventas' => $this->normalizeClientModuleValue((string) ($post['module_ventas'] ?? ''), true, (string) ($item['pNoVentas'] ?? '1')),
+            'module_compras' => $this->normalizeClientModuleValue((string) ($post['module_compras'] ?? ''), true, (string) ($item['pNoCompras'] ?? '1')),
+            'module_stock' => $this->normalizeClientModuleValue((string) ($post['module_stock'] ?? ''), true, (string) ($item['pNoStock'] ?? '1')),
+            'module_caja_bancos' => $this->normalizeClientModuleValue((string) ($post['module_caja_bancos'] ?? ''), true, (string) ($item['pNoCajayBancos'] ?? '1')),
+            'module_crm' => $this->normalizeClientModuleValue((string) ($post['module_crm'] ?? ''), true, (string) ($item['pNoCrm'] ?? '1')),
+            'module_produccion' => $this->normalizeClientModuleValue((string) ($post['module_produccion'] ?? ''), true, (string) ($item['pNoProduccion'] ?? '1')),
+            'module_tpv' => $this->normalizeClientModuleValue((string) ($post['module_tpv'] ?? ''), false, (string) ($item['pTpvSoft'] ?? '0')),
+            'module_veterinarias' => $this->normalizeClientModuleValue((string) ($post['module_veterinarias'] ?? ''), true, (string) ($item['pNoVeterinarias'] ?? '1')),
+            'module_quitar_resguardos' => $this->normalizeClientModuleValue((string) ($post['module_quitar_resguardos'] ?? ''), true, (string) ($item['pNoResguardo'] ?? '0')),
+            'module_abonados' => $this->normalizeClientModuleValue((string) ($post['module_abonados'] ?? ''), true, (string) ($item['pNoAbonados'] ?? '0')),
+            'module_importaciones' => $this->normalizeClientModuleValue((string) ($post['module_importaciones'] ?? ''), false, (string) ($item['pImportaciones'] ?? '0')),
+            'module_pedidos_clientes' => $this->normalizeClientModuleValue((string) ($post['module_pedidos_clientes'] ?? ''), false, (string) ($item['pGestionPedidosClientes'] ?? '0')),
+            'module_fact_masiva_excel' => $this->normalizeClientModuleValue((string) ($post['module_fact_masiva_excel'] ?? ''), false, (string) ($item['pFactMasivaExcel'] ?? '0')),
+            'module_shopping' => $this->normalizeClientModuleValue((string) ($post['module_shopping'] ?? ''), false, (string) ($item['pLec_Shopping'] ?? '0')),
+            'module_facturador' => $this->normalizeClientModuleValue((string) ($post['module_facturador'] ?? ''), false, (string) ($item['pFacturador'] ?? '0')),
+            'module_notificaciones' => $this->normalizeClientModuleValue((string) ($post['module_notificaciones'] ?? ''), false, (string) ($item['pNotificaciones'] ?? '0')),
+            'module_supervisor_tpv' => $this->normalizeClientModuleValue((string) ($post['module_supervisor_tpv'] ?? ''), false, (string) ($item['pSupervisorTPV'] ?? '0')),
+            'module_medios_pago' => $this->normalizeClientModuleValue((string) ($post['module_medios_pago'] ?? ''), false, (string) ($item['pMediosDePago'] ?? '0')),
+            'module_pedidos_proveedores' => $this->normalizeClientModuleValue((string) ($post['module_pedidos_proveedores'] ?? ''), false, (string) ($item['pPedProvee'] ?? '0')),
+            'module_agencia' => $this->normalizeClientModuleValue((string) ($post['module_agencia'] ?? ''), false, (string) ($item['pAgencia'] ?? '0')),
+            'module_contabilidad' => $this->normalizeClientEnumValue((string) ($post['module_contabilidad'] ?? ''), ['0', '1', '2'], (string) ($item['pContabilidad'] ?? '0')),
+            'module_balanza' => $this->normalizeClientEnumValue((string) ($post['module_balanza'] ?? ''), ['0', '1'], (string) ($item['pBalanza'] ?? '0')),
+            'module_mas_de_un_cae' => $this->normalizeClientEnumValue((string) ($post['module_mas_de_un_cae'] ?? ''), ['0', '1'], (string) ($item['pMasDeUnTipoCae'] ?? '0')),
+            'module_asu' => $this->normalizeClientModuleValue((string) ($post['module_asu'] ?? ''), false, (string) ($item['pAsu'] ?? '0')),
+            'module_sucursales' => $this->normalizeClientModuleValue((string) ($post['module_sucursales'] ?? ''), false, (string) ($item['pSucursales'] ?? '0')),
+        ];
+
+        return array_merge([
+            'empresa_id' => (int) ($item['IdEmpresa'] ?? 0),
+            'cliente_id' => (int) ($item['IdCliente'] ?? 0),
+            'rut' => preg_replace('/\D+/', '', (string) ($post['rut'] ?? ($item['Rut'] ?? ''))),
+            'razon_social' => mb_substr(trim((string) ($post['razon_social'] ?? '')), 0, 120),
+            'nombre_fantasia' => mb_substr(trim((string) ($post['nombre_fantasia'] ?? '')), 0, 120),
+            'domicilio' => mb_substr(trim((string) ($post['domicilio'] ?? '')), 0, 120),
+            'email_principal' => self::normalizeEmails(trim((string) ($post['email_principal'] ?? ''))),
+            'sitio_web' => mb_substr(trim((string) ($post['sitio_web'] ?? '')), 0, 120),
+            'licencia_codigo' => (string) max(0, (int) ($post['licencia_codigo'] ?? ($item['LicenciaCodigo'] ?? 0))),
+            'licencia_texto' => self::licenseLabel((int) ($post['licencia_codigo'] ?? ($item['LicenciaCodigo'] ?? 0))),
+            'email_envio_fe' => self::normalizeEmails(trim((string) ($post['email_envio_fe'] ?? ''))),
+            'telefono' => mb_substr(trim((string) ($post['telefono'] ?? '')), 0, 40),
+            'ciudad_id' => $ciudadOption['id'],
+            'departamento_id' => $departamentoOption['id'],
+            'ciudad_nombre' => $ciudadOption['label'],
+            'departamento_nombre' => $departamentoOption['label'],
+            'habilitada' => $this->normalizeClientEnumValue((string) ($post['habilitada'] ?? ''), ['SI', 'NO (En Proc. de Certificacion)', 'SUSPENDIDA (Por no pago)', 'NO', 'DEMO'], (string) ($item['Habilitada'] ?? 'SI')),
+            'literal_e' => $this->normalizeClientEnumValue((string) ($post['literal_e'] ?? ''), ['0', '1'], (string) ((int) ($item['LiteralE'] ?? 0))),
+            'usuario_ef' => mb_substr(trim((string) ($post['usuario_ef'] ?? '')), 0, 20),
+            'clave_usuario_ef' => mb_substr(trim((string) ($post['clave_usuario_ef'] ?? '')), 0, 40),
+            'id_usuario_ad' => mb_substr(trim((string) ($post['id_usuario_ad'] ?? ($item['IdUsuarioAD'] ?? ''))), 0, 40),
+            'fecha_ip' => mb_substr(trim((string) ($post['fecha_ip'] ?? '')), 0, 20),
+            'alta_tipoempresa' => mb_substr(trim((string) ($post['alta_tipoempresa'] ?? '')), 0, 20),
+            'alta_tributario' => mb_substr(trim((string) ($post['alta_tributario'] ?? '')), 0, 30),
+            'alta_exonerado_norma' => $this->deriveExoneradoNorma((string) ($post['alta_tributario'] ?? '')),
+            'notificar_deuda' => $this->normalizeClientPanelDayValue((string) ($post['notificar_deuda'] ?? ''), $notificarActual),
+            'notificar_suspension' => $this->normalizeClientPanelDayValue((string) ($post['notificar_suspension'] ?? ''), $notificarSuspensionActual),
+            'suspension_dias' => $this->normalizeClientPanelDayValue((string) ($post['suspension_dias'] ?? ''), $suspensionActual),
+            'nombre_completo_firmante' => mb_substr(trim((string) ($post['nombre_completo_firmante'] ?? '')), 0, 120),
+            'ci_firmante' => mb_substr(preg_replace('/\D+/', '', (string) ($post['ci_firmante'] ?? '')), 0, 20),
+            'notas_admin' => trim((string) ($post['notas_admin'] ?? '')),
+        ], $modulePayload);
+    }
+
+    private function normalizeClientPanelDayValue(string $value, string $current): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return $current !== '' ? $current : '0';
+        }
+
+        $digits = preg_replace('/\D+/', '', $value);
+        if ($digits === '') {
+            return $current !== '' ? $current : '0';
+        }
+
+        return (string) min(365, max(0, (int) $digits));
+    }
+
+    private function normalizeClientModuleValue(string $value, bool $inverted, string $current): string
+    {
+        $value = strtoupper(trim($value));
+        if ($value === '') {
+            return trim($current) !== '' ? trim($current) : ($inverted ? '1' : '0');
+        }
+
+        if (in_array($value, ['SI', 'S', '1'], true)) {
+            return $inverted ? '0' : '1';
+        }
+
+        return $inverted ? '1' : '0';
+    }
+
+    private function normalizeClientEnumValue(string $value, array $allowed, string $current): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return $current !== '' ? $current : (string) ($allowed[0] ?? '0');
+        }
+
+        return in_array($value, $allowed, true)
+            ? $value
+            : ($current !== '' ? $current : (string) ($allowed[0] ?? '0'));
+    }
+
+    private function syncClientPanelEdit(array $context, array $payload, string $usuarioLogin, array $logoUpload = []): void
+    {
+        $item = $context['item'];
+        $onboarding = is_array($context['onboarding'] ?? null) ? $context['onboarding'] : null;
+        $empresaModel = new EmpresaModel();
+        $clienteModel = new ClienteModel();
+
+        $empresaModel->updateClientPanelData((int) $payload['empresa_id'], $payload);
+
+        if ((int) $payload['cliente_id'] > 0) {
+            $clienteModel->updateClientPanelData((int) $payload['cliente_id'], $payload);
+        }
+
+        $syncItem = $this->buildClientPanelSyncItem($item, $onboarding, $payload);
+
+        if (is_array($onboarding) && (int) ($onboarding['id'] ?? 0) > 0) {
+            $tempPayload = $this->buildClientPanelTempPayload($onboarding, $payload);
+            $this->model->updateTemp((int) $onboarding['id'], $tempPayload);
+        }
+
+        if (($logoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $this->syncClientPanelLogo($context, $payload, $usuarioLogin, $logoUpload, $empresaModel);
+        }
+
+        $folderRelative = trim((string) ($syncItem['carpeta_base'] ?? ''));
+        if ($folderRelative !== '') {
+            $this->appendRecordLog($folderRelative, 'CLIENT_PANEL_LOCAL_SYNC_OK', [
+                'empresa_id' => $payload['empresa_id'],
+                'cliente_id' => $payload['cliente_id'],
+                'onboarding_id' => (int) ($onboarding['id'] ?? 0),
+                'usuario' => $usuarioLogin,
+            ]);
+        }
+
+        $empresaLocal = $empresaModel->findById((int) $payload['empresa_id']);
+        $empresaInvoicy = trim((string) ($empresaLocal['EmpresaInvoicy'] ?? ''));
+        if ($empresaInvoicy === '') {
+            if ($folderRelative !== '') {
+                $this->appendRecordLog($folderRelative, 'CLIENT_PANEL_SYNC_LOCAL_ONLY', [
+                    'empresa_id' => $payload['empresa_id'],
+                    'cliente_id' => $payload['cliente_id'],
+                    'usuario' => $usuarioLogin,
+                    'observacion' => 'La ficha se sincronizo en Empresas, Clientes y onboarding ligado. No se envio a Migrate porque no existe EmpresaInvoicy.',
+                ]);
+            }
+            return;
+        }
+
+        $references = array_merge($this->buildMigrateReferences($syncItem), [
+            'empresa_invoicy' => $empresaInvoicy,
+        ]);
+
+        $result = $this->migrateService->updateCompanyData($syncItem, $references);
+
+        if ($folderRelative !== '') {
+            $this->storeMigrateArtifacts($folderRelative, (string) ($result['request_xml'] ?? ''), (string) ($result['response_xml'] ?? ''));
+            $this->appendRecordLog($folderRelative, 'CLIENT_PANEL_SYNC', [
+                'empresa_id' => $payload['empresa_id'],
+                'usuario' => $usuarioLogin,
+                'msg_code' => $result['msg_code'] ?? '',
+                'msg_desc' => $result['msg_desc'] ?? '',
+                'errors' => $result['errors'] ?? [],
+            ]);
+        }
+
+        if (!$result['success']) {
+            throw new RuntimeException($this->normalizeMigrateErrors($result));
+        }
+
+        if ($folderRelative !== '') {
+            $this->appendRecordLog($folderRelative, 'CLIENT_PANEL_SYNC_MIGRATE_OK', [
+                'empresa_id' => $payload['empresa_id'],
+                'cliente_id' => $payload['cliente_id'],
+                'usuario' => $usuarioLogin,
+                'empresa_invoicy' => $empresaInvoicy,
+                'msg_code' => $result['msg_code'] ?? '',
+                'msg_desc' => $result['msg_desc'] ?? '',
+            ]);
+        }
+    }
+
+    private function buildClientPanelSyncItem(array $item, ?array $onboarding, array $payload): array
+    {
+        $base = is_array($onboarding) ? $onboarding : [];
+        $base['rut'] = $payload['rut'];
+        $base['razon_social'] = $payload['razon_social'];
+        $base['nombre_fantasia'] = $payload['nombre_fantasia'];
+        $base['domicilio'] = $payload['domicilio'];
+        $base['email_principal'] = $payload['email_principal'];
+        $base['email_envio_fe'] = $payload['email_envio_fe'];
+        $base['telefono'] = $payload['telefono'];
+        $base['ciudad'] = $payload['ciudad_id'] !== '' ? $payload['ciudad_id'] : ($onboarding['ciudad'] ?? ($item['ClienteIdCiudad'] ?? ''));
+        $base['departamento'] = $payload['departamento_id'] !== '' ? $payload['departamento_id'] : ($onboarding['departamento'] ?? '');
+        $base['usuario_ef'] = $payload['usuario_ef'];
+        $base['clave_usuario_ef'] = $payload['clave_usuario_ef'];
+        $base['id_usuario_ad'] = $payload['id_usuario_ad'];
+        $base['alta_tipoempresa'] = $payload['alta_tipoempresa'];
+        $base['alta_tributario'] = $payload['alta_tributario'];
+        $base['alta_exonerado_norma'] = $payload['alta_exonerado_norma'];
+        $base['alta_credito_fiscal'] = $this->resolveAltaCreditoFiscalFromClientPanel($onboarding, $payload);
+        $base['nombre_completo_firmante'] = $payload['nombre_completo_firmante'];
+        $base['ci_firmante'] = $payload['ci_firmante'];
+        $base['notas_admin'] = $payload['notas_admin'];
+        $base['observaciones'] = $payload['notas_admin'];
+        $base['empresa_id_creada'] = (int) ($payload['empresa_id'] ?? 0);
+        $base['cliente_id_creado'] = (int) ($payload['cliente_id'] ?? 0);
+        $base['cliente_id_giro'] = $base['cliente_id_giro'] ?? ($item['OnboardingClienteIdGiro'] ?? ($item['ClienteIdGiro'] ?? 0));
+        $base['cliente_id_vendedor'] = $base['cliente_id_vendedor'] ?? ($item['OnboardingClienteIdVendedor'] ?? ($item['ClienteIdVendedor'] ?? 0));
+        $base['licencia'] = $payload['licencia_codigo'] !== ''
+            ? (int) $payload['licencia_codigo']
+            : (int) ($base['licencia'] ?? ($item['OnboardingLicencia'] ?? ($item['LicenciaCodigo'] ?? 0)));
+        $base['licencia_texto'] = $payload['licencia_texto'] !== ''
+            ? $payload['licencia_texto']
+            : (string) ($base['licencia_texto'] ?? self::licenseLabel((int) ($item['OnboardingLicencia'] ?? ($item['LicenciaCodigo'] ?? 0))));
+        $base['suc_cod_sucursal'] = $base['suc_cod_sucursal'] ?? ($item['OnboardingSucCodSucursal'] ?? '001');
+        $base['carpeta_base'] = $base['carpeta_base'] ?? '';
+
+        return $base;
+    }
+
+    private function buildClientPanelTempPayload(array $onboarding, array $payload): array
+    {
+        $merged = array_merge($onboarding, [
+            'razon_social' => $payload['razon_social'],
+            'nombre_fantasia' => $payload['nombre_fantasia'],
+            'domicilio' => $payload['domicilio'],
+            'email_principal' => $payload['email_principal'],
+            'rut' => $payload['rut'],
+            'licencia' => (int) ($payload['licencia_codigo'] ?? 0),
+            'licencia_texto' => $payload['licencia_texto'],
+            'email_envio_fe' => $payload['email_envio_fe'],
+            'telefono' => $payload['telefono'],
+            'ciudad' => $payload['ciudad_id'],
+            'departamento' => $payload['departamento_id'],
+            'usuario_ef' => $payload['usuario_ef'],
+            'clave_usuario_ef' => $payload['clave_usuario_ef'],
+            'idusuarioad' => $payload['id_usuario_ad'],
+            'alta_tipoempresa' => $payload['alta_tipoempresa'],
+            'alta_tributario' => $payload['alta_tributario'],
+            'alta_exonerado_norma' => $payload['alta_exonerado_norma'],
+            'alta_credito_fiscal' => $this->resolveAltaCreditoFiscalFromClientPanel($onboarding, $payload),
+            'nombre_completo_firmante' => $payload['nombre_completo_firmante'],
+            'ci_firmante' => $payload['ci_firmante'],
+            'notas_admin' => $payload['notas_admin'],
+            'observaciones' => $payload['notas_admin'],
+        ]);
+
+        return self::applyConditionalBusinessRules($merged);
+    }
+
+    private function resolveAltaCreditoFiscalFromClientPanel(?array $onboarding, array $payload): string
+    {
+        $literalE = (string) ($payload['literal_e'] ?? '0');
+        if ($literalE === '1') {
+            return 'LITERAL E';
+        }
+
+        $actual = strtoupper(trim((string) ($onboarding['alta_credito_fiscal'] ?? 'NO')));
+        if ($actual === 'RESGUARDO') {
+            return 'RESGUARDO';
+        }
+
+        return 'NO';
+    }
+
+    private function syncClientPanelLogo(array $context, array $payload, string $usuarioLogin, array $logoUpload, EmpresaModel $empresaModel): void
+    {
+        $empresaId = (int) ($payload['empresa_id'] ?? 0);
+        if ($empresaId <= 0) {
+            return;
+        }
+
+        $tmpPath = (string) ($logoUpload['tmp_name'] ?? '');
+        if ($tmpPath === '' || !is_file($tmpPath)) {
+            throw new RuntimeException('No fue posible leer el archivo del logo cargado.');
+        }
+
+        $binary = file_get_contents($tmpPath);
+        if ($binary === false || $binary === '') {
+            throw new RuntimeException('El archivo del logo no contiene datos utilizables.');
+        }
+
+        $empresaModel->updateClientPanelLogo($empresaId, $binary);
+
+        $onboarding = is_array($context['onboarding'] ?? null) ? $context['onboarding'] : null;
+        $rut = trim((string) ($payload['rut'] ?? ''));
+
+        if (!is_array($onboarding) || (int) ($onboarding['id'] ?? 0) <= 0 || $rut === '') {
+            return;
+        }
+
+        $folderInfo = FileStorage::ensureFolderForRutChange(
+            (string) ($onboarding['carpeta_base'] ?? ''),
+            $rut,
+            $rut
+        );
+
+        if ((string) ($onboarding['carpeta_base'] ?? '') !== (string) $folderInfo['relative']) {
+            $this->model->updateFolder((int) $onboarding['id'], (string) $folderInfo['relative'], 1);
+        }
+
+        $existingLogo = null;
+        foreach ($this->archivoModel->listByNuevaEmpresaId((int) $onboarding['id']) as $archivo) {
+            if (strtolower(trim((string) ($archivo['tipo_archivo'] ?? ''))) === 'logo') {
+                $existingLogo = $archivo;
+                break;
+            }
+        }
+
+        if ($existingLogo !== null && !empty($existingLogo['ruta_archivo'])) {
+            FileStorage::deleteRelativeFile((string) $existingLogo['ruta_archivo']);
+        }
+
+        $stored = FileStorage::storeUploadedFileInFolder($logoUpload, 'logo', (string) $folderInfo['relative']);
+
+        if ($existingLogo !== null) {
+            $this->archivoModel->updateFile((int) $existingLogo['id'], [
+                'nombre_original' => $stored['original_name'],
+                'nombre_guardado' => $stored['stored_name'],
+                'ruta_archivo' => $stored['relative_path'],
+                'extension' => $stored['extension'],
+                'mime_type' => $stored['mime_type'],
+                'tamano_bytes' => $stored['size'],
+                'usuario_subida' => $usuarioLogin,
+            ]);
+        } else {
+            $this->archivoModel->create([
+                'nueva_empresa_id' => (int) $onboarding['id'],
+                'tipo_archivo' => 'logo',
+                'nombre_original' => $stored['original_name'],
+                'nombre_guardado' => $stored['stored_name'],
+                'ruta_archivo' => $stored['relative_path'],
+                'extension' => $stored['extension'],
+                'mime_type' => $stored['mime_type'],
+                'tamano_bytes' => $stored['size'],
+                'obligatorio' => 0,
+                'usuario_subida' => $usuarioLogin,
+            ]);
+        }
+
+        $this->appendRecordLog((string) $folderInfo['relative'], 'CLIENT_PANEL_LOGO_ACTUALIZADO', [
+            'empresa_id' => $empresaId,
+            'nueva_empresa_id' => (int) $onboarding['id'],
+            'usuario' => $usuarioLogin,
+            'nombre_original' => $stored['original_name'],
+            'ruta_archivo' => $stored['relative_path'],
+            'tamano_bytes' => $stored['size'],
+        ]);
+    }
+
+    private function deriveExoneradoNorma(string $tributario): string
+    {
+        $tributario = strtoupper(trim($tributario));
+        if ($tributario === 'IVA MINIMO') {
+            return 'CONTRIBUYENTE IVA MINIMO';
+        }
+
+        if ($tributario === 'MONOTRIBUTO') {
+            return 'CONTRIBUYENTE MONOTRIBUTO';
+        }
+
+        if ($tributario === 'MONOTRIBUTO MIDES') {
+            return 'CONTRIBUYENTE MONOTRIBUTO MIDES';
+        }
+
+        if ($tributario === 'EXONERADO') {
+            return 'LEY 17400 ARTICULO ...';
+        }
+
+        return '';
+    }
+
     private function resolveOptionLabel(array $options, string $idKey, string $labelKey, string $value): string
     {
         foreach ($options as $option) {
@@ -2898,6 +4406,34 @@ class NuevasEmpresasController
         }
 
         return $value;
+    }
+
+    private function resolveOptionValueByIdOrLabel(array $options, string $idKey, string $labelKey, string $value): array
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return ['id' => '', 'label' => ''];
+        }
+
+        foreach ($options as $option) {
+            if ((string) ($option[$idKey] ?? '') === $value) {
+                return [
+                    'id' => (string) ($option[$idKey] ?? ''),
+                    'label' => trim((string) ($option[$labelKey] ?? $value)),
+                ];
+            }
+        }
+
+        foreach ($options as $option) {
+            if (mb_strtoupper(trim((string) ($option[$labelKey] ?? ''))) === mb_strtoupper($value)) {
+                return [
+                    'id' => (string) ($option[$idKey] ?? ''),
+                    'label' => trim((string) ($option[$labelKey] ?? $value)),
+                ];
+            }
+        }
+
+        return ['id' => '', 'label' => $value];
     }
 
     private function normalizeMigrateErrors(array $result): string
@@ -2916,6 +4452,154 @@ class NuevasEmpresasController
         }
 
         return 'Migrate no devolvio un resultado utilizable.';
+    }
+
+    private function syncApprovedRecordAfterEdit(array $item, string $usuarioLogin): void
+    {
+        $empresaId = (int) ($item['empresa_id_creada'] ?? 0);
+        $clienteId = (int) ($item['cliente_id_creado'] ?? 0);
+        if ($empresaId <= 0 && $clienteId <= 0) {
+            return;
+        }
+
+        // Si el caso ya creo empresa/cliente definitivos, cualquier correccion
+        // posterior del onboarding debe mantener alineados ambos lados.
+        $empresaModel = new EmpresaModel();
+        $clienteModel = new ClienteModel();
+
+        if ($empresaId > 0) {
+            $empresaModel->syncExistingFromNuevaEmpresa($empresaId, $item);
+        }
+
+        if ($clienteId > 0) {
+            $clienteModel->syncExistingFromNuevaEmpresa($clienteId, $item, ID_EMPRESA_MASTER);
+        }
+
+        $this->syncOnboardingCertificateHistory($item, $usuarioLogin);
+
+        $empresaLocal = $empresaId > 0 ? $empresaModel->findById($empresaId) : null;
+        $empresaInvoicy = trim((string) ($empresaLocal['EmpresaInvoicy'] ?? ''));
+        if ($empresaInvoicy === '') {
+            $this->appendRecordLog((string) ($item['carpeta_base'] ?? ''), 'EDICION_SYNC_LOCAL_OK', [
+                'nueva_empresa_id' => $item['id'] ?? 0,
+                'usuario' => $usuarioLogin,
+                'empresa_id_creada' => $empresaId,
+                'cliente_id_creado' => $clienteId,
+                'observacion' => 'Correccion aplicada en Dynamica. No se envio a Migrate porque el caso aun no tiene EmpCodigo asociado.',
+            ]);
+            return;
+        }
+
+        $references = array_merge($this->buildMigrateReferences($item), [
+            'empresa_invoicy' => $empresaInvoicy,
+        ]);
+        $result = $this->migrateService->updateCompanyData($item, $references);
+
+        $this->storeMigrateArtifacts((string) ($item['carpeta_base'] ?? ''), (string) ($result['request_xml'] ?? ''), (string) ($result['response_xml'] ?? ''));
+        $this->model->storeMigrateExchange((int) ($item['id'] ?? 0), (string) ($result['request_xml'] ?? ''), (string) ($result['response_xml'] ?? ''));
+
+        if (empty($result['success'])) {
+            $message = $this->normalizeMigrateErrors($result);
+            $this->appendRecordLog((string) ($item['carpeta_base'] ?? ''), 'EDICION_MIGRATE_ERROR', [
+                'nueva_empresa_id' => $item['id'] ?? 0,
+                'usuario' => $usuarioLogin,
+                'empresa_id_creada' => $empresaId,
+                'cliente_id_creado' => $clienteId,
+                'empresa_invoicy' => $empresaInvoicy,
+                'migrate_environment' => $result['environment'] ?? '',
+                'migrate_wsdl' => $result['wsdl'] ?? '',
+                'msg_code' => $result['msg_code'] ?? '',
+                'msg_desc' => $result['msg_desc'] ?? '',
+                'errors' => $result['errors'] ?? [],
+            ]);
+
+            throw new RuntimeException('Migrate no confirmo la correccion del registro: ' . $message);
+        }
+
+        $this->appendRecordLog((string) ($item['carpeta_base'] ?? ''), 'EDICION_MIGRATE_OK', [
+            'nueva_empresa_id' => $item['id'] ?? 0,
+            'usuario' => $usuarioLogin,
+            'empresa_id_creada' => $empresaId,
+            'cliente_id_creado' => $clienteId,
+            'empresa_invoicy' => $empresaInvoicy,
+            'migrate_environment' => $result['environment'] ?? '',
+            'migrate_wsdl' => $result['wsdl'] ?? '',
+            'msg_code' => $result['msg_code'] ?? '',
+            'msg_desc' => $result['msg_desc'] ?? '',
+        ]);
+    }
+
+    private function syncOnboardingCertificateHistory(array $item, string $usuarioLogin): void
+    {
+        $empresaId = (int) ($item['empresa_id_creada'] ?? 0);
+        $nuevaEmpresaId = (int) ($item['id'] ?? 0);
+        $rut = preg_replace('/\D+/', '', (string) ($item['rut'] ?? ''));
+
+        if ($empresaId <= 0 || $nuevaEmpresaId <= 0 || $rut === '') {
+            return;
+        }
+
+        $authUser = Auth::user() ?? ['name' => ''];
+        $usuarioNombre = trim((string) ($authUser['name'] ?? ''));
+        $password = trim((string) ($item['certificado_contrasena'] ?? ''));
+
+        foreach ($this->archivoModel->listByNuevaEmpresaId($nuevaEmpresaId) as $archivo) {
+            if ((string) ($archivo['tipo_archivo'] ?? '') !== 'pfx') {
+                continue;
+            }
+
+            $relativePath = trim((string) ($archivo['ruta_archivo'] ?? ''));
+            if ($relativePath === '') {
+                continue;
+            }
+
+            $absolutePath = FileStorage::absoluteFromRelative($relativePath);
+            if (!is_file($absolutePath)) {
+                continue;
+            }
+
+            $certificateMeta = null;
+            if ($password !== '') {
+                try {
+                    $certificateMeta = CertificateDigitalInspector::inspect($absolutePath, $password);
+                } catch (Throwable $e) {
+                    $certificateMeta = null;
+                }
+            }
+
+            $validToDate = trim((string) ($certificateMeta['valid_to_date'] ?? ''));
+            $daysRemaining = null;
+            if ($validToDate !== '') {
+                try {
+                    $today = new DateTimeImmutable('today');
+                    $expiry = new DateTimeImmutable($validToDate);
+                    $daysRemaining = (int) $today->diff($expiry)->format('%r%a');
+                } catch (Throwable $e) {
+                    $daysRemaining = null;
+                }
+            }
+
+            $certificateHistoryModel = $this->getCertificateHistoryModel();
+            if ($certificateHistoryModel !== null) {
+                $certificateHistoryModel->upsertByEmpresaAndPath([
+                    'empresa_id' => $empresaId,
+                    'rut' => $rut,
+                    'nueva_empresa_id' => $nuevaEmpresaId,
+                    'origen_carga' => 'ONBOARDING',
+                    'nombre_original' => (string) ($archivo['nombre_original'] ?? ''),
+                    'nombre_guardado' => (string) ($archivo['nombre_guardado'] ?? ''),
+                    'ruta_archivo' => $relativePath,
+                    'password_certificado' => $password,
+                    'alias_certificado' => (string) (($certificateMeta['common_name'] ?? '') !== '' ? $certificateMeta['common_name'] : ($archivo['nombre_original'] ?? 'Certificado')),
+                    'fecha_vencimiento' => $validToDate,
+                    'dias_restantes' => $daysRemaining,
+                    'usuario_login' => $usuarioLogin,
+                    'usuario_nombre' => $usuarioNombre,
+                    'estado_carga' => 'DISPONIBLE',
+                    'detalle' => 'Certificado asociado al caso de onboarding y consolidado al cliente activo.',
+                ]);
+            }
+        }
     }
 
     private function isMigrateAlreadyRegistered(array $result): bool
@@ -3010,6 +4694,15 @@ class NuevasEmpresasController
     {
         try {
             FileStorage::appendOnboardingLog($folderRelative, $event, $context);
+        } catch (Throwable $e) {
+            // El log nunca debe romper el flujo principal.
+        }
+    }
+
+    private function appendAutomationAuditLog(string $event, array $context = []): void
+    {
+        try {
+            FileStorage::appendAutomationRuntimeLog($event, $context);
         } catch (Throwable $e) {
             // El log nunca debe romper el flujo principal.
         }

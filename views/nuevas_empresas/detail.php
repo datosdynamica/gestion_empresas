@@ -2,6 +2,7 @@
 declare(strict_types=1);
 $enableCreateModal = false;
 $activeNav = 'panel';
+$embeddedView = isset($_GET['embed']) && $_GET['embed'] === '1';
 $pageSubtitle = 'Consulta, documentos y acciones administrativas del registro.';
 require __DIR__ . '/../layout/header.php';
 ?>
@@ -438,12 +439,14 @@ $certificadoDone =
             break;
 
         case 'CERTIFICADO_DIGITAL':
+            $event = $events['HITO_CERTIFICADO_DIGITAL'] ?? null;
             $done = $certificadoDone;
             $current = !$done && $currentWorkflow === 'CERTIFICADO_DIGITAL';
             if ($done) {
                 $desc = $modoCert === 'ADJUNTO'
                     ? 'Certificado digital recibido y cargado.'
                     : 'Certificado digital gestionado manualmente.';
+                $date = detailWorkflowDate($event['fecha_evento'] ?? null);
             } elseif ($modoCert !== '') {
                 $desc = 'Modo de certificado definido: ' . (string) ($item['alta_certificado_digital'] ?? '');
             }
@@ -679,22 +682,24 @@ if ($currentWorkflow === 'CLIENTE_ACTIVO') {
                 </div>
             </div>
 
-            <div class="flex flex-wrap gap-2">
-                <a href="<?= htmlspecialchars(app_url('panel'), ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">
-                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                    <span>Volver</span>
-                </a>
-                <button type="button" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm" data-open-modal="modal-edit">
-                    <i data-lucide="edit-3" class="w-4 h-4"></i>
-                    <span>Editar</span>
-                </button>
-                <?php if ($migrateSummary['has_data']): ?>
-                    <button type="button" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm" data-open-modal="modal-migrate-xml">
-                        <i data-lucide="file-code-2" class="w-4 h-4"></i>
-                        <span>Ver XML Migrate</span>
+            <?php if (!$embeddedView): ?>
+                <div class="flex flex-wrap gap-2">
+                    <a href="<?= htmlspecialchars(app_url('panel'), ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        <span>Volver</span>
+                    </a>
+                    <button type="button" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm" data-open-modal="modal-edit">
+                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        <span>Editar</span>
                     </button>
-                <?php endif; ?>
-            </div>
+                    <?php if ($migrateSummary['has_data']): ?>
+                        <button type="button" class="inline-flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium px-4 py-2.5 rounded-lg shadow-sm transition duration-150 text-sm" data-open-modal="modal-migrate-xml">
+                            <i data-lucide="file-code-2" class="w-4 h-4"></i>
+                            <span>Ver XML Migrate</span>
+                        </button>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 

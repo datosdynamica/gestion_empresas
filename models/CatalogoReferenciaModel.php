@@ -54,6 +54,18 @@ class CatalogoReferenciaModel extends BaseModel
         return $this->fetchAll("SELECT login AS id, COALESCE(NULLIF(name, ''), login) AS nombre FROM sec_users WHERE IdEmpresa = ? AND active = 'Y' AND TRIM(COALESCE(login, '')) <> '' ORDER BY COALESCE(NULLIF(name, ''), login)", [$idEmpresa]);
     }
 
+    public function listAdminUsersByEmpresa(int $idEmpresa): array
+    {
+        return $this->fetchAll(
+            "SELECT login AS id, login AS nombre
+             FROM sec_users
+             WHERE IdEmpresa = ?
+               AND TRIM(COALESCE(login, '')) <> ''
+             ORDER BY pswd, login",
+            [$idEmpresa]
+        );
+    }
+
     public function listProductosAbonado(int $idEmpresa): array
     {
         return $this->fetchAll(

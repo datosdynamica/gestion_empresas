@@ -1,7 +1,7 @@
 Options -Indexes
 DirectoryIndex index.php
 RewriteEngine On
-RewriteBase /plugin/gestion_empresas/
+RewriteBase /administrativo/
 
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
@@ -11,6 +11,7 @@ RewriteRule ^$ index.php?route=panel [QSA,L]
 RewriteRule ^panel/?$ index.php?route=panel [QSA,L]
 RewriteRule ^trazabilidad/?$ index.php?route=trazabilidad [QSA,L]
 RewriteRule ^configuracion/?$ index.php?route=configuracion [QSA,L]
+RewriteRule ^clientes/?$ index.php?route=clientes [QSA,L]
 RewriteRule ^certificados-migrate/?$ index.php?route=certificados-migrate [QSA,L]
 RewriteRule ^login/?$ index.php?route=login [QSA,L]
 RewriteRule ^logout/?$ index.php?route=logout [QSA,L]

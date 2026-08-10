@@ -17,6 +17,8 @@ declare(strict_types=1);
 class FileStorage
 {
     private const ONBOARDING_LOG_FILE = 'onboarding_trace.log';
+    private const AUTOMATION_LOG_DIR = 'logs';
+    private const AUTOMATION_LOG_FILE = 'onboarding_auto_runtime.log';
 
     private static function normalizeRut(string $rut): string
     {
@@ -291,9 +293,74 @@ class FileStorage
         $payload = implode(PHP_EOL, $lines) . PHP_EOL;
         $target = $folderAbsolute . DIRECTORY_SEPARATOR . self::ONBOARDING_LOG_FILE;
 
-        file_put_contents($target, $payload, FILE_APPEND | LOCK_EX);
+        // El cron de onboarding corre con otro usuario del sistema. Si el archivo
+        // ya fue creado por la web, intentamos normalizar permisos para evitar que
+        // la traza quede sin actualizar cuando la cola automatica agrega eventos.
+        self::ensureTraceWritable($folderAbsolute, $target);
+
+        $written = @file_put_contents($target, $payload, FILE_APPEND | LOCK_EX);
+        if ($written === false) {
+            return null;
+        }
 
         return $target;
+    }
+
+    public static function appendAutomationRuntimeLog(string $event, array $context = []): ?string
+    {
+        $logDir = rtrim((string) BASE_PATH, '\\/') . DIRECTORY_SEPARATOR . self::AUTOMATION_LOG_DIR;
+        if (!is_dir($logDir) && !@mkdir($logDir, 0775, true) && !is_dir($logDir)) {
+            return null;
+        }
+
+        if (!is_writable($logDir)) {
+            @chmod($logDir, 0775);
+        }
+
+        $target = $logDir . DIRECTORY_SEPARATOR . self::AUTOMATION_LOG_FILE;
+        if (is_file($target) && !is_writable($target)) {
+            @chmod($target, 0664);
+        }
+
+        $timestamp = date('Y-m-d H:i:s');
+        $lines = [
+            str_repeat('=', 90),
+            '[' . $timestamp . '] ' . $event,
+            str_repeat('-', 90),
+        ];
+
+        foreach ($context as $key => $value) {
+            if (is_bool($value)) {
+                $value = $value ? 'SI' : 'NO';
+            } elseif (is_array($value)) {
+                $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            } elseif ($value === null) {
+                $value = 'NULL';
+            }
+
+            $lines[] = $key . ': ' . (string) $value;
+        }
+
+        $lines[] = '';
+        $payload = implode(PHP_EOL, $lines) . PHP_EOL;
+        $written = @file_put_contents($target, $payload, FILE_APPEND | LOCK_EX);
+
+        return $written === false ? null : $target;
+    }
+
+    private static function ensureTraceWritable(string $folderAbsolute, string $target): void
+    {
+        if (!is_dir($folderAbsolute)) {
+            return;
+        }
+
+        if (!is_writable($folderAbsolute)) {
+            @chmod($folderAbsolute, 0775);
+        }
+
+        if (is_file($target) && !is_writable($target)) {
+            @chmod($target, 0664);
+        }
     }
 
     private static function mergeFolderContents(string $source, string $target): void

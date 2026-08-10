@@ -191,6 +191,23 @@ class MigrateCertificateCacheModel extends BaseModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function listLatestSnapshotMap(array $companyIds, string $environment): array
+    {
+        $rows = $this->listCachedRows($companyIds, $environment, false);
+        $map = [];
+
+        foreach ($rows as $row) {
+            $empresaId = (int) ($row['EmpresaId'] ?? 0);
+            if ($empresaId <= 0 || isset($map[$empresaId])) {
+                continue;
+            }
+
+            $map[$empresaId] = $row;
+        }
+
+        return $map;
+    }
+
     private function insertRow(array $row): void
     {
         $sql = 'INSERT INTO ' . self::TABLE . ' (

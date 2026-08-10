@@ -48,6 +48,7 @@ require __DIR__ . '/models/EmpresaModel.php';
 require __DIR__ . '/models/MigrateCertificateCacheModel.php';
 require __DIR__ . '/models/CertificateActionModel.php';
 require __DIR__ . '/models/CertificateNotificationModel.php';
+require __DIR__ . '/models/CertificateHistoryModel.php';
 require __DIR__ . '/models/EmpresaProvisioningModel.php';
 require __DIR__ . '/models/ClienteModel.php';
 

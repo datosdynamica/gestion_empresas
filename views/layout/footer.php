@@ -1,7 +1,11 @@
 <?php declare(strict_types=1); ?>
+<?php if (!empty($embeddedView)): ?>
+        </main>
+<?php else: ?>
         </main>
     </div>
 </div>
+<?php endif; ?>
 <div class="confirm-overlay" id="confirm-overlay" hidden>
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden border border-slate-100">
         <div class="p-6">

@@ -180,4 +180,75 @@ class EmpresaNuevaHitoAutoModel extends BaseModel
 
         return $map;
     }
+
+    public function listAutomationAlerts(int $limit = 50): array
+    {
+        $this->ensureTable();
+        $limit = max(1, $limit);
+
+        $alerts = [];
+
+        $taskRows = $this->fetchAll(
+            'SELECT Id, NuevaEmpresaId, TareaCodigo, Estado, ProgramadoPara, Intentos, FechaProcesado, FechaCreacion, FechaActualizacion, UltimoError
+             FROM ' . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . "
+             WHERE TareaCodigo = 'ENVIO_CREDENCIALES'
+               AND (
+                    Estado = 'ERROR'
+                    OR (Estado = 'PROCESANDO' AND FechaActualizacion <= DATE_SUB(NOW(), INTERVAL 30 MINUTE))
+                    OR (Estado = 'PENDIENTE' AND ProgramadoPara <= DATE_SUB(NOW(), INTERVAL 15 MINUTE))
+               )
+             ORDER BY FechaActualizacion DESC
+             LIMIT " . $limit
+        );
+
+        foreach ($taskRows as $row) {
+            $alerts[] = [
+                'type' => 'TASK_' . strtoupper((string) ($row['Estado'] ?? 'UNKNOWN')),
+                'nueva_empresa_id' => (int) ($row['NuevaEmpresaId'] ?? 0),
+                'task_id' => (int) ($row['Id'] ?? 0),
+                'task_code' => (string) ($row['TareaCodigo'] ?? ''),
+                'estado' => (string) ($row['Estado'] ?? ''),
+                'programado_para' => (string) ($row['ProgramadoPara'] ?? ''),
+                'intentos' => (int) ($row['Intentos'] ?? 0),
+                'fecha_actualizacion' => (string) ($row['FechaActualizacion'] ?? ''),
+                'ultimo_error' => (string) ($row['UltimoError'] ?? ''),
+            ];
+        }
+
+        $orphanRows = $this->fetchAll(
+            'SELECT e.Id AS NuevaEmpresaId, e.HitoActual, e.EstadoDetalle, e.FechaActualizacion
+             FROM ' . TABLA_EMPRESAS_NUEVAS . ' e
+             LEFT JOIN (
+                 SELECT NuevaEmpresaId, MAX(Id) AS MaxId
+                 FROM ' . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . "
+                 WHERE TareaCodigo = 'ENVIO_CREDENCIALES'
+                 GROUP BY NuevaEmpresaId
+             ) latest ON latest.NuevaEmpresaId = e.Id
+             LEFT JOIN " . TABLA_EMPRESAS_NUEVAS_HITOS_AUTO . ' t ON t.Id = latest.MaxId
+             WHERE e.HitoActual = ?
+               AND (
+                    t.Id IS NULL
+                    OR t.Estado NOT IN (\'PENDIENTE\', \'PROCESANDO\', \'OK\')
+               )
+             ORDER BY e.FechaActualizacion DESC
+             LIMIT ' . $limit,
+            ['ENVIO_CREDENCIALES']
+        );
+
+        foreach ($orphanRows as $row) {
+            $alerts[] = [
+                'type' => 'CASE_WITHOUT_ACTIVE_TASK',
+                'nueva_empresa_id' => (int) ($row['NuevaEmpresaId'] ?? 0),
+                'task_id' => 0,
+                'task_code' => 'ENVIO_CREDENCIALES',
+                'estado' => (string) ($row['HitoActual'] ?? ''),
+                'programado_para' => '',
+                'intentos' => 0,
+                'fecha_actualizacion' => (string) ($row['FechaActualizacion'] ?? ''),
+                'ultimo_error' => (string) ($row['EstadoDetalle'] ?? ''),
+            ];
+        }
+
+        return $alerts;
+    }
 }

@@ -63,6 +63,7 @@ class NuevaEmpresaModel extends BaseModel
         AltaEsEmisor AS alta_es_emisor,
         AltaCreditoFiscal AS alta_credito_fiscal,
         AltaCertificadoDigital AS alta_certificado_digital,
+        CertificadoContrasena AS certificado_contrasena,
         CarpetaBase AS carpeta_base,
         CarpetaCreada AS carpeta_creada,
         Aprobada AS aprobada,
@@ -142,7 +143,7 @@ class NuevaEmpresaModel extends BaseModel
                     ClientePnCreditoFiscal, ClientePnMonto, ClienteIdFormaPago, ClienteIdMedioPago, ClienteAdenda,
                     SucCodSucursal, SucCodFechaVigencia, AltaTipoEmpresa, AltaEspecial,
                     AltaEspecialNorma, AltaEsEmisor, AltaCreditoFiscal,
-                    AltaCertificadoDigital, NombreCompletoFirmante, CIFirmante,
+                    AltaCertificadoDigital, CertificadoContrasena, NombreCompletoFirmante, CIFirmante,
                     Observaciones
                 ) VALUES (
                     :estado, :usuario_creacion, :razon_social, :nombre_fantasia, :domicilio,
@@ -155,7 +156,7 @@ class NuevaEmpresaModel extends BaseModel
                     :cliente_pn_credito_fiscal, :cliente_pn_monto, :cliente_id_formapago, :cliente_id_medio_pago, :cliente_adenda,
                     :suc_cod_sucursal, :suc_cod_fecha_vigencia, :alta_tipoempresa, :alta_tributario,
                     :alta_exonerado_norma, :alta_es_emisor, :alta_credito_fiscal,
-                    :alta_certificado_digital, :nombre_completo_firmante, :ci_firmante,
+                    :alta_certificado_digital, :certificado_contrasena, :nombre_completo_firmante, :ci_firmante,
                     :observaciones
                 )";
 
@@ -216,6 +217,7 @@ class NuevaEmpresaModel extends BaseModel
                     AltaEsEmisor = :alta_es_emisor,
                     AltaCreditoFiscal = :alta_credito_fiscal,
                     AltaCertificadoDigital = :alta_certificado_digital,
+                    CertificadoContrasena = :certificado_contrasena,
                     NombreCompletoFirmante = :nombre_completo_firmante,
                     CIFirmante = :ci_firmante,
                     Observaciones = :observaciones,

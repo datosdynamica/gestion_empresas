@@ -272,6 +272,12 @@ if ($suggestedVendedorId === '') {
                 <option value="ADJUNTO" <?= $field('alta_certificado_digital') === 'ADJUNTO' ? 'selected' : '' ?>>Adjunto</option>
             </select>
         </div>
+        <div id="<?= $prefix ?>certificado_contrasena_wrapper" class="<?= $field('alta_certificado_digital') === 'ADJUNTO' ? '' : 'hidden' ?>">
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>certificado_contrasena">Contrasena del Certificado</label>
+            <input id="<?= $prefix ?>certificado_contrasena" type="text" name="certificado_contrasena" value="<?= $field('certificado_contrasena') ?>" autocomplete="off" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
+            <p class="mt-1 text-[11px] text-slate-500">Se usa cuando el modo del certificado digital es Adjunto.</p>
+            <?php if (!empty($errors['certificado_contrasena'])): ?><p class="text-xs text-rose-600 mt-1"><?= e($errors['certificado_contrasena']) ?></p><?php endif; ?>
+        </div>
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1.5" for="<?= $prefix ?>nombre_completo_firmante">Nombre Completo Firmante <span class="text-rose-500">*</span></label>
             <input id="<?= $prefix ?>nombre_completo_firmante" type="text" name="nombre_completo_firmante" value="<?= $field('nombre_completo_firmante') ?>" required class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm transition">
@@ -283,6 +289,33 @@ if ($suggestedVendedorId === '') {
         </div>
     </div>
 </section>
+
+<script>
+(function () {
+    var certificadoField = document.getElementById('<?= $prefix ?>alta_certificado_digital');
+    var passwordWrapper = document.getElementById('<?= $prefix ?>certificado_contrasena_wrapper');
+    var passwordField = document.getElementById('<?= $prefix ?>certificado_contrasena');
+
+    if (!certificadoField || !passwordWrapper || !passwordField) {
+        return;
+    }
+
+    // Esta contrasena solo aplica para certificados adjuntos.
+    // Si en el futuro se toca este selector, hay que conservar esta regla
+    // para no volver a pedir ni mostrar el campo en modos que no lo usan.
+    function syncCertificatePasswordVisibility() {
+        var showPassword = certificadoField.value === 'ADJUNTO';
+        passwordWrapper.classList.toggle('hidden', !showPassword);
+
+        if (!showPassword) {
+            passwordField.value = '';
+        }
+    }
+
+    certificadoField.addEventListener('change', syncCertificatePasswordVisibility);
+    syncCertificatePasswordVisibility();
+})();
+</script>
 
 <?php if (empty($values['id'])): ?>
     <section class="md:col-span-2 lg:col-span-3 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-5 shadow-sm">
@@ -300,15 +333,18 @@ if ($suggestedVendedorId === '') {
             </div>
             <div class="rounded-xl border border-white/80 bg-white/90 p-4 shadow-sm">
                 <label class="block text-xs font-semibold text-slate-600 mb-2" for="<?= $prefix ?>archivo_credito_fiscal">Archivo Cr&eacute;dito Fiscal</label>
-                <input id="<?= $prefix ?>archivo_credito_fiscal" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_credito_fiscal">
+                <input id="<?= $prefix ?>archivo_credito_fiscal" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_credito_fiscal" accept=".pdf,.jpg,.jpeg,.png,.img">
+                <p class="mt-2 text-xs text-slate-500">Formatos permitidos: PDF, JPG, JPEG, PNG o IMG.</p>
             </div>
             <div class="rounded-xl border border-white/80 bg-white/90 p-4 shadow-sm">
                 <label class="block text-xs font-semibold text-slate-600 mb-2" for="<?= $prefix ?>archivo_contrato">Archivo Contrato</label>
-                <input id="<?= $prefix ?>archivo_contrato" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_contrato">
+                <input id="<?= $prefix ?>archivo_contrato" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_contrato" accept=".pdf,.jpg,.jpeg,.png,.img">
+                <p class="mt-2 text-xs text-slate-500">Formatos permitidos: PDF, JPG, JPEG, PNG o IMG.</p>
             </div>
             <div class="rounded-xl border border-white/80 bg-white/90 p-4 shadow-sm">
                 <label class="block text-xs font-semibold text-slate-600 mb-2" for="<?= $prefix ?>archivo_6906">Archivo 6906</label>
-                <input id="<?= $prefix ?>archivo_6906" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_6906">
+                <input id="<?= $prefix ?>archivo_6906" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer transition" type="file" name="archivo_6906" accept=".pdf,.jpg,.jpeg,.png,.img">
+                <p class="mt-2 text-xs text-slate-500">Formatos permitidos: PDF, JPG, JPEG, PNG o IMG.</p>
             </div>
             <div class="rounded-xl border border-white/80 bg-white/90 p-4 shadow-sm">
                 <label class="block text-xs font-semibold text-slate-600 mb-2" for="<?= $prefix ?>archivo_logo">Archivo Logo</label>

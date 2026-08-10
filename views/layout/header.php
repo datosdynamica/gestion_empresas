@@ -28,13 +28,36 @@
 <?php
 $activeNav = $activeNav ?? 'panel';
 $pageSubtitle = $pageSubtitle ?? 'Aprovisionamiento y seguimiento operativo de nuevas empresas.';
+$embeddedView = !empty($embeddedView);
 $authUser = Auth::check() ? Auth::user() : null;
 $userDisplayName = 'Usuario';
 if (is_array($authUser)) {
     $userDisplayName = (string) (($authUser['name'] ?? '') !== '' ? $authUser['name'] : ($authUser['login'] ?? 'Usuario'));
 }
 ?>
-<body class="app-body bg-[#fff8f6] text-slate-800 min-h-screen">
+<body class="<?= $embeddedView ? 'bg-white text-slate-800 min-h-screen' : 'app-body bg-[#fff8f6] text-slate-800 min-h-screen' ?>">
+<?php if ($embeddedView): ?>
+<main class="min-h-screen bg-white p-5">
+    <?php if (!empty($_SESSION['success'])): ?>
+        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-3 text-sm font-medium mb-5"><?= htmlspecialchars((string) $_SESSION['success'], ENT_QUOTES, 'UTF-8') ?></div>
+        <?php unset($_SESSION['success']); ?>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['error'])): ?>
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3 text-sm font-medium mb-5"><?= htmlspecialchars((string) $_SESSION['error'], ENT_QUOTES, 'UTF-8') ?></div>
+        <?php unset($_SESSION['error']); ?>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['errors']) && is_array($_SESSION['errors'])): ?>
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3 text-sm mb-5">
+            <p class="font-semibold mb-2">Revise los siguientes puntos:</p>
+            <ul class="list-disc pl-5 space-y-1">
+                <?php foreach ($_SESSION['errors'] as $errorMessage): ?>
+                    <li><?= htmlspecialchars((string) $errorMessage, ENT_QUOTES, 'UTF-8') ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <?php unset($_SESSION['errors']); ?>
+    <?php endif; ?>
+<?php else: ?>
 <div class="app-shell" data-app-shell>
     <aside class="app-sidebar" id="app-sidebar">
         <div class="app-sidebar__inner">
@@ -78,6 +101,10 @@ if (is_array($authUser)) {
                     <a href="<?= htmlspecialchars(app_url('configuracion'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'configuracion' ? ' is-active' : '' ?>" title="Configuraci&oacute;n">
                         <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
                         <span class="app-nav__label">Configuracion</span>
+                    </a>
+                    <a href="<?= htmlspecialchars(app_url('index.php?route=clientes'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'clientes' ? ' is-active' : '' ?>" title="Clientes">
+                        <i data-lucide="building-2" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Clientes</span>
                     </a>
                     <a href="<?= htmlspecialchars(app_url('certificados-migrate'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'certificados-migrate' ? ' is-active' : '' ?>" title="Certificados Migrate">
                         <i data-lucide="shield-check" class="w-5 h-5"></i>
@@ -190,3 +217,4 @@ if (is_array($authUser)) {
                 </div>
                 <?php unset($_SESSION['errors']); ?>
             <?php endif; ?>
+<?php endif; ?>

@@ -110,6 +110,37 @@ class CertificateNotificationModel extends BaseModel
         return (int) $this->db->lastInsertId();
     }
 
+    public function listByEmpresaId(int $empresaId, int $limit = 50): array
+    {
+        $empresaId = max(0, $empresaId);
+        $limit = max(1, $limit);
+
+        return $this->fetchAll(
+            'SELECT Id,
+                    EmpresaId,
+                    Rut,
+                    RazonSocial,
+                    Apodo,
+                    CerStatus,
+                    DiasObjetivo,
+                    DiasRestantes,
+                    FechaVencimiento,
+                    TipoNotificacion,
+                    Destinatarios,
+                    Copias,
+                    Asunto,
+                    Plantilla,
+                    Estado,
+                    Detalle,
+                    FechaEnvio
+             FROM ' . TABLA_CERTIFICADOS_NOTIFICACIONES . '
+             WHERE EmpresaId = ?
+             ORDER BY FechaEnvio DESC, Id DESC
+             LIMIT ' . $limit,
+            [$empresaId]
+        );
+    }
+
     private function ensureTable(): void
     {
         $sql = 'CREATE TABLE IF NOT EXISTS ' . TABLA_CERTIFICADOS_NOTIFICACIONES . ' (

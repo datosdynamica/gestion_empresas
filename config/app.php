@@ -85,6 +85,7 @@ define('TABLA_EMPRESAS_NUEVAS_HISTORIAL', 'EmpresasNuevasHistorial');
 define('TABLA_EMPRESAS_NUEVAS_HITOS_AUTO', 'EmpresasNuevasHitosAuto');
 define('TABLA_CERTIFICADOS_ACCIONES', 'CertificadosAcciones');
 define('TABLA_CERTIFICADOS_NOTIFICACIONES', 'CertificadosNotificaciones');
+define('TABLA_CERTIFICADOS_HISTORIAL', 'CertificadosHistorial');
 define('TABLA_SEC_USERS', 'sec_users');
 define('AUTH_SESSION_KEY', 'gestion_empresas_auth');
 define('AUTH_REMEMBER_LOGIN_COOKIE', 'gestion_empresas_login');
@@ -93,9 +94,9 @@ define('ONBOARDING_TEMPLATE_DIR', BASE_PATH . '/notificaciones_alertas_recordato
 
 const TIPOS_ARCHIVO_PERMITIDOS = [
     'pfx' => ['pfx', 'p12', 'zip'],
-    'credito_fiscal' => ['pdf', 'doc', 'docx'],
-    'contrato' => ['pdf', 'jpg', 'jpeg', 'png'],
-    'f6906' => ['pdf'],
+    'credito_fiscal' => ['pdf', 'jpg', 'jpeg', 'png', 'img'],
+    'contrato' => ['pdf', 'jpg', 'jpeg', 'png', 'img'],
+    'f6906' => ['pdf', 'jpg', 'jpeg', 'png', 'img'],
     'logo' => ['jpg', 'jpeg', 'png', 'webp'],
 ];
 

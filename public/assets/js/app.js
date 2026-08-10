@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var filtroBusqueda = document.getElementById('filtro-busqueda');
     var filtroEstado = document.getElementById('filtro-estado');
     var filtroHito = document.getElementById('filtro-hito');
+    var filtroPorPagina = document.getElementById('filtro-por-pagina');
     var filaSeleccionadaParaCancelar = null;
 
     var createForm = document.getElementById('modal-create-form');
@@ -62,13 +63,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (filtroEstado && estadoParam) {
             filtroEstado.value = estadoParam;
-            filtroEstado.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
         if (filtroHito && hitoParam) {
             filtroHito.value = hitoParam;
-            filtroHito.dispatchEvent(new Event('change', { bubbles: true }));
         }
+    }
+
+    function reloadListWithFilters() {
+        var url = new URL(window.location.href);
+        var estado = filtroEstado ? (filtroEstado.value || 'todos') : 'todos';
+        var hito = filtroHito ? (filtroHito.value || 'todos') : 'todos';
+        var perPage = filtroPorPagina ? (filtroPorPagina.value || '10') : (url.searchParams.get('per_page') || '10');
+
+        url.searchParams.set('page', '1');
+        url.searchParams.set('per_page', perPage);
+
+        if (estado === 'todos') {
+            url.searchParams.delete('estado');
+        } else {
+            url.searchParams.set('estado', estado);
+        }
+
+        if (hito === 'todos') {
+            url.searchParams.delete('hito');
+        } else {
+            url.searchParams.set('hito', hito);
+        }
+
+        window.location.href = url.toString();
     }
 
     function persistSidebarState(isCollapsed) {
@@ -255,6 +278,50 @@ document.addEventListener('DOMContentLoaded', function () {
         field.value = value == null ? '' : value;
     }
 
+    function setCurrentFileIndicator(inputName, meta) {
+        if (!createForm) {
+            return;
+        }
+
+        var input = createForm.querySelector('[name="' + inputName + '"]');
+        if (!input || !input.id) {
+            return;
+        }
+
+        var wrapper = document.getElementById(input.id + '_current');
+        var nameNode = document.getElementById(input.id + '_current_name');
+        var linkNode = document.getElementById(input.id + '_current_link');
+        var fileName = meta && meta.name ? String(meta.name) : '';
+        var downloadUrl = meta && meta.download_url ? String(meta.download_url) : '';
+
+        if (nameNode) {
+            nameNode.textContent = fileName;
+        }
+
+        if (linkNode) {
+            linkNode.href = downloadUrl || '#';
+            linkNode.classList.toggle('hidden', downloadUrl === '');
+        }
+
+        if (wrapper) {
+            wrapper.classList.toggle('hidden', fileName === '');
+        }
+
+        input.value = '';
+    }
+
+    function resetCurrentFileIndicators() {
+        [
+            'archivo_pfx',
+            'archivo_credito_fiscal',
+            'archivo_contrato',
+            'archivo_6906',
+            'archivo_logo'
+        ].forEach(function (inputName) {
+            setCurrentFileIndicator(inputName, null);
+        });
+    }
+
     function saveCreateFormDraft() {
         if (!createForm) {
             return;
@@ -426,6 +493,20 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        function hasCurrentUploadedFile(input) {
+            if (!input || !input.id) {
+                return false;
+            }
+
+            var currentInfo = document.getElementById(input.id + '_current');
+            if (!currentInfo || currentInfo.classList.contains('hidden')) {
+                return false;
+            }
+
+            var text = (currentInfo.textContent || '').replace(/\s+/g, ' ').trim();
+            return text !== '' && text.toLowerCase() !== 'actual:';
+        }
+
         var certificado = createForm.querySelector('select[name="alta_certificado_digital"]');
         var credito = createForm.querySelector('input[name="alta_credito_fiscal"]:checked');
         var importe = createForm.querySelector('input[name="cliente_abonado_importe"]');
@@ -439,7 +520,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var requiereContrato = importe && Number(importe.value || 0) > 1000;
 
         if (pfx) {
-            if (requierePfx) {
+            if (requierePfx && !hasCurrentUploadedFile(pfx)) {
                 pfx.setAttribute('required', 'required');
             } else {
                 pfx.removeAttribute('required');
@@ -447,7 +528,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (creditoFiscal) {
-            if (requiereCreditoFiscal) {
+            if (requiereCreditoFiscal && !hasCurrentUploadedFile(creditoFiscal)) {
                 creditoFiscal.setAttribute('required', 'required');
             } else {
                 creditoFiscal.removeAttribute('required');
@@ -455,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (contrato) {
-            if (requiereContrato) {
+            if (requiereContrato && !hasCurrentUploadedFile(contrato)) {
                 contrato.setAttribute('required', 'required');
             } else {
                 contrato.removeAttribute('required');
@@ -698,6 +779,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         createForm.reset();
+        resetCurrentFileIndicators();
         createForm.action = appUrl('index.php?action=store');
         createForm.dataset.demoMode = '0';
         applyBusinessRules(createForm);
@@ -1035,6 +1117,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        resetCurrentFileIndicators();
+
         Object.keys(row).forEach(function (key) {
             if (key === 'alta_es_emisor' || key === 'alta_credito_fiscal') {
                 document.querySelectorAll('[name="' + key + '"]').forEach(function (radio) {
@@ -1063,6 +1147,14 @@ document.addEventListener('DOMContentLoaded', function () {
         applySelectValue('alta_tipoempresa', row.alta_tipoempresa || 'UNIPERSONAL');
         applySelectValue('alta_tributario', row.alta_tributario || row.alta_especial || 'GENERAL');
         applySelectValue('alta_certificado_digital', row.alta_certificado_digital || '');
+
+        var currentFiles = row.current_files && typeof row.current_files === 'object' ? row.current_files : {};
+        setCurrentFileIndicator('archivo_pfx', currentFiles.pfx || null);
+        setCurrentFileIndicator('archivo_credito_fiscal', currentFiles.credito_fiscal || null);
+        setCurrentFileIndicator('archivo_contrato', currentFiles.contrato || null);
+        setCurrentFileIndicator('archivo_6906', currentFiles.f6906 || null);
+        setCurrentFileIndicator('archivo_logo', currentFiles.logo || null);
+
         updateCityDependency(createForm || document);
         applyBusinessRules(createForm || document);
         updateConditionalFileRequirements();
@@ -1671,22 +1763,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function filtrarTabla() {
         var filas = document.querySelectorAll('#tabla-clientes tbody > tr.row-registro');
         var busqueda = filtroBusqueda ? filtroBusqueda.value.toLowerCase() : '';
-        var estado = filtroEstado ? filtroEstado.value : 'todos';
-        var hito = filtroHito ? filtroHito.value : 'todos';
         var mostrados = 0;
 
         filas.forEach(function (fila) {
             var razonSocial = fila.querySelector('.text-slate-900');
             var rutElement = fila.querySelector('.text-slate-400');
-            var dataEstado = fila.getAttribute('data-status');
-            var dataHito = fila.getAttribute('data-hito');
             var detalleFila = document.getElementById('detalle-' + fila.getAttribute('data-id'));
             var coincideBusqueda = !razonSocial || razonSocial.innerText.toLowerCase().indexOf(busqueda) !== -1
                 || (rutElement && rutElement.innerText.toLowerCase().indexOf(busqueda) !== -1);
-            var coincideEstado = estado === 'todos' || dataEstado === estado;
-            var coincideHito = hito === 'todos' || dataHito === hito;
 
-            if (coincideBusqueda && coincideEstado && coincideHito) {
+            if (coincideBusqueda) {
                 fila.classList.remove('hidden');
                 mostrados += 1;
             } else {
@@ -1716,10 +1802,15 @@ document.addEventListener('DOMContentLoaded', function () {
         filtroBusqueda.addEventListener('input', filtrarTabla);
     }
     if (filtroEstado) {
-        filtroEstado.addEventListener('change', filtrarTabla);
+        filtroEstado.addEventListener('change', reloadListWithFilters);
     }
     if (filtroHito) {
-        filtroHito.addEventListener('change', filtrarTabla);
+        filtroHito.addEventListener('change', reloadListWithFilters);
+    }
+    if (filtroPorPagina) {
+        filtroPorPagina.addEventListener('change', function () {
+            reloadListWithFilters();
+        });
     }
 
     document.addEventListener('keydown', function (event) {

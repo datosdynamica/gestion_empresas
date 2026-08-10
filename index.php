@@ -30,6 +30,9 @@ if ($route !== '') {
         case 'configuracion':
             $action = 'settings';
             break;
+        case 'clientes':
+            $action = 'clients';
+            break;
         case 'certificados-migrate':
             $action = 'certificates';
             break;
@@ -69,6 +72,18 @@ switch ($action) {
         break;
     case 'settings':
         $controller->settings();
+        break;
+    case 'clients':
+        $controller->clients();
+        break;
+    case 'client-show':
+        $controller->clientShow($id);
+        break;
+    case 'client-certificates':
+        $controller->clientCertificates($id);
+        break;
+    case 'client-update':
+        $controller->clientUpdate($id);
         break;
     case 'certificates':
         $controller->certificates();

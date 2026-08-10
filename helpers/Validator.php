@@ -55,6 +55,11 @@ class Validator
             }
         }
 
+        if (($data['alta_certificado_digital'] ?? '') === 'ADJUNTO'
+            && trim((string) ($data['certificado_contrasena'] ?? '')) === '') {
+            $errors['certificado_contrasena'] = 'La contrasena del certificado es obligatoria cuando el modo es Adjunto.';
+        }
+
         if (($data['email_principal'] ?? '') !== '' && !filter_var($data['email_principal'], FILTER_VALIDATE_EMAIL)) {
             $errors['email_principal'] = 'El email principal no es valido.';
         }

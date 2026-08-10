@@ -51,6 +51,17 @@ Archivos importantes:
 
 Contiene las plantillas de la interfaz del panel administrativo.
 
+### `docs/`
+
+Contiene documentos de analisis y definicion funcional del proyecto.
+
+Archivo importante:
+
+- `docs/diseno_panel_clientes.md`
+  - separa lo que hoy ya existe en onboarding y certificados;
+  - deja definida la base para el futuro panel de clientes real;
+  - evita duplicar datos entre tablas temporales y tablas productivas.
+
 ### `config/`
 
 Contiene configuraciones operativas del modulo.
@@ -115,6 +126,12 @@ La factura del onboarding se dejo configurada para usar eFactura, evitando que e
 
 Si el hito de factura ya fue ejecutado, el sistema evita volver a emitir un segundo documento en reintentos posteriores.
 
+### Correccion de edicion sincronizada con Migrate
+
+Cuando un registro ya aprobado se corrige desde onboarding, la actualizacion no solo se guarda en las tablas locales `Empresas` y `Clientes`: tambien se replica hacia Migrate usando el `EmpCodigo` real de la empresa ya creada.
+
+Ademas, si el nombre comercial del caso venia igual a la razon social anterior y el usuario corrige solo la razon social, el sistema ahora arrastra ese mismo cambio al nombre comercial y al apodo de sucursal. Con esto se evita el caso donde en Migrate quedaba actualizada la empresa, pero la sucursal seguia mostrando el nombre viejo.
+
 ### Persistencia temprana de `abonado_FechaDesde`
 
 La fecha base de facturacion ahora se guarda desde el hito de factura, para que el panel y la base de datos reflejen el valor correcto sin esperar al cierre completo del alta.
@@ -122,6 +139,25 @@ La fecha base de facturacion ahora se guarda desde el hito de factura, para que 
 ### Cola automatica de hitos
 
 Las tareas diferidas del onboarding se apoyan en una tabla propia del modulo para no mezclar el flujo manual con el automatico.
+
+### Certificado adjunto con contrasena
+
+Cuando el modo de certificado digital del onboarding queda en `ADJUNTO`, el formulario ahora muestra un campo especifico para cargar la contrasena del certificado.
+
+Ese campo no debe quedar visible en los otros modos (`SOLICITUD` o `GESTION`), porque en esos casos no aplica y genera confusion en la operacion.
+
+Ademas de mostrarse solo cuando corresponde:
+
+- el dato se guarda en la tabla temporal del onboarding;
+- se conserva al editar el caso si el usuario no lo reemplaza;
+- se valida solo cuando el modo es `ADJUNTO`;
+- y viaja hacia Migrate dentro del bloque del certificado adjunto.
+
+Premisa importante para cambios futuros:
+
+- si se vuelve a tocar el selector `alta_certificado_digital`, hay que mantener la regla visual y funcional de que `certificado_contrasena` solo se usa para `ADJUNTO`;
+- no se debe volver obligatorio ni visible para todos los modos;
+- y cualquier cambio de interfaz debe probarse tanto en alta nueva como en edicion.
 
 ## Rutas de despliegue
 

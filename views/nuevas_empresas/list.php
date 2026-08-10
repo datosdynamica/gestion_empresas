@@ -223,7 +223,7 @@ function listIsNegativeMigrateMessage(string $message): bool
         return false;
     }
 
-    foreach (['rechaz', 'error', 'falla', 'fallo', 'inválid', 'invÃ¡lid', 'invalid', 'deneg', 'no autorizado'] as $needle) {
+    foreach (['rechaz', 'error', 'falla', 'fallo', 'invÃ¡lid', 'invÃƒÂ¡lid', 'invalid', 'deneg', 'no autorizado'] as $needle) {
         if (mb_strpos($normalized, $needle) !== false) {
             return true;
         }
@@ -772,11 +772,14 @@ $certificadoDone =
         }
 
         if ($step['key'] === 'HITO_CERTIFICADO_DIGITAL') {
+            $certEvent = $events['HITO_CERTIFICADO_DIGITAL'] ?? null;
             if ($certificadoDone) {
                 $step['state'] = 'done';
-                $step['desc'] = $modoCert === 'ADJUNTO'
+                $desc = $modoCert === 'ADJUNTO'
                     ? 'Certificado digital recibido y cargado.'
                     : 'Certificado digital gestionado manualmente.';
+                $date = formatWorkflowDate($certEvent['fecha_evento'] ?? null);
+                $step['desc'] = $date !== '' ? $desc . ' - ' . $date : $desc;
             } elseif ($modoCert !== '') {
                 $step['desc'] = 'Modo de certificado definido: ' . trim((string) ($item['alta_certificado_digital'] ?? ''));
                 if ($current === 'CERTIFICADO_DIGITAL' && $meta['timeline_mode'] !== 'done' && $meta['timeline_mode'] !== 'cancelled') {
@@ -990,12 +993,16 @@ $sessionFormErrors = array_values($_SESSION['errors'] ?? []);
 $hasActiveRealRows = count(array_filter($items ?? [], static function (array $item): bool {
     return (string) ($item['estado'] ?? '') !== ESTADO_ELIMINADO;
 })) > 0;
-$rows = $hasActiveRealRows ? ($items ?? []) : demoEmpresasNuevasRows();
+$rows = $items ?? [];
 $modalValues = $values;
-$isDemoFallback = !$hasActiveRealRows;
+$isDemoFallback = false;
 $currentPage = (int) ($pagination['page'] ?? 1);
 $totalPages = (int) ($pagination['total_pages'] ?? 1);
 $totalItems = (int) ($pagination['total_items'] ?? count($rows));
+$selectedPerPage = (string) ($pagination['per_page_requested'] ?? (string) ($pagination['per_page'] ?? '10'));
+$selectedEstado = (string) ($pagination['estado'] ?? 'todos');
+$selectedHito = (string) ($pagination['hito'] ?? 'todos');
+$perPageOptions = $pagination['per_page_options'] ?? [10];
 require __DIR__ . '/../layout/header.php';
 unset($_SESSION['old']);
 unset($_SESSION['errors']);
@@ -1029,30 +1036,42 @@ window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_U
             <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
                 <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Estado general:</span>
                 <select id="filtro-estado" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
-                    <option value="todos">Todos</option>
-                    <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>"><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
-                    <option value="Dynamica">Dynamica</option>
-                    <option value="Migrate">Migrate</option>
-                    <option value="Certificado digital">Certificado digital</option>
-                    <option value="Homologación DGI">Homologación DGI</option>
-                    <option value="Alta pendiente">Alta pendiente</option>
-                    <option value="Cliente activo">Cliente activo</option>
-                    <option value="Cancelado">Cancelado</option>
+                    <option value="todos" <?= $selectedEstado === 'todos' ? 'selected' : '' ?>>Todos</option>
+                    <option value="EN_PROCESO_RAPIDO" <?= $selectedEstado === 'EN_PROCESO_RAPIDO' ? 'selected' : '' ?>>Pendientes / En proceso</option>
+                    <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>" <?= $selectedEstado === u('Aprobaci&oacute;n pendiente') ? 'selected' : '' ?>><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
+                    <option value="Dynamica" <?= $selectedEstado === 'Dynamica' ? 'selected' : '' ?>>Dynamica</option>
+                    <option value="Migrate" <?= $selectedEstado === 'Migrate' ? 'selected' : '' ?>>Migrate</option>
+                    <option value="Certificado digital" <?= $selectedEstado === 'Certificado digital' ? 'selected' : '' ?>>Certificado digital</option>
+                    <option value="<?= h(u('Homologaci&oacute;n DGI')) ?>" <?= $selectedEstado === u('Homologaci&oacute;n DGI') ? 'selected' : '' ?>><?= h(u('Homologaci&oacute;n DGI')) ?></option>
+                    <option value="Alta pendiente" <?= $selectedEstado === 'Alta pendiente' ? 'selected' : '' ?>>Alta pendiente</option>
+                    <option value="Cliente activo" <?= $selectedEstado === 'Cliente activo' ? 'selected' : '' ?>>Cliente activo</option>
+                    <option value="Cancelado" <?= $selectedEstado === 'Cancelado' ? 'selected' : '' ?>>Cancelado</option>
                 </select>
             </div>
 
             <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
                 <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Hito Actual:</span>
                 <select id="filtro-hito" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
-                    <option value="todos">Todos los hitos</option>
-                    <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>"><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
-                    <option value="Dynamica">Dynamica</option>
-                    <option value="Migrate">Migrate</option>
-                    <option value="Certificado Digital">Certificado Digital</option>
-                    <option value="Homologación DGI">Homologación DGI</option>
-                    <option value="Alta Pendiente">Alta pendiente</option>
-                    <option value="Cliente Activo">Cliente activo</option>
-                    <option value="Cancelado">Cancelado</option>
+                    <option value="todos" <?= $selectedHito === 'todos' ? 'selected' : '' ?>>Todos los hitos</option>
+                    <option value="<?= h(u('Aprobaci&oacute;n pendiente')) ?>" <?= $selectedHito === u('Aprobaci&oacute;n pendiente') ? 'selected' : '' ?>><?= h(u('Aprobaci&oacute;n pendiente')) ?></option>
+                    <option value="Dynamica" <?= $selectedHito === 'Dynamica' ? 'selected' : '' ?>>Dynamica</option>
+                    <option value="Migrate" <?= $selectedHito === 'Migrate' ? 'selected' : '' ?>>Migrate</option>
+                    <option value="Certificado Digital" <?= $selectedHito === 'Certificado Digital' ? 'selected' : '' ?>>Certificado Digital</option>
+                    <option value="<?= h(u('Homologaci&oacute;n DGI')) ?>" <?= $selectedHito === u('Homologaci&oacute;n DGI') ? 'selected' : '' ?>><?= h(u('Homologaci&oacute;n DGI')) ?></option>
+                    <option value="Alta Pendiente" <?= $selectedHito === 'Alta Pendiente' ? 'selected' : '' ?>>Alta pendiente</option>
+                    <option value="Cliente Activo" <?= $selectedHito === 'Cliente Activo' ? 'selected' : '' ?>>Cliente activo</option>
+                    <option value="Cancelado" <?= $selectedHito === 'Cancelado' ? 'selected' : '' ?>>Cancelado</option>
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-sm w-full sm:w-auto">
+                <span class="text-slate-500 font-medium text-xs uppercase tracking-wider">Por pagina:</span>
+                <select id="filtro-por-pagina" class="bg-transparent border-none focus:outline-none text-slate-700 font-semibold cursor-pointer">
+                    <?php foreach ($perPageOptions as $option): ?>
+                        <?php $optionValue = (string) $option; ?>
+                        <option value="<?= h($optionValue) ?>" <?= $selectedPerPage === $optionValue ? 'selected' : '' ?>><?= h($optionValue) ?></option>
+                    <?php endforeach; ?>
+                    <option value="todos" <?= $selectedPerPage === 'todos' ? 'selected' : '' ?>>Todos</option>
                 </select>
             </div>
         </div>
@@ -1353,23 +1372,28 @@ window.CREATE_FORM_ERRORS = <?= json_encode($sessionFormErrors, JSON_UNESCAPED_U
                     Mostrando
                     <span id="num-registros-mostrados" class="text-slate-700 font-bold"><?= count($rows) ?></span>
                     de
-                    <?= $isDemoFallback ? count($rows) : $totalItems ?>
+                    <?= $totalItems ?>
                     registros de clientes
                 </p>
-                <?php if (!$isDemoFallback): ?>
-                    <p class="text-[11px] text-slate-400">P&aacute;gina <?= $currentPage ?> de <?= $totalPages ?></p>
-                <?php else: ?>
-                    <p class="text-[11px] text-slate-400">Vista demo del panel de referencia</p>
-                <?php endif; ?>
+                <p class="text-[11px] text-slate-400">P&aacute;gina <?= $currentPage ?> de <?= $totalPages ?></p>
             </div>
             <div class="flex items-center justify-center gap-1.5">
-                <?php if ($isDemoFallback): ?>
-                    <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Anterior</button>
-                    <button class="bg-white border border-slate-200 text-slate-400 px-3 py-1.5 rounded-lg transition disabled:opacity-50" disabled>Siguiente</button>
-                <?php else: ?>
-                    <a href="<?= htmlspecialchars(app_url('index.php?page=' . (int) ($pagination['prev_page'] ?? 1)), ENT_QUOTES, 'UTF-8') ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_prev']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Anterior</a>
-                    <a href="<?= htmlspecialchars(app_url('index.php?page=' . (int) ($pagination['next_page'] ?? $totalPages)), ENT_QUOTES, 'UTF-8') ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_next']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Siguiente</a>
-                <?php endif; ?>
+                <?php
+                    $prevQuery = http_build_query([
+                        'page' => (int) ($pagination['prev_page'] ?? 1),
+                        'per_page' => $selectedPerPage,
+                        'estado' => $selectedEstado,
+                        'hito' => $selectedHito,
+                    ]);
+                    $nextQuery = http_build_query([
+                        'page' => (int) ($pagination['next_page'] ?? $totalPages),
+                        'per_page' => $selectedPerPage,
+                        'estado' => $selectedEstado,
+                        'hito' => $selectedHito,
+                    ]);
+                ?>
+                    <a href="<?= htmlspecialchars(app_url('index.php?' . $prevQuery), ENT_QUOTES, 'UTF-8') ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_prev']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Anterior</a>
+                    <a href="<?= htmlspecialchars(app_url('index.php?' . $nextQuery), ENT_QUOTES, 'UTF-8') ?>" class="bg-white border border-slate-200 <?= !empty($pagination['has_next']) ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none opacity-60' ?> px-3 py-1.5 rounded-lg transition">Siguiente</a>
             </div>
             <div class="hidden lg:block"></div>
         </div>

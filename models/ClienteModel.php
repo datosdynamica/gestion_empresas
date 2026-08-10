@@ -6,6 +6,8 @@ declare(strict_types=1);
 // registro temporal del onboarding.
 class ClienteModel extends BaseModel
 {
+    private const ONBOARDING_ID_SUCURSAL_ABONADO = 418;
+
     private const BILLING_MONTHS = [
         1 => 'ENERO',
         2 => 'FEBRERO',
@@ -36,6 +38,31 @@ class ClienteModel extends BaseModel
         return (bool) $stmt->fetchColumn();
     }
 
+    public function findById(int $clienteId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT IdCliente,
+                    nombrefantasia,
+                    razonsocial,
+                    direccion,
+                    Documento,
+                    email,
+                    emailEnvioFE,
+                    Tel,
+                    IdCiudad,
+                    Departamento,
+                    IdVendedor,
+                    NombreCompletoFirmante,
+                    CI_Firmante
+             FROM Clientes
+             WHERE IdCliente = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$clienteId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
+
     public function createFromNuevaEmpresa(array $item, int $idEmpresaMaster): int
     {
         // El alta del cliente sale ya con los defaults comerciales esperados
@@ -58,7 +85,7 @@ class ClienteModel extends BaseModel
                     :idFormapago, :abonado, :abonado_IdProducto, :abonado_Importe,
                     :abonado_TV, :abonado_Moneda, 0, CURDATE(), :abonado_periodo,
                     :abonado_Grupo, 0, '', 0, 'SI', 'NO', 'NO', '',
-                    'UY', :IdFidelizacion, 0, :IdEmpresa, 0, 0,
+                    'UY', :IdFidelizacion, 0, :IdEmpresa, :IdSucursalAbonado, 0,
                     0, 0, 0, 0, :Adenda, 0, 0, '', '',
                     :NombreCompletoFirmante, :CI_Firmante, '', '',
                     :pnCreditoFiscal, :pnMonto, 0, :abonado_Descuento, :abonado_IdMedioPago
@@ -117,7 +144,7 @@ class ClienteModel extends BaseModel
                     IdFidelizacion = :IdFidelizacion,
                     Seleccionado = 0,
                     IdEmpresa = :IdEmpresa,
-                    IdSucursalAbonado = 0,
+                    IdSucursalAbonado = :IdSucursalAbonado,
                     Saldo = 0,
                     cf = 0,
                     Asu = 0,
@@ -146,6 +173,43 @@ class ClienteModel extends BaseModel
         $stmt->execute($params);
     }
 
+    public function updateClientPanelData(int $clienteId, array $data): void
+    {
+        $ciudadId = $this->resolveCiudadId($data['ciudad_id'] !== '' ? $data['ciudad_id'] : ($data['ciudad_nombre'] ?? null), ID_EMPRESA_MASTER);
+        $departamentoId = $this->resolveDepartamentoId($data['departamento_id'] !== '' ? $data['departamento_id'] : ($data['departamento_nombre'] ?? null), ID_EMPRESA_MASTER);
+
+        $stmt = $this->db->prepare(
+            "UPDATE Clientes
+             SET nombrefantasia = :nombre_fantasia,
+                 razonsocial = :razon_social,
+                 Documento = :rut,
+                 direccion = :domicilio,
+                 email = :email_principal,
+                 emailEnvioFE = :email_envio_fe,
+                 Tel = :telefono,
+                 IdCiudad = :ciudad_id,
+                 Departamento = :departamento_id,
+                 NombreCompletoFirmante = :nombre_completo_firmante,
+                 CI_Firmante = :ci_firmante
+             WHERE IdCliente = :cliente_id"
+        );
+
+        $stmt->execute([
+            ':nombre_fantasia' => $data['nombre_fantasia'] !== '' ? $data['nombre_fantasia'] : null,
+            ':razon_social' => $data['razon_social'],
+            ':rut' => $data['rut'] !== '' ? $data['rut'] : null,
+            ':domicilio' => $data['domicilio'],
+            ':email_principal' => $data['email_principal'] !== '' ? $data['email_principal'] : null,
+            ':email_envio_fe' => $data['email_envio_fe'] !== '' ? $data['email_envio_fe'] : null,
+            ':telefono' => $data['telefono'] !== '' ? $data['telefono'] : null,
+            ':ciudad_id' => $ciudadId,
+            ':departamento_id' => $departamentoId,
+            ':nombre_completo_firmante' => $data['nombre_completo_firmante'] !== '' ? $data['nombre_completo_firmante'] : null,
+            ':ci_firmante' => $data['ci_firmante'] !== '' ? $data['ci_firmante'] : null,
+            ':cliente_id' => $clienteId,
+        ]);
+    }
+
     public function activateForOnboarding(int $clienteId, array $item): array
     {
         // Alta final: el cliente pasa a abonado=SI y, si corresponde, se marca
@@ -160,10 +224,11 @@ class ClienteModel extends BaseModel
             "UPDATE Clientes
              SET abonado = 'SI',
                  abonado_FechaDesde = ?,
-                 pnCreditoFiscal = ?
+                 pnCreditoFiscal = ?,
+                 IdSucursalAbonado = ?
              WHERE IdCliente = ?"
         );
-        $stmt->execute([$billingStartDate, $pnCreditoFiscal, $clienteId]);
+        $stmt->execute([$billingStartDate, $pnCreditoFiscal, self::ONBOARDING_ID_SUCURSAL_ABONADO, $clienteId]);
 
         return [
             'billing_start_date' => $billingStartDate,
@@ -222,6 +287,7 @@ class ClienteModel extends BaseModel
             'abonado_Descuento' => $item['cliente_abonado_descuento'] ?: 0,
             'IdFidelizacion' => $item['cliente_id_fidelizacion'] ?: 0,
             'IdEmpresa' => $idEmpresaMaster,
+            'IdSucursalAbonado' => self::ONBOARDING_ID_SUCURSAL_ABONADO,
             'NombreCompletoFirmante' => $item['nombre_completo_firmante'] ?: null,
             'CI_Firmante' => $item['ci_firmante'] ?: null,
             'pnCreditoFiscal' => $item['cliente_pn_credito_fiscal'] ?: 'NO',

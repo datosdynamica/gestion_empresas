@@ -1,7 +1,6 @@
-const CACHE_NAME = 'gestion-empresas-v3';
+const CACHE_NAME = 'gestion-empresas-v4';
 const APP_SHELL = [
     '/administrativo/login',
-    '/administrativo/panel',
     '/administrativo/public/assets/css/app.css',
     '/administrativo/public/assets/js/app.js',
     '/administrativo/public/assets/img/logo-dynamica.jpeg',
