@@ -2792,6 +2792,7 @@ class NuevasEmpresasController
             'ENVIO_CREDENCIALES',
             'Factura emitida. Credenciales programadas para envio diferido el ' . $scheduledAt . '.'
         );
+        $this->model->updateErrorProceso($id, null);
 
         $summary = [
             $invoiceAlreadyDone
@@ -3101,6 +3102,7 @@ class NuevasEmpresasController
 
                 $itemAfterCredentials = $this->model->findByIdForUpdate($nuevaEmpresaId) ?? $item;
                 $activationInfo = $this->processFinalActivationStage($itemAfterCredentials, 'sistema', $folderBase);
+                $this->model->updateErrorProceso($nuevaEmpresaId, null);
 
                 $db->commit();
                 $this->hitoAutoModel->markSuccess($taskId, [
