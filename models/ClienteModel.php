@@ -49,9 +49,17 @@ class ClienteModel extends BaseModel
                     email,
                     emailEnvioFE,
                     Tel,
+                    abonado,
+                    IdGiro,
+                    IdFidelizacion,
                     IdCiudad,
                     Departamento,
                     IdVendedor,
+                    abonado_Importe,
+                    abonado_Moneda,
+                    abonado_periodo,
+                    abonado_Descuento,
+                    Adenda,
                     NombreCompletoFirmante,
                     CI_Firmante
              FROM Clientes
@@ -175,39 +183,85 @@ class ClienteModel extends BaseModel
 
     public function updateClientPanelData(int $clienteId, array $data): void
     {
-        $ciudadId = $this->resolveCiudadId($data['ciudad_id'] !== '' ? $data['ciudad_id'] : ($data['ciudad_nombre'] ?? null), ID_EMPRESA_MASTER);
-        $departamentoId = $this->resolveDepartamentoId($data['departamento_id'] !== '' ? $data['departamento_id'] : ($data['departamento_nombre'] ?? null), ID_EMPRESA_MASTER);
+        $updates = [];
+        $params = [':cliente_id' => $clienteId];
+
+        $assign = static function (string $column, string $placeholder, $value) use (&$updates, &$params): void {
+            $updates[] = $column . ' = ' . $placeholder;
+            $params[$placeholder] = $value;
+        };
+
+        if (array_key_exists('nombre_fantasia', $data)) {
+            $assign('nombrefantasia', ':nombre_fantasia', $data['nombre_fantasia'] !== '' ? $data['nombre_fantasia'] : null);
+        }
+        if (array_key_exists('razon_social', $data)) {
+            $assign('razonsocial', ':razon_social', $data['razon_social']);
+        }
+        if (array_key_exists('rut', $data)) {
+            $assign('Documento', ':rut', $data['rut'] !== '' ? $data['rut'] : null);
+        }
+        if (array_key_exists('domicilio', $data)) {
+            $assign('direccion', ':domicilio', $data['domicilio']);
+        }
+        if (array_key_exists('email_principal', $data)) {
+            $assign('email', ':email_principal', $data['email_principal'] !== '' ? $data['email_principal'] : null);
+        }
+        if (array_key_exists('email_envio_fe', $data)) {
+            $assign('emailEnvioFE', ':email_envio_fe', $data['email_envio_fe'] !== '' ? $data['email_envio_fe'] : null);
+        }
+        if (array_key_exists('telefono', $data)) {
+            $assign('Tel', ':telefono', $data['telefono'] !== '' ? $data['telefono'] : null);
+        }
+        if (array_key_exists('ciudad_id', $data) || array_key_exists('ciudad_nombre', $data)) {
+            $ciudadId = $this->resolveCiudadId(($data['ciudad_id'] ?? '') !== '' ? $data['ciudad_id'] : ($data['ciudad_nombre'] ?? null), ID_EMPRESA_MASTER);
+            $assign('IdCiudad', ':ciudad_id', $ciudadId);
+        }
+        if (array_key_exists('departamento_id', $data) || array_key_exists('departamento_nombre', $data)) {
+            $departamentoId = $this->resolveDepartamentoId(($data['departamento_id'] ?? '') !== '' ? $data['departamento_id'] : ($data['departamento_nombre'] ?? null), ID_EMPRESA_MASTER);
+            $assign('Departamento', ':departamento_id', $departamentoId);
+        }
+        if (array_key_exists('cliente_abonado', $data)) {
+            $assign('abonado', ':cliente_abonado', strtoupper(trim((string) ($data['cliente_abonado'] ?? 'NO'))) === 'SI' ? 'SI' : 'NO');
+        }
+        if (array_key_exists('cliente_id_giro', $data)) {
+            $assign('IdGiro', ':cliente_id_giro', (int) ($data['cliente_id_giro'] ?? 0));
+        }
+        if (array_key_exists('cliente_id_fidelizacion', $data)) {
+            $assign('IdFidelizacion', ':cliente_id_fidelizacion', (int) ($data['cliente_id_fidelizacion'] ?? 0));
+        }
+        if (array_key_exists('cliente_id_vendedor', $data)) {
+            $assign('IdVendedor', ':cliente_id_vendedor', ($data['cliente_id_vendedor'] ?? '') !== '' ? (string) $data['cliente_id_vendedor'] : null);
+        }
+        if (array_key_exists('cliente_abonado_importe', $data)) {
+            $assign('abonado_Importe', ':cliente_abonado_importe', (float) ($data['cliente_abonado_importe'] ?? 0));
+        }
+        if (array_key_exists('cliente_abonado_moneda', $data)) {
+            $assign('abonado_Moneda', ':cliente_abonado_moneda', $data['cliente_abonado_moneda'] !== '' ? $data['cliente_abonado_moneda'] : 'UYU');
+        }
+        if (array_key_exists('cliente_abonado_periodo', $data)) {
+            $assign('abonado_periodo', ':cliente_abonado_periodo', $data['cliente_abonado_periodo'] !== '' ? $data['cliente_abonado_periodo'] : 'MENSUAL');
+        }
+        if (array_key_exists('cliente_abonado_descuento', $data)) {
+            $assign('abonado_Descuento', ':cliente_abonado_descuento', (float) ($data['cliente_abonado_descuento'] ?? 0));
+        }
+        if (array_key_exists('cliente_adenda', $data)) {
+            $assign('Adenda', ':cliente_adenda', $data['cliente_adenda'] !== '' ? $data['cliente_adenda'] : null);
+        }
+        if (array_key_exists('nombre_completo_firmante', $data)) {
+            $assign('NombreCompletoFirmante', ':nombre_completo_firmante', $data['nombre_completo_firmante'] !== '' ? $data['nombre_completo_firmante'] : null);
+        }
+        if (array_key_exists('ci_firmante', $data)) {
+            $assign('CI_Firmante', ':ci_firmante', $data['ci_firmante'] !== '' ? $data['ci_firmante'] : null);
+        }
+
+        if ($updates === []) {
+            return;
+        }
 
         $stmt = $this->db->prepare(
-            "UPDATE Clientes
-             SET nombrefantasia = :nombre_fantasia,
-                 razonsocial = :razon_social,
-                 Documento = :rut,
-                 direccion = :domicilio,
-                 email = :email_principal,
-                 emailEnvioFE = :email_envio_fe,
-                 Tel = :telefono,
-                 IdCiudad = :ciudad_id,
-                 Departamento = :departamento_id,
-                 NombreCompletoFirmante = :nombre_completo_firmante,
-                 CI_Firmante = :ci_firmante
-             WHERE IdCliente = :cliente_id"
+            'UPDATE Clientes SET ' . implode(', ', $updates) . ' WHERE IdCliente = :cliente_id'
         );
-
-        $stmt->execute([
-            ':nombre_fantasia' => $data['nombre_fantasia'] !== '' ? $data['nombre_fantasia'] : null,
-            ':razon_social' => $data['razon_social'],
-            ':rut' => $data['rut'] !== '' ? $data['rut'] : null,
-            ':domicilio' => $data['domicilio'],
-            ':email_principal' => $data['email_principal'] !== '' ? $data['email_principal'] : null,
-            ':email_envio_fe' => $data['email_envio_fe'] !== '' ? $data['email_envio_fe'] : null,
-            ':telefono' => $data['telefono'] !== '' ? $data['telefono'] : null,
-            ':ciudad_id' => $ciudadId,
-            ':departamento_id' => $departamentoId,
-            ':nombre_completo_firmante' => $data['nombre_completo_firmante'] !== '' ? $data['nombre_completo_firmante'] : null,
-            ':ci_firmante' => $data['ci_firmante'] !== '' ? $data['ci_firmante'] : null,
-            ':cliente_id' => $clienteId,
-        ]);
+        $stmt->execute($params);
     }
 
     public function activateForOnboarding(int $clienteId, array $item): array

@@ -12,12 +12,14 @@ class NuevasEmpresasController
     private $certificateCacheModel;
     private $certificateActionModel;
     private $certificateHistoryModel;
+    private $clientPanelHistoryModel;
     private $localModel;
     private $secUserModel;
     private $provisioningModel;
     private $onboardingMailer;
     private $onboardingInvoiceService;
     private $hitoAutoModel;
+    private $lastClientPanelSyncStatus = [];
 
     public function __construct()
     {
@@ -28,6 +30,7 @@ class NuevasEmpresasController
         $this->migrateService = new MigrateInvoicyService();
         $this->certificateCacheModel = new MigrateCertificateCacheModel();
         $this->certificateActionModel = new CertificateActionModel();
+        $this->clientPanelHistoryModel = new ClientePanelHistorialModel();
         $this->localModel = new LocalModel();
         $this->secUserModel = new SecUserModel();
         $this->provisioningModel = new EmpresaProvisioningModel();
@@ -171,12 +174,12 @@ class NuevasEmpresasController
             $perPage = 25;
         }
         $search = trim((string) ($_GET['q'] ?? ''));
-        $statusFilter = trim((string) ($_GET['status'] ?? 'habilitadas'));
+        $statusFilter = trim((string) ($_GET['status'] ?? 'todos'));
         if ($statusFilter === 'todas') {
             $statusFilter = 'todos';
         }
         if (!in_array($statusFilter, ['habilitadas', 'no_habilitadas', 'todos'], true)) {
-            $statusFilter = 'habilitadas';
+            $statusFilter = 'todos';
         }
         $habFilter = trim((string) ($_GET['hab'] ?? ''));
         if (!in_array($habFilter, ['', 'baja_logica', 'en_certificacion', 'si', 'suspendida'], true)) {
@@ -187,7 +190,7 @@ class NuevasEmpresasController
             $licenseFilter = '';
         }
         $usersFilter = trim((string) ($_GET['users'] ?? ''));
-        if (!in_array($usersFilter, ['', '0', '1', '2_5', '6_10', '11_plus'], true)) {
+        if ($usersFilter !== '' && !ctype_digit($usersFilter)) {
             $usersFilter = '';
         }
         $certificateFilter = trim((string) ($_GET['cert'] ?? ''));
@@ -218,11 +221,15 @@ class NuevasEmpresasController
         }
 
         $empresaModel = new EmpresaModel();
-        $filteredUniverse = $empresaModel->listClientPanelItems(
+        $facetUniverse = $empresaModel->listClientPanelItems(
+            $search,
+            'todos',
+            $sortBy,
+            $sortDirection
+        );
+        $totalItems = $empresaModel->countClientPanelItems(
             $search,
             $statusFilter,
-            $sortBy,
-            $sortDirection,
             $habFilter,
             $licenseFilter,
             $usersFilter,
@@ -231,7 +238,6 @@ class NuevasEmpresasController
             $suspensionNotificationFilter,
             $suspensionFilter
         );
-        $totalItems = count($filteredUniverse);
         $totalPages = max(1, (int) ceil($totalItems / $perPage));
 
         if ($page > $totalPages) {
@@ -254,6 +260,7 @@ class NuevasEmpresasController
             $suspensionNotificationFilter,
             $suspensionFilter
         );
+        $items = $empresaModel->attachClientPanelDebtData($items);
         $empresaIds = array_values(array_filter(array_map(static function (array $item): int {
             return (int) ($item['IdEmpresa'] ?? 0);
         }, $items)));
@@ -294,7 +301,7 @@ class NuevasEmpresasController
             }
         }
 
-        $facetCounts = $this->buildClientPanelFacetCounts($filteredUniverse);
+        $facetCounts = $this->buildClientPanelFacetCounts($facetUniverse);
 
         $pagination = [
             'page' => $page,
@@ -332,6 +339,13 @@ class NuevasEmpresasController
             Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
         }
 
+        $conflictResolution = trim((string) ($_POST['client_conflict_resolution'] ?? ''));
+        if ($conflictResolution === 'discard') {
+            $this->clearClientPanelConflictSessionState();
+            Response::flash('success', 'Se descartaron los cambios pendientes y se conservaron los valores actuales.');
+            Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+        }
+
         $context = $this->buildClientPanelContext($empresaId);
         if ($context === null) {
             Response::flash('error', 'No se encontro el cliente solicitado.');
@@ -339,20 +353,47 @@ class NuevasEmpresasController
         }
 
         $formOptions = $this->loadFormOptions();
-        $payload = $this->normalizeClientPanelInput($_POST, $formOptions, $context);
         $usuarioLogin = (string) ($_SESSION['usuario'] ?? 'admin');
         $logoUpload = $_FILES['archivo_logo'] ?? [];
-        unset($_SESSION['client_panel_conflicts']);
+        $skipConflictCheck = false;
 
-        $conflicts = $this->detectClientPanelDirectConflicts($context, $payload);
-        if ($conflicts !== []) {
-            $_SESSION['client_panel_old_input'] = $payload;
-            $_SESSION['client_panel_conflicts'] = $conflicts;
-            $_SESSION['errors'] = array_map(static function (array $conflict): string {
-                return $conflict['message'];
-            }, $conflicts);
-            Response::flash('error', 'Se detectaron diferencias entre fuentes para algunos campos. Revise el detalle antes de guardar.');
-            Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+        if ($conflictResolution === 'overwrite') {
+            $payload = $_SESSION['client_panel_pending_payload'] ?? null;
+            $pendingEmpresaId = (int) ($_SESSION['client_panel_pending_empresa_id'] ?? 0);
+            if (!is_array($payload) || $pendingEmpresaId !== $empresaId) {
+                $this->clearClientPanelConflictSessionState();
+                Response::flash('error', 'No existe un intento pendiente para confirmar. Vuelva a editar y guarde nuevamente.');
+                Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+            }
+
+            $this->clearClientPanelConflictSessionState();
+            $skipConflictCheck = true;
+        } else {
+            $payload = $this->normalizeClientPanelInput($_POST, $formOptions, $context);
+            $dirtyFields = $this->extractClientPanelDirtyFields($_POST);
+            $payload = $this->filterClientPanelPayloadToDirtyFields($payload, $dirtyFields);
+            unset($_SESSION['client_panel_conflicts']);
+
+            $hasLogoUpload = is_array($logoUpload) && (($logoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+            if ($dirtyFields === [] && !$hasLogoUpload) {
+                Response::flash('success', 'No se detectaron cambios para guardar.');
+                Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+            }
+        }
+
+        if (!$skipConflictCheck) {
+            $conflicts = $this->detectClientPanelDirectConflicts($context, $payload);
+            if ($conflicts !== []) {
+                $_SESSION['client_panel_old_input'] = $payload;
+                $_SESSION['client_panel_pending_payload'] = $payload;
+                $_SESSION['client_panel_pending_empresa_id'] = $empresaId;
+                $_SESSION['client_panel_conflicts'] = $conflicts;
+                $_SESSION['errors'] = array_map(static function (array $conflict): string {
+                    return $conflict['message'];
+                }, $conflicts);
+                Response::flash('error', 'Se detectaron diferencias entre fuentes para algunos campos. Revise el detalle antes de guardar.');
+                Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
+            }
         }
 
         if (is_array($logoUpload) && (($logoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE)) {
@@ -365,15 +406,28 @@ class NuevasEmpresasController
         }
 
         try {
+            $this->lastClientPanelSyncStatus = [];
             $this->syncClientPanelEdit($context, $payload, $usuarioLogin, is_array($logoUpload) ? $logoUpload : []);
         } catch (Throwable $e) {
-            $_SESSION['client_panel_old_input'] = $payload;
+            if (!$skipConflictCheck) {
+                $_SESSION['client_panel_old_input'] = $payload;
+            }
+            if ($skipConflictCheck) {
+                $this->clearClientPanelConflictSessionState();
+            }
+            if ($this->lastClientPanelSyncStatus !== []) {
+                $_SESSION['client_panel_sync_status'] = $this->lastClientPanelSyncStatus;
+            }
             Response::flash('error', 'Los cambios locales quedaron guardados, pero no se completo toda la sincronizacion: ' . $e->getMessage());
             Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView));
         }
 
-        unset($_SESSION['client_panel_old_input']);
-        unset($_SESSION['client_panel_conflicts']);
+        if ($this->lastClientPanelSyncStatus !== []) {
+            $_SESSION['client_panel_sync_status'] = $this->lastClientPanelSyncStatus;
+        } else {
+            unset($_SESSION['client_panel_sync_status']);
+        }
+        $this->clearClientPanelConflictSessionState();
         Response::flash('success', 'Cliente actualizado correctamente.');
         Response::redirect($this->buildClientShowUrl($empresaId, $embeddedView, ['updated' => '1']));
     }
@@ -1531,6 +1585,7 @@ class NuevasEmpresasController
             'cliente_id_vendedor' => $this->resolveSuggestedVendedorId(trim((string) ($_POST['cliente_id_vendedor'] ?? ''))),
             'cliente_id_fidelizacion' => (int) ($_POST['cliente_id_fidelizacion'] ?? 0),
             'email_envio_fe' => self::normalizeEmails($_POST['email_envio_fe'] ?? ''),
+            'cliente_abonado' => trim((string) ($_POST['cliente_abonado'] ?? 'SI')),
             'cliente_abonado_importe' => (float) ($_POST['cliente_abonado_importe'] ?? 0),
             'cliente_abonado_id_producto' => (int) ($_POST['cliente_abonado_id_producto'] ?? 0),
             'cliente_abonado_moneda' => trim($_POST['cliente_abonado_moneda'] ?? 'UYU'),
@@ -1808,6 +1863,7 @@ class NuevasEmpresasController
             'cliente_id_vendedor' => $this->resolveSuggestedVendedorId(trim((string) ($_POST['cliente_id_vendedor'] ?? ''))),
             'cliente_id_fidelizacion' => (int) ($_POST['cliente_id_fidelizacion'] ?? 0),
             'email_envio_fe' => self::normalizeEmails($_POST['email_envio_fe'] ?? ''),
+            'cliente_abonado' => trim((string) ($_POST['cliente_abonado'] ?? (($item['cliente_abonado'] ?? '') !== '' ? ($item['cliente_abonado'] ?? '') : 'SI'))),
             'cliente_abonado_importe' => (float) ($_POST['cliente_abonado_importe'] ?? 0),
             'cliente_abonado_id_producto' => (int) ($_POST['cliente_abonado_id_producto'] ?? 0),
             'cliente_abonado_moneda' => trim($_POST['cliente_abonado_moneda'] ?? 'UYU'),
@@ -2109,6 +2165,7 @@ class NuevasEmpresasController
         $data['email_envio_fe'] = trim((string) ($data['email_envio_fe'] ?? '')) !== ''
             ? (string) $data['email_envio_fe']
             : (string) ($data['email_principal'] ?? '');
+        $data['cliente_abonado'] = strtoupper(trim((string) ($data['cliente_abonado'] ?? ''))) === 'NO' ? 'NO' : 'SI';
         $data['cliente_abonado_id_producto'] = self::resolveAbonadoProductByLicense($licencia);
         $data['cliente_abonado_tv'] = 'CREDITO';
         $periodo = trim((string) ($data['cliente_abonado_periodo'] ?? 'MENSUAL')) ?: 'MENSUAL';
@@ -2126,8 +2183,7 @@ class NuevasEmpresasController
             $data['cliente_abonado_tv'] = 'CONTADO';
             $data['cliente_id_medio_pago'] = 820;
         } elseif ($creditoFiscal === 'RESGUARDO') {
-            $data['cliente_abonado_periodo'] = 'MENSUAL';
-            $data['cliente_abonado_grupo'] = 'MENSUAL';
+            $data['cliente_abonado_grupo'] = $periodo === 'ANUAL' ? self::currentBillingMonth() : 'MENSUAL';
             $data['cliente_pn_credito_fiscal'] = 'SI';
             $data['cliente_pn_monto'] = min($importe, $topeCreditoFiscal);
         }
@@ -2956,8 +3012,18 @@ class NuevasEmpresasController
         if ($clienteId <= 0) {
             throw new RuntimeException('No existe ClienteId creado para completar el alta final.');
         }
+        $empresaId = (int) ($item['empresa_id_creada'] ?? 0);
+        if ($empresaId <= 0) {
+            throw new RuntimeException('No existe EmpresaId creada para completar el alta final.');
+        }
 
-        $activation = (new ClienteModel())->activateForOnboarding($clienteId, $item);
+        $clienteModel = new ClienteModel();
+        $empresaModel = new EmpresaModel();
+
+        $activation = $clienteModel->activateForOnboarding($clienteId, $item);
+        $empresaModel->activateForOnboarding($empresaId);
+        $this->model->markClientActivated((int) ($item['id'] ?? 0), $activation);
+
         $description = 'Cliente activo. Abonado=SI. FechaDesde=' . $activation['billing_start_date'];
         if ((float) ($activation['pn_monto'] ?? 0) > 0) {
             $description .= '. pnCreditoFiscal=' . $activation['pn_credito_fiscal'];
@@ -3517,6 +3583,26 @@ class NuevasEmpresasController
             return null;
         }
 
+        $formOptions = $this->loadFormOptions();
+        $item['ciudad_nombre'] = $this->resolveCatalogDisplayLabel(
+            $formOptions['ciudades'] ?? [],
+            'id',
+            'nombre',
+            (string) (($item['Ciudad'] ?? '') !== '' ? $item['Ciudad'] : ($item['ClienteIdCiudad'] ?? '')),
+            'Ciudades',
+            'IdCiudad',
+            'Ciudad'
+        );
+        $item['departamento_nombre'] = $this->resolveCatalogDisplayLabel(
+            $formOptions['departamentos'] ?? [],
+            'id',
+            'nombre',
+            (string) ($item['Departamento'] ?? ''),
+            'Departamentos',
+            'IdDepartamento',
+            'Departamento'
+        );
+
         $rut = trim((string) ($item['Rut'] ?? ''));
         $onboarding = $rut !== '' ? $this->model->findLatestByRut($rut) : null;
         $snapshot = $this->certificateCacheModel->listLatestSnapshotMap([$empresaId], (string) MIGRATE_ENVIRONMENT)[$empresaId] ?? null;
@@ -3527,6 +3613,7 @@ class NuevasEmpresasController
             ? $certificateHistoryModel->listByEmpresaId($empresaId, 40)
             : [];
         $certificateNotifications = (new CertificateNotificationModel())->listByEmpresaId($empresaId, 40);
+        $clientPanelHistory = $this->clientPanelHistoryModel->listByEmpresaId($empresaId, 40);
         $logo = null;
         $files = [];
         $certificateFiles = [];
@@ -3578,10 +3665,11 @@ class NuevasEmpresasController
             'actions' => $actions,
             'certificate_history' => $certificateHistory,
             'certificate_notifications' => $certificateNotifications,
+            'client_panel_history' => $clientPanelHistory,
             'logo' => $logo,
             'files' => $files,
             'certificate_files' => $certificateFiles,
-            'admin_users' => $this->catalogoModel->listAdminUsersByEmpresa($empresaId),
+            'admin_users' => $this->catalogoModel->listAdminUsersByEmpresa(ID_EMPRESA_MASTER),
         ];
     }
 
@@ -3599,6 +3687,15 @@ class NuevasEmpresasController
         return 'index.php?' . http_build_query($params);
     }
 
+    private function clearClientPanelConflictSessionState(): void
+    {
+        unset($_SESSION['client_panel_old_input']);
+        unset($_SESSION['client_panel_conflicts']);
+        unset($_SESSION['client_panel_pending_payload']);
+        unset($_SESSION['client_panel_pending_empresa_id']);
+        unset($_SESSION['errors']);
+    }
+
     private function detectClientPanelDirectConflicts(array $context, array $payload): array
     {
         $fieldMap = $this->clientPanelDirectConflictFieldMap();
@@ -3607,6 +3704,13 @@ class NuevasEmpresasController
         $conflicts = [];
 
         foreach ($fieldMap as $field => $definition) {
+            // El payload ya llega filtrado solo a campos realmente tocados en la
+            // ficha. Si aqui evaluamos ausentes, terminamos fabricando conflictos
+            // con "Sin dato" para campos que el usuario nunca modifico.
+            if (!array_key_exists($field, $payload)) {
+                continue;
+            }
+
             $newValue = $this->normalizeClientConflictValue($field, $payload[$field] ?? null);
             $baselineValue = $this->normalizeClientConflictValue($field, $baseline[$field] ?? null);
             if ($newValue === $baselineValue) {
@@ -3650,19 +3754,38 @@ class NuevasEmpresasController
     private function buildClientPanelDisplayBaseline(array $context): array
     {
         $item = $context['item'];
+        $onboarding = is_array($context['onboarding'] ?? null) ? $context['onboarding'] : [];
+        $cliente = [];
+        $clienteId = (int) ($item['IdCliente'] ?? 0);
+        if ($clienteId > 0) {
+            $clienteRow = (new ClienteModel())->findById($clienteId);
+            if (is_array($clienteRow)) {
+                $cliente = $clienteRow;
+            }
+        }
         $formOptions = $this->loadFormOptions();
-        $ciudadActual = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['ciudades'] ?? [],
-            'id',
-            'nombre',
-            (string) (($item['Ciudad'] ?? '') !== '' ? $item['Ciudad'] : ($item['ClienteIdCiudad'] ?? ''))
-        );
-        $departamentoActual = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['departamentos'] ?? [],
-            'id',
-            'nombre',
-            (string) ($item['Departamento'] ?? '')
-        );
+        $ciudadActual = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['ciudades'] ?? [],
+                'id',
+                'nombre',
+                (string) (($cliente['IdCiudad'] ?? '') !== '' ? ($cliente['IdCiudad'] ?? '') : (($item['Ciudad'] ?? '') !== '' ? ($item['Ciudad'] ?? '') : ($item['ClienteIdCiudad'] ?? ''))),
+                'Ciudades',
+                'IdCiudad',
+                'Ciudad'
+            ),
+        ];
+        $departamentoActual = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['departamentos'] ?? [],
+                'id',
+                'nombre',
+                (string) (($cliente['Departamento'] ?? '') !== '' ? ($cliente['Departamento'] ?? '') : ($item['Departamento'] ?? '')),
+                'Departamentos',
+                'IdDepartamento',
+                'Departamento'
+            ),
+        ];
 
         return [
             'rut' => (string) ($item['Rut'] ?? ''),
@@ -3674,13 +3797,37 @@ class NuevasEmpresasController
             'email_principal' => (string) (($item['ClienteEmail'] ?? '') !== '' ? $item['ClienteEmail'] : ($item['EmpresaEmail'] ?? '')),
             'email_envio_fe' => (string) (($item['emailEnvioFE'] ?? '') !== '' ? $item['emailEnvioFE'] : ($item['cUsuarioEmailInv'] ?? '')),
             'telefono' => (string) ($item['Tel'] ?? ''),
+            'cliente_abonado' => (string) ($item['ClienteAbonado'] ?? 'NO'),
+            'cliente_id_giro' => (string) (($item['ClienteIdGiro'] ?? '') !== '' ? ($item['ClienteIdGiro'] ?? '') : ($onboarding['cliente_id_giro'] ?? '')),
+            'cliente_id_fidelizacion' => (string) (($item['ClienteIdFidelizacion'] ?? '') !== '' ? ($item['ClienteIdFidelizacion'] ?? '') : ($onboarding['cliente_id_fidelizacion'] ?? '')),
+            'cliente_id_vendedor' => (string) (($cliente['IdVendedor'] ?? '') !== '' ? ($cliente['IdVendedor'] ?? '') : (($item['ClienteIdVendedor'] ?? '') !== '' ? ($item['ClienteIdVendedor'] ?? '') : ($onboarding['cliente_id_vendedor'] ?? ''))),
+            // Estos campos comerciales se muestran priorizando onboarding cuando
+            // existe dato ligado. La linea base visual debe respetar el mismo
+            // orden que la ficha para que el historial compare contra lo que el
+            // usuario vio antes de guardar.
+            'cliente_abonado_importe' => (string) (($context['onboarding']['cliente_abonado_importe'] ?? '') !== '' ? ($context['onboarding']['cliente_abonado_importe'] ?? '') : ($item['ClienteAbonadoImporte'] ?? '')),
+            'cliente_abonado_moneda' => (string) (($context['onboarding']['cliente_abonado_moneda'] ?? '') !== '' ? ($context['onboarding']['cliente_abonado_moneda'] ?? '') : (($item['ClienteAbonadoMoneda'] ?? '') !== '' ? ($item['ClienteAbonadoMoneda'] ?? '') : 'UYU')),
+            'cliente_abonado_periodo' => (string) (($context['onboarding']['cliente_abonado_periodo'] ?? '') !== '' ? ($context['onboarding']['cliente_abonado_periodo'] ?? '') : (($item['ClienteAbonadoPeriodo'] ?? '') !== '' ? ($item['ClienteAbonadoPeriodo'] ?? '') : 'MENSUAL')),
+            'cliente_abonado_descuento' => (string) (($context['onboarding']['cliente_abonado_descuento'] ?? '') !== '' ? ($context['onboarding']['cliente_abonado_descuento'] ?? '') : (($item['ClienteAbonadoDescuento'] ?? '') !== '' ? ($item['ClienteAbonadoDescuento'] ?? '') : '0')),
+            'cliente_adenda' => (string) (($context['onboarding']['cliente_adenda'] ?? '') !== '' ? ($context['onboarding']['cliente_adenda'] ?? '') : ($cliente['Adenda'] ?? '')),
+            'suc_cod_sucursal' => $this->preferClientPanelReferenceValue($onboarding['suc_cod_sucursal'] ?? null, (string) ($item['SucCodSucursal'] ?? ($item['OnboardingSucCodSucursal'] ?? ''))),
+            'suc_cod_fecha_vigencia' => $this->preferClientPanelReferenceValue($onboarding['suc_cod_fecha_vigencia'] ?? null, (string) ($item['SucCodFechaVigencia'] ?? '')),
+            'alta_es_emisor' => $this->preferClientPanelEnumValue($onboarding['alta_es_emisor'] ?? null, (string) ($item['AltaEsEmisor'] ?? 'NO')),
+            'alta_credito_fiscal' => $this->resolveAltaCreditoFiscalFromClientPanel($onboarding, [
+                'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
+            ]),
             'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
             'licencia_codigo' => (string) ($item['LicenciaCodigo'] ?? ''),
+            'usuarios' => (string) (($context['onboarding']['usuarios'] ?? '') !== '' ? ($context['onboarding']['usuarios'] ?? '') : ($item['UsuariosLicencia'] ?? '0')),
+            'cfe_mensuales' => (string) (($context['onboarding']['cfe_mensuales'] ?? '') !== '' ? ($context['onboarding']['cfe_mensuales'] ?? '') : (($item['Plan'] ?? '') !== '' ? ($item['Plan'] ?? '') : '0')),
             'usuario_ef' => (string) ($item['UsuarioEF'] ?? ''),
             'clave_usuario_ef' => (string) ($item['ClaveUsuarioEF'] ?? ''),
             'id_usuario_ad' => (string) ($item['IdUsuarioAD'] ?? ''),
-            'alta_tipoempresa' => (string) ($item['AltaTipoEmpresa'] ?? ''),
+            'alta_tipoempresa' => $this->preferClientPanelEnumValue($onboarding['alta_tipoempresa'] ?? null, (string) ($item['AltaTipoEmpresa'] ?? '')),
             'alta_tributario' => (string) ($item['AltaTributario'] ?? ''),
+            'alta_exonerado_norma' => $this->preferClientPanelReferenceValue($onboarding['alta_exonerado_norma'] ?? null, (string) ($item['AltaExoneradoNorma'] ?? '')),
+            'alta_certificado_digital' => $this->preferClientPanelReferenceValue($onboarding['alta_certificado_digital'] ?? null, (string) ($item['AltaCertificadoDigital'] ?? '')),
+            'certificado_contrasena' => $this->preferClientPanelReferenceValue($onboarding['certificado_contrasena'] ?? null, (string) ($item['CertificadoContrasena'] ?? '')),
             'nombre_completo_firmante' => (string) ($item['NombreCompletoFirmante'] ?? ''),
             'ci_firmante' => (string) ($item['CI_Firmante'] ?? ''),
             'notas_admin' => (string) ($item['Notas'] ?? ''),
@@ -3702,42 +3849,72 @@ class NuevasEmpresasController
             }
         }
 
-        $empresaCiudad = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['ciudades'] ?? [],
-            'id',
-            'nombre',
-            (string) (($item['Ciudad'] ?? '') !== '' ? $item['Ciudad'] : ($item['ClienteIdCiudad'] ?? ''))
-        );
-        $empresaDepartamento = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['departamentos'] ?? [],
-            'id',
-            'nombre',
-            (string) ($item['Departamento'] ?? '')
-        );
-        $clienteCiudad = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['ciudades'] ?? [],
-            'id',
-            'nombre',
-            (string) ($cliente['IdCiudad'] ?? '')
-        );
-        $clienteDepartamento = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['departamentos'] ?? [],
-            'id',
-            'nombre',
-            (string) ($cliente['Departamento'] ?? '')
-        );
-        $onboardingCiudad = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['ciudades'] ?? [],
-            'id',
-            'nombre',
-            (string) ($onboarding['ciudad'] ?? '')
-        );
-        $onboardingDepartamento = $this->resolveOptionValueByIdOrLabel(
-            $formOptions['departamentos'] ?? [],
-            'id',
-            'nombre',
-            (string) ($onboarding['departamento'] ?? '')
-        );
+        $empresaCiudad = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['ciudades'] ?? [],
+                'id',
+                'nombre',
+                (string) (($item['Ciudad'] ?? '') !== '' ? $item['Ciudad'] : ($item['ClienteIdCiudad'] ?? '')),
+                'Ciudades',
+                'IdCiudad',
+                'Ciudad'
+            ),
+        ];
+        $empresaDepartamento = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['departamentos'] ?? [],
+                'id',
+                'nombre',
+                (string) ($item['Departamento'] ?? ''),
+                'Departamentos',
+                'IdDepartamento',
+                'Departamento'
+            ),
+        ];
+        $clienteCiudad = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['ciudades'] ?? [],
+                'id',
+                'nombre',
+                (string) ($cliente['IdCiudad'] ?? ''),
+                'Ciudades',
+                'IdCiudad',
+                'Ciudad'
+            ),
+        ];
+        $clienteDepartamento = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['departamentos'] ?? [],
+                'id',
+                'nombre',
+                (string) ($cliente['Departamento'] ?? ''),
+                'Departamentos',
+                'IdDepartamento',
+                'Departamento'
+            ),
+        ];
+        $onboardingCiudad = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['ciudades'] ?? [],
+                'id',
+                'nombre',
+                (string) ($onboarding['ciudad'] ?? ''),
+                'Ciudades',
+                'IdCiudad',
+                'Ciudad'
+            ),
+        ];
+        $onboardingDepartamento = [
+            'label' => $this->resolveCatalogDisplayLabel(
+                $formOptions['departamentos'] ?? [],
+                'id',
+                'nombre',
+                (string) ($onboarding['departamento'] ?? ''),
+                'Departamentos',
+                'IdDepartamento',
+                'Departamento'
+            ),
+        ];
 
         return [
             'empresas' => [
@@ -3750,13 +3927,31 @@ class NuevasEmpresasController
                 'email_principal' => (string) ($item['EmpresaEmail'] ?? ''),
                 'email_envio_fe' => (string) ($item['cUsuarioEmailInv'] ?? ''),
                 'telefono' => '',
+                'cliente_abonado' => '',
+                'cliente_id_giro' => '',
+                'cliente_id_fidelizacion' => '',
+                'cliente_id_vendedor' => '',
+                'cliente_abonado_importe' => '',
+                'cliente_abonado_moneda' => '',
+                'cliente_abonado_periodo' => '',
+                'cliente_abonado_descuento' => '',
+                'cliente_adenda' => '',
+                'suc_cod_sucursal' => (string) ($item['SucCodSucursal'] ?? ''),
+                'suc_cod_fecha_vigencia' => (string) ($item['SucCodFechaVigencia'] ?? ''),
+                'alta_es_emisor' => (string) ($item['AltaEsEmisor'] ?? ''),
+                'alta_credito_fiscal' => strtoupper((int) ($item['LiteralE'] ?? 0) === 1 ? 'LITERAL E' : 'NO'),
                 'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
                 'licencia_codigo' => (string) ($item['LicenciaCodigo'] ?? ''),
+                'usuarios' => (string) ($item['UsuariosLicencia'] ?? ''),
+                'cfe_mensuales' => (string) ($item['Plan'] ?? ''),
                 'usuario_ef' => (string) ($item['UsuarioEF'] ?? ''),
                 'clave_usuario_ef' => (string) ($item['ClaveUsuarioEF'] ?? ''),
                 'id_usuario_ad' => (string) ($item['IdUsuarioAD'] ?? ''),
                 'alta_tipoempresa' => (string) ($item['AltaTipoEmpresa'] ?? ''),
                 'alta_tributario' => (string) ($item['AltaTributario'] ?? ''),
+                'alta_exonerado_norma' => (string) ($item['AltaExoneradoNorma'] ?? ''),
+                'alta_certificado_digital' => (string) ($item['AltaCertificadoDigital'] ?? ''),
+                'certificado_contrasena' => (string) ($item['CertificadoContrasena'] ?? ''),
                 'nombre_completo_firmante' => '',
                 'ci_firmante' => '',
                 'notas_admin' => (string) ($item['Notas'] ?? ''),
@@ -3771,13 +3966,31 @@ class NuevasEmpresasController
                 'email_principal' => (string) ($cliente['email'] ?? ''),
                 'email_envio_fe' => (string) ($cliente['emailEnvioFE'] ?? ''),
                 'telefono' => (string) ($cliente['Tel'] ?? ''),
+                'cliente_abonado' => (string) ($cliente['abonado'] ?? ''),
+                'cliente_id_giro' => (string) ($cliente['IdGiro'] ?? ''),
+                'cliente_id_fidelizacion' => (string) ($cliente['IdFidelizacion'] ?? ''),
+                'cliente_id_vendedor' => (string) ($cliente['IdVendedor'] ?? ''),
+                'cliente_abonado_importe' => (string) ($cliente['abonado_Importe'] ?? ''),
+                'cliente_abonado_moneda' => (string) ($cliente['abonado_Moneda'] ?? ''),
+                'cliente_abonado_periodo' => (string) ($cliente['abonado_periodo'] ?? ''),
+                'cliente_abonado_descuento' => (string) ($cliente['abonado_Descuento'] ?? ''),
+                'cliente_adenda' => (string) ($cliente['Adenda'] ?? ''),
+                'suc_cod_sucursal' => '',
+                'suc_cod_fecha_vigencia' => '',
+                'alta_es_emisor' => '',
+                'alta_credito_fiscal' => '',
                 'literal_e' => '',
                 'licencia_codigo' => '',
+                'usuarios' => '',
+                'cfe_mensuales' => '',
                 'usuario_ef' => '',
                 'clave_usuario_ef' => '',
                 'id_usuario_ad' => '',
                 'alta_tipoempresa' => '',
                 'alta_tributario' => '',
+                'alta_exonerado_norma' => '',
+                'alta_certificado_digital' => '',
+                'certificado_contrasena' => '',
                 'nombre_completo_firmante' => (string) ($cliente['NombreCompletoFirmante'] ?? ''),
                 'ci_firmante' => (string) ($cliente['CI_Firmante'] ?? ''),
                 'notas_admin' => '',
@@ -3792,13 +4005,31 @@ class NuevasEmpresasController
                 'email_principal' => (string) ($onboarding['email_principal'] ?? ''),
                 'email_envio_fe' => (string) ($onboarding['email_envio_fe'] ?? ''),
                 'telefono' => (string) ($onboarding['telefono'] ?? ''),
+                'cliente_abonado' => (string) ($onboarding['cliente_abonado'] ?? ''),
+                'cliente_id_giro' => (string) ($onboarding['cliente_id_giro'] ?? ''),
+                'cliente_id_fidelizacion' => (string) ($onboarding['cliente_id_fidelizacion'] ?? ''),
+                'cliente_id_vendedor' => (string) ($onboarding['cliente_id_vendedor'] ?? ''),
+                'cliente_abonado_importe' => (string) ($onboarding['cliente_abonado_importe'] ?? ''),
+                'cliente_abonado_moneda' => (string) ($onboarding['cliente_abonado_moneda'] ?? ''),
+                'cliente_abonado_periodo' => (string) ($onboarding['cliente_abonado_periodo'] ?? ''),
+                'cliente_abonado_descuento' => (string) ($onboarding['cliente_abonado_descuento'] ?? ''),
+                'cliente_adenda' => (string) ($onboarding['cliente_adenda'] ?? ''),
+                'suc_cod_sucursal' => (string) ($onboarding['suc_cod_sucursal'] ?? ''),
+                'suc_cod_fecha_vigencia' => (string) ($onboarding['suc_cod_fecha_vigencia'] ?? ''),
+                'alta_es_emisor' => (string) ($onboarding['alta_es_emisor'] ?? ''),
+                'alta_credito_fiscal' => (string) ($onboarding['alta_credito_fiscal'] ?? ''),
                 'literal_e' => (string) ($onboarding['alta_credito_fiscal'] ?? ''),
                 'licencia_codigo' => (string) ($onboarding['licencia'] ?? ''),
+                'usuarios' => (string) ($onboarding['usuarios'] ?? ''),
+                'cfe_mensuales' => (string) ($onboarding['cfe_mensuales'] ?? ''),
                 'usuario_ef' => (string) ($onboarding['usuario_ef'] ?? ''),
                 'clave_usuario_ef' => (string) ($onboarding['clave_usuario_ef'] ?? ''),
                 'id_usuario_ad' => (string) ($onboarding['idusuarioad'] ?? ''),
                 'alta_tipoempresa' => (string) ($onboarding['alta_tipoempresa'] ?? ''),
                 'alta_tributario' => (string) ($onboarding['alta_tributario'] ?? ''),
+                'alta_exonerado_norma' => (string) ($onboarding['alta_exonerado_norma'] ?? ''),
+                'alta_certificado_digital' => (string) ($onboarding['alta_certificado_digital'] ?? ''),
+                'certificado_contrasena' => (string) ($onboarding['certificado_contrasena'] ?? ''),
                 'nombre_completo_firmante' => (string) ($onboarding['nombre_completo_firmante'] ?? ''),
                 'ci_firmante' => (string) ($onboarding['ci_firmante'] ?? ''),
                 'notas_admin' => (string) (($onboarding['notas_admin'] ?? '') !== '' ? $onboarding['notas_admin'] : ($onboarding['observaciones'] ?? '')),
@@ -3815,16 +4046,30 @@ class NuevasEmpresasController
             'domicilio' => ['label' => 'Domicilio', 'sources' => ['empresas', 'clientes', 'onboarding']],
             'departamento_nombre' => ['label' => 'Departamento', 'sources' => ['empresas', 'clientes', 'onboarding']],
             'ciudad_nombre' => ['label' => 'Ciudad', 'sources' => ['empresas', 'clientes', 'onboarding']],
-            'literal_e' => ['label' => 'Credito fiscal / Literal E', 'sources' => ['empresas', 'onboarding']],
+            'alta_credito_fiscal' => ['label' => 'Credito fiscal', 'sources' => ['empresas', 'onboarding']],
             'email_principal' => ['label' => 'Email principal', 'sources' => ['empresas', 'clientes', 'onboarding']],
             'email_envio_fe' => ['label' => 'Email envio FE', 'sources' => ['empresas', 'clientes', 'onboarding']],
             'telefono' => ['label' => 'Telefono', 'sources' => ['clientes', 'onboarding']],
+            'cliente_abonado' => ['label' => 'Abonado', 'sources' => ['clientes', 'onboarding']],
+            'cliente_id_giro' => ['label' => 'Rubro', 'sources' => ['clientes', 'onboarding']],
+            'cliente_id_fidelizacion' => ['label' => 'Origen', 'sources' => ['clientes', 'onboarding']],
+            'cliente_id_vendedor' => ['label' => 'Vendedor / Operador', 'sources' => ['clientes', 'onboarding']],
+            'cliente_abonado_importe' => ['label' => 'Monto', 'sources' => ['clientes', 'onboarding']],
+            'cliente_abonado_moneda' => ['label' => 'Moneda', 'sources' => ['clientes', 'onboarding']],
+            'cliente_abonado_periodo' => ['label' => 'Periodo de pago', 'sources' => ['clientes', 'onboarding']],
+            'cliente_abonado_descuento' => ['label' => 'Descuento', 'sources' => ['clientes', 'onboarding']],
+            'cliente_adenda' => ['label' => 'Adenda', 'sources' => ['clientes', 'onboarding']],
             'licencia_codigo' => ['label' => 'Licencia', 'sources' => ['empresas', 'onboarding']],
+            'usuarios' => ['label' => 'Usuarios', 'sources' => ['empresas', 'onboarding']],
+            'cfe_mensuales' => ['label' => 'CFE mensuales', 'sources' => ['empresas', 'onboarding']],
             'usuario_ef' => ['label' => 'Usuario EF', 'sources' => ['empresas', 'onboarding']],
             'clave_usuario_ef' => ['label' => 'Clave usuario EF', 'sources' => ['empresas', 'onboarding']],
             'id_usuario_ad' => ['label' => 'Usuario administrador Dynamica', 'sources' => ['empresas', 'onboarding']],
-            'alta_tipoempresa' => ['label' => 'Tipo empresa', 'sources' => ['empresas', 'onboarding']],
+            'suc_cod_sucursal' => ['label' => 'Codigo de sucursal', 'sources' => ['empresas', 'onboarding']],
+            'suc_cod_fecha_vigencia' => ['label' => 'Fecha codigo sucursal', 'sources' => ['empresas', 'onboarding']],
+            'alta_tipoempresa' => ['label' => 'Tipo de empresa', 'sources' => ['empresas', 'onboarding']],
             'alta_tributario' => ['label' => 'Regimen tributario', 'sources' => ['empresas', 'onboarding']],
+            'alta_exonerado_norma' => ['label' => 'Norma de exoneracion', 'sources' => ['empresas', 'onboarding']],
             'nombre_completo_firmante' => ['label' => 'Nombre firmante', 'sources' => ['clientes', 'onboarding']],
             'ci_firmante' => ['label' => 'CI firmante', 'sources' => ['clientes', 'onboarding']],
             'notas_admin' => ['label' => 'Notas cliente', 'sources' => ['empresas', 'onboarding']],
@@ -3842,7 +4087,7 @@ class NuevasEmpresasController
             return mb_strtolower($text);
         }
 
-        if ($field === 'literal_e') {
+        if ($field === 'literal_e' || $field === 'alta_credito_fiscal') {
             if ($text === '1' || $text === 'SI' || $text === 'S' || $text === 'LITERAL E') {
                 return 'LITERAL_E';
             }
@@ -3884,7 +4129,7 @@ class NuevasEmpresasController
             return self::licenseLabel((int) $text);
         }
 
-        if ($field === 'literal_e') {
+        if ($field === 'literal_e' || $field === 'alta_credito_fiscal') {
             $normalized = $this->normalizeClientConflictValue($field, $text);
             if ($normalized === 'LITERAL_E') {
                 return 'Literal E';
@@ -3900,6 +4145,462 @@ class NuevasEmpresasController
         return $text;
     }
 
+    private function clientPanelHistoryFieldMap(): array
+    {
+        return [
+            'rut' => ['label' => 'RUT', 'type' => 'text'],
+            'razon_social' => ['label' => 'Razon social', 'type' => 'text'],
+            'nombre_fantasia' => ['label' => 'Nombre fantasia', 'type' => 'text'],
+            'domicilio' => ['label' => 'Domicilio', 'type' => 'text'],
+            'departamento_nombre' => ['label' => 'Departamento', 'type' => 'departamento'],
+            'ciudad_nombre' => ['label' => 'Ciudad', 'type' => 'ciudad'],
+            'email_principal' => ['label' => 'Email principal', 'type' => 'text'],
+            'email_envio_fe' => ['label' => 'Email facturas', 'type' => 'text'],
+            'telefono' => ['label' => 'Telefono', 'type' => 'text'],
+            'cliente_abonado' => ['label' => 'Abonado', 'type' => 'text'],
+            'cliente_id_giro' => ['label' => 'Rubro', 'type' => 'giro'],
+            'cliente_id_fidelizacion' => ['label' => 'Origen', 'type' => 'fidelizacion'],
+            'cliente_id_vendedor' => ['label' => 'Vendedor / Operador', 'type' => 'vendedor'],
+            'cliente_abonado_importe' => ['label' => 'Monto', 'type' => 'decimal'],
+            'cliente_abonado_moneda' => ['label' => 'Moneda', 'type' => 'text'],
+            'cliente_abonado_periodo' => ['label' => 'Periodo de pago', 'type' => 'text'],
+            'cliente_abonado_descuento' => ['label' => 'Descuento', 'type' => 'decimal'],
+            'cliente_adenda' => ['label' => 'Adenda', 'type' => 'text'],
+            'sitio_web' => ['label' => 'Sitio web', 'type' => 'text'],
+            'habilitada' => ['label' => 'Habilitada', 'type' => 'hab'],
+            'alta_credito_fiscal' => ['label' => 'Credito fiscal', 'type' => 'literal_e'],
+            'licencia_codigo' => ['label' => 'Licencia', 'type' => 'license'],
+            'usuarios' => ['label' => 'Usuarios', 'type' => 'integer'],
+            'cfe_mensuales' => ['label' => 'CFE mensuales', 'type' => 'integer'],
+            'usuario_ef' => ['label' => 'Usuario EF', 'type' => 'text'],
+            'clave_usuario_ef' => ['label' => 'Clave usuario EF', 'type' => 'text'],
+            'id_usuario_ad' => ['label' => 'Usuario administrador Dynamica', 'type' => 'admin_user'],
+            'fecha_ip' => ['label' => 'Fecha IP', 'type' => 'date'],
+            'suc_cod_sucursal' => ['label' => 'Codigo de sucursal', 'type' => 'text'],
+            'suc_cod_fecha_vigencia' => ['label' => 'Fecha codigo sucursal', 'type' => 'date'],
+            'alta_tipoempresa' => ['label' => 'Tipo de empresa', 'type' => 'text'],
+            'alta_tributario' => ['label' => 'Regimen tributario', 'type' => 'text'],
+            'alta_exonerado_norma' => ['label' => 'Norma de exoneracion', 'type' => 'text'],
+            'notificar_deuda' => ['label' => 'Notificar por deuda', 'type' => 'days'],
+            'notificar_suspension' => ['label' => 'Notificar por suspension', 'type' => 'days'],
+            'suspension_dias' => ['label' => 'Suspension', 'type' => 'days'],
+            'nombre_completo_firmante' => ['label' => 'Nombre firmante', 'type' => 'text'],
+            'ci_firmante' => ['label' => 'CI firmante', 'type' => 'text'],
+            'notas_admin' => ['label' => 'Notas del cliente', 'type' => 'html'],
+            'module_ventas' => ['label' => 'Modulo ventas', 'type' => 'module', 'inverted' => true],
+            'module_compras' => ['label' => 'Modulo compras', 'type' => 'module', 'inverted' => true],
+            'module_stock' => ['label' => 'Modulo stock', 'type' => 'module', 'inverted' => true],
+            'module_caja_bancos' => ['label' => 'Modulo caja y bancos', 'type' => 'module', 'inverted' => true],
+            'module_crm' => ['label' => 'Modulo CRM', 'type' => 'module', 'inverted' => true],
+            'module_produccion' => ['label' => 'Modulo produccion', 'type' => 'module', 'inverted' => true],
+            'module_veterinarias' => ['label' => 'Modulo veterinarias', 'type' => 'module', 'inverted' => true],
+            'module_tpv' => ['label' => 'Modulo TPV', 'type' => 'module', 'inverted' => false],
+            'module_importaciones' => ['label' => 'Modulo importaciones', 'type' => 'module', 'inverted' => false],
+            'module_pedidos_clientes' => ['label' => 'Modulo gestion pedidos clientes', 'type' => 'module', 'inverted' => false],
+            'module_fact_masiva_excel' => ['label' => 'Modulo facturacion masiva Excel', 'type' => 'module', 'inverted' => false],
+            'module_agencia' => ['label' => 'Modulo agencia', 'type' => 'module', 'inverted' => false],
+            'module_abonados' => ['label' => 'Funcion abonados', 'type' => 'module', 'inverted' => true],
+            'module_quitar_resguardos' => ['label' => 'Funcion quitar resguardos', 'type' => 'module', 'inverted' => true],
+            'module_asu' => ['label' => 'Funcion ASU', 'type' => 'module', 'inverted' => false],
+            'module_supervisor_tpv' => ['label' => 'Funcion supervisor TPV', 'type' => 'module', 'inverted' => false],
+            'module_shopping' => ['label' => 'Funcion shopping', 'type' => 'module', 'inverted' => false],
+            'module_facturador' => ['label' => 'Funcion facturador', 'type' => 'module', 'inverted' => false],
+            'module_notificaciones' => ['label' => 'Funcion notificaciones', 'type' => 'module', 'inverted' => false],
+            'module_medios_pago' => ['label' => 'Funcion medios de pago', 'type' => 'module', 'inverted' => false],
+            'module_pedidos_proveedores' => ['label' => 'Funcion pedidos a proveedores', 'type' => 'module', 'inverted' => false],
+            'module_contabilidad' => ['label' => 'Contabilidad', 'type' => 'contabilidad'],
+            'module_balanza' => ['label' => 'Balanza en TPV', 'type' => 'balanza'],
+            'module_mas_de_un_cae' => ['label' => 'Mas de un CAE por documento', 'type' => 'binary'],
+            'module_sucursales' => ['label' => 'Sucursales', 'type' => 'module', 'inverted' => false],
+        ];
+    }
+
+    private function buildClientPanelHistoryBaseline(array $context): array
+    {
+        $item = $context['item'];
+        $base = $this->buildClientPanelDisplayBaseline($context);
+
+        $base['sitio_web'] = (string) ($item['SitioWeb'] ?? '');
+        $base['habilitada'] = (string) ($item['Habilitada'] ?? '');
+        $base['fecha_ip'] = trim((string) ($item['FechaIP'] ?? ''));
+        $base['alta_credito_fiscal'] = (string) ($base['alta_credito_fiscal'] ?? $this->resolveAltaCreditoFiscalFromClientPanel($context['onboarding'] ?? null, [
+            'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
+        ]));
+        $base['suc_cod_sucursal'] = (string) ($base['suc_cod_sucursal'] ?? '');
+        $base['suc_cod_fecha_vigencia'] = (string) ($base['suc_cod_fecha_vigencia'] ?? '');
+        $base['alta_exonerado_norma'] = (string) ($base['alta_exonerado_norma'] ?? '');
+        $base['alta_es_emisor'] = (string) ($base['alta_es_emisor'] ?? 'NO');
+        $base['alta_certificado_digital'] = (string) ($base['alta_certificado_digital'] ?? '');
+        $base['certificado_contrasena'] = (string) ($base['certificado_contrasena'] ?? '');
+        $base['notificar_deuda'] = (string) (int) ($item['Notificar'] ?? 0);
+        $base['notificar_suspension'] = (string) (int) ($item['NotificarSuspension'] ?? 20);
+        $base['suspension_dias'] = (string) (int) ($item['Suspension'] ?? 30);
+        $base['module_ventas'] = (string) ($item['pNoVentas'] ?? '1');
+        $base['module_compras'] = (string) ($item['pNoCompras'] ?? '1');
+        $base['module_stock'] = (string) ($item['pNoStock'] ?? '1');
+        $base['module_caja_bancos'] = (string) ($item['pNoCajayBancos'] ?? '1');
+        $base['module_crm'] = (string) ($item['pNoCrm'] ?? '1');
+        $base['module_produccion'] = (string) ($item['pNoProduccion'] ?? '1');
+        $base['module_veterinarias'] = (string) ($item['pNoVeterinarias'] ?? '1');
+        $base['module_tpv'] = (string) ($item['pTpvSoft'] ?? '0');
+        $base['module_importaciones'] = (string) ($item['pImportaciones'] ?? '0');
+        $base['module_pedidos_clientes'] = (string) ($item['pGestionPedidosClientes'] ?? '0');
+        $base['module_fact_masiva_excel'] = (string) ($item['pFactMasivaExcel'] ?? '0');
+        $base['module_agencia'] = (string) ($item['pAgencia'] ?? '0');
+        $base['module_abonados'] = (string) ($item['pNoAbonados'] ?? '0');
+        $base['module_quitar_resguardos'] = (string) ($item['pNoResguardo'] ?? '0');
+        $base['module_asu'] = (string) ($item['pAsu'] ?? '0');
+        $base['module_supervisor_tpv'] = (string) ($item['pSupervisorTPV'] ?? '0');
+        $base['module_shopping'] = (string) ($item['pLec_Shopping'] ?? '0');
+        $base['module_facturador'] = (string) ($item['pFacturador'] ?? '0');
+        $base['module_notificaciones'] = (string) ($item['pNotificaciones'] ?? '0');
+        $base['module_medios_pago'] = (string) ($item['pMediosDePago'] ?? '0');
+        $base['module_pedidos_proveedores'] = (string) ($item['pPedProvee'] ?? '0');
+        $base['module_contabilidad'] = (string) ($item['pContabilidad'] ?? '0');
+        $base['module_balanza'] = (string) ($item['pBalanza'] ?? '0');
+        $base['module_mas_de_un_cae'] = (string) ($item['pMasDeUnTipoCae'] ?? '0');
+        $base['module_sucursales'] = (string) ($item['pSucursales'] ?? '0');
+
+        return $base;
+    }
+
+    private function normalizeClientPanelHistoryCompareValue(string $field, $value, array $definition): string
+    {
+        $type = (string) ($definition['type'] ?? 'text');
+        $text = trim((string) $value);
+
+        if ($type === 'date') {
+            if ($text === '') {
+                return '';
+            }
+
+            try {
+                return (new DateTimeImmutable($text))->format('Y-m-d');
+            } catch (Throwable $e) {
+                return $text;
+            }
+        }
+
+        if ($type === 'decimal') {
+            if ($text === '') {
+                return '';
+            }
+
+            return number_format((float) str_replace(',', '.', $text), 2, '.', '');
+        }
+
+        if ($type === 'binary' || $type === 'module' || $type === 'contabilidad' || $type === 'balanza') {
+            return $text;
+        }
+
+        if ($field === 'rut' || $field === 'ci_firmante') {
+            return preg_replace('/\D+/', '', $text);
+        }
+
+        if ($field === 'email_principal' || $field === 'email_envio_fe') {
+            return mb_strtolower($text);
+        }
+
+        if ($type === 'html') {
+            return $this->normalizeClientPanelHistoryHtmlText($text);
+        }
+
+        if ($type === 'literal_e') {
+            return $this->normalizeClientConflictValue($field, $text);
+        }
+
+        return mb_strtoupper($text);
+    }
+
+    private function formatClientPanelHistoryDate(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 'Sin fecha';
+        }
+
+        try {
+            return (new DateTimeImmutable($value))->format('d/m/Y');
+        } catch (Throwable $e) {
+            return $value;
+        }
+    }
+
+    private function normalizeClientPanelHistoryHtmlText(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $plain = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $plain = preg_replace('/\s+/u', ' ', $plain) ?? $plain;
+
+        return trim($plain);
+    }
+
+    private function isClientPanelHistoryModuleEnabled(string $rawValue, bool $inverted): bool
+    {
+        $value = strtoupper(trim($rawValue));
+        if ($inverted) {
+            return !in_array($value, ['1', 'SI', 'S'], true);
+        }
+
+        return in_array($value, ['1', 'SI', 'S'], true);
+    }
+
+    private function formatClientPanelHistoryValue(string $field, $value, array $definition, array $context): string
+    {
+        $type = (string) ($definition['type'] ?? 'text');
+        $text = trim((string) $value);
+
+        if ($text === '') {
+            return 'Sin dato';
+        }
+
+        if ($type === 'license') {
+            return self::licenseLabel((int) $text);
+        }
+
+        if ($type === 'literal_e') {
+            $normalized = $this->normalizeClientConflictValue($field, $text);
+            if ($normalized === 'LITERAL_E') {
+                return 'Literal E';
+            }
+            if ($normalized === 'RESGUARDO') {
+                return 'Resguardo';
+            }
+
+            return 'No';
+        }
+
+        if ($type === 'days') {
+            return $text . ' dias';
+        }
+
+        if ($type === 'date') {
+            return $this->formatClientPanelHistoryDate($text);
+        }
+
+        if ($type === 'decimal') {
+            return number_format((float) str_replace(',', '.', $text), 2, '.', '');
+        }
+
+        if ($type === 'hab') {
+            $normalized = $this->normalizeClientPanelHabilitadaValue($text, $text);
+            $map = [
+                'SI' => 'Si',
+                'NO' => 'No (En proc. de certificacion)',
+                'SU' => 'Suspendida (Por no pago)',
+                'BA' => 'Baja logica',
+                'DE' => 'Demo',
+            ];
+
+            return $map[$normalized] ?? $text;
+        }
+
+        if ($type === 'module') {
+            $enabled = $this->isClientPanelHistoryModuleEnabled($text, (bool) ($definition['inverted'] ?? false));
+            return $enabled ? 'Si' : 'No';
+        }
+
+        if ($type === 'binary') {
+            return $text === '1' ? 'Si' : 'No';
+        }
+
+        if ($type === 'contabilidad') {
+            $map = ['0' => 'Sin integracion', '1' => 'Integrado', '2' => 'Sistema contable'];
+            return $map[$text] ?? $text;
+        }
+
+        if ($type === 'balanza') {
+            $map = ['0' => 'Precio', '1' => 'Peso'];
+            return $map[$text] ?? $text;
+        }
+
+        if ($type === 'admin_user') {
+            $resolved = $this->resolveOptionValueByIdOrLabel($context['admin_users'] ?? [], 'id', 'nombre', $text);
+            if (trim((string) ($resolved['label'] ?? '')) !== '') {
+                return (string) $resolved['label'];
+            }
+        }
+
+        if ($type === 'departamento') {
+            return $this->resolveCatalogDisplayLabel(
+                $this->catalogoModel->listDepartamentos(ID_EMPRESA_MASTER),
+                'id',
+                'nombre',
+                $text,
+                'Departamentos',
+                'IdDepartamento',
+                'Departamento'
+            );
+        }
+
+        if ($type === 'ciudad') {
+            return $this->resolveCatalogDisplayLabel(
+                $this->catalogoModel->listCiudades(ID_EMPRESA_MASTER),
+                'id',
+                'nombre',
+                $text,
+                'Ciudades',
+                'IdCiudad',
+                'Ciudad'
+            );
+        }
+
+        if ($type === 'giro') {
+            $resolved = $this->resolveOptionValueByIdOrLabel($this->catalogoModel->listGiros(ID_EMPRESA_MASTER), 'id', 'nombre', $text);
+            if (trim((string) ($resolved['label'] ?? '')) !== '') {
+                return (string) $resolved['label'];
+            }
+        }
+
+        if ($type === 'fidelizacion') {
+            $resolved = $this->resolveOptionValueByIdOrLabel($this->catalogoModel->listFidelizaciones(ID_EMPRESA_MASTER), 'id', 'nombre', $text);
+            if (trim((string) ($resolved['label'] ?? '')) !== '') {
+                return (string) $resolved['label'];
+            }
+        }
+
+        if ($type === 'vendedor') {
+            $resolved = $this->resolveOptionValueByIdOrLabel($this->catalogoModel->listVendedores(ID_EMPRESA_MASTER), 'id', 'nombre', $text);
+            if (trim((string) ($resolved['label'] ?? '')) !== '') {
+                return (string) $resolved['label'];
+            }
+        }
+
+        if ($type === 'html') {
+            return $this->normalizeClientPanelHistoryHtmlText($text);
+        }
+
+        return $text;
+    }
+
+    private function buildClientPanelHistoryEntries(array $context, array $payload, string $usuarioLogin): array
+    {
+        $fieldMap = $this->clientPanelHistoryFieldMap();
+        $sourceFieldMap = $this->clientPanelDirectConflictFieldMap();
+        $sourceSnapshots = $this->buildClientPanelDirectConflictSources($context);
+        $baseline = $this->buildClientPanelHistoryBaseline($context);
+        $item = $context['item'];
+        $onboarding = is_array($context['onboarding'] ?? null) ? $context['onboarding'] : [];
+        $usuarioNombre = $usuarioLogin;
+        $userRow = $this->secUserModel->findByLoginAndEmpresa($usuarioLogin, ID_EMPRESA_MASTER);
+        if (is_array($userRow) && trim((string) ($userRow['name'] ?? '')) !== '') {
+            $usuarioNombre = trim((string) $userRow['name']);
+        }
+
+        $rows = [];
+        foreach ($fieldMap as $field => $definition) {
+            if (!array_key_exists($field, $payload)) {
+                continue;
+            }
+
+            $oldValue = $baseline[$field] ?? '';
+            $newValue = $payload[$field] ?? '';
+            $oldCompare = $this->normalizeClientPanelHistoryCompareValue($field, $oldValue, $definition);
+            $newCompare = $this->normalizeClientPanelHistoryCompareValue($field, $newValue, $definition);
+
+            // La ficha puede mostrar un valor resuelto desde una fuente, pero
+            // al guardar sincroniza varias tablas. Si la base visual coincide
+            // con el valor nuevo, igual debemos registrar el cambio cuando
+            // alguna fuente real (Clientes/Onboarding/Empresas) todavia tenga
+            // otro dato y vaya a ser sobrescrita.
+            if ($oldCompare === $newCompare && isset($sourceFieldMap[$field], $sourceFieldMap[$field]['sources'])) {
+                foreach ((array) $sourceFieldMap[$field]['sources'] as $sourceName) {
+                    if (!isset($sourceSnapshots[$sourceName]) || !array_key_exists($field, $sourceSnapshots[$sourceName])) {
+                        continue;
+                    }
+
+                    $sourceValue = $sourceSnapshots[$sourceName][$field];
+                    $sourceCompare = $this->normalizeClientPanelHistoryCompareValue($field, $sourceValue, $definition);
+                    if ($sourceCompare === $newCompare) {
+                        continue;
+                    }
+
+                    $oldValue = $sourceValue;
+                    $oldCompare = $sourceCompare;
+                    break;
+                }
+            }
+
+            if ($oldCompare === $newCompare) {
+                continue;
+            }
+
+            $rows[] = [
+                'empresa_id' => (int) ($payload['empresa_id'] ?? 0),
+                'cliente_id' => (int) ($payload['cliente_id'] ?? 0),
+                'nueva_empresa_id' => (int) ($onboarding['id'] ?? 0),
+                'rut' => (string) ($payload['rut'] ?? ($item['Rut'] ?? '')),
+                'field_key' => $field,
+                'field_label' => (string) ($definition['label'] ?? $field),
+                'old_value' => $this->formatClientPanelHistoryValue($field, $oldValue, $definition, $context),
+                'new_value' => $this->formatClientPanelHistoryValue($field, $newValue, $definition, $context),
+                'usuario_login' => $usuarioLogin,
+                'usuario_nombre' => $usuarioNombre,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function extractClientPanelDirtyFields(array $post): array
+    {
+        $raw = trim((string) ($post['client_dirty_fields'] ?? ''));
+        if ($raw === '') {
+            return [];
+        }
+
+        $fields = array_map('trim', explode(',', $raw));
+        $fields = array_values(array_unique(array_filter($fields, static function (string $field): bool {
+            return $field !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $field) === 1;
+        })));
+
+        return $fields;
+    }
+
+    private function filterClientPanelPayloadToDirtyFields(array $payload, array $dirtyFields): array
+    {
+        $alwaysKeep = [
+            'empresa_id' => true,
+            'cliente_id' => true,
+            'rut' => true,
+        ];
+
+        if (in_array('alta_credito_fiscal', $dirtyFields, true)) {
+            $dirtyFields[] = 'literal_e';
+        }
+
+        if (in_array('ciudad_id', $dirtyFields, true)) {
+            $dirtyFields[] = 'ciudad_nombre';
+        }
+
+        if (in_array('departamento_id', $dirtyFields, true)) {
+            $dirtyFields[] = 'departamento_nombre';
+        }
+
+        if (in_array('licencia_codigo', $dirtyFields, true)) {
+            $dirtyFields[] = 'licencia_texto';
+        }
+
+        if (in_array('cfe_mensuales', $dirtyFields, true)) {
+            $dirtyFields[] = 'plan';
+        }
+
+        $allowed = array_fill_keys($dirtyFields, true) + $alwaysKeep;
+        $filtered = [];
+
+        foreach ($payload as $key => $value) {
+            if (isset($allowed[$key])) {
+                $filtered[$key] = $value;
+            }
+        }
+
+        return $filtered;
+    }
+
     private function buildClientPanelFacetCounts(array $items): array
     {
         $counts = [
@@ -3910,13 +4611,7 @@ class NuevasEmpresasController
                 'suspendida' => 0,
             ],
             'licenses' => [],
-            'users' => [
-                '0' => 0,
-                '1' => 0,
-                '2_5' => 0,
-                '6_10' => 0,
-                '11_plus' => 0,
-            ],
+            'users' => [],
             'cert' => [
                 'con_empcodigo' => 0,
                 'sin_empcodigo' => 0,
@@ -3930,33 +4625,15 @@ class NuevasEmpresasController
 
         foreach ($items as $item) {
             $habilitada = strtoupper(trim((string) ($item['Habilitada'] ?? '')));
-            if (strpos($habilitada, 'NO') === 0 && strpos($habilitada, 'CERTIFIC') !== false) {
+            $isDemo = $habilitada === 'DE' || strpos($habilitada, 'DEMO') === 0;
+            if ($habilitada === 'NO' || (strpos($habilitada, 'NO') === 0 && strpos($habilitada, 'CERTIFIC') !== false)) {
                 $counts['hab']['en_certificacion']++;
-            } elseif (strpos($habilitada, 'NO') === 0) {
+            } elseif ($habilitada === 'BA' || strpos($habilitada, 'BAJA') === 0) {
                 $counts['hab']['baja_logica']++;
-            } elseif (strpos($habilitada, 'SUSPEND') === 0) {
+            } elseif ($habilitada === 'SU' || strpos($habilitada, 'SUSPEND') === 0) {
                 $counts['hab']['suspendida']++;
             } elseif (in_array($habilitada, ['SI', 'S', '1'], true)) {
                 $counts['hab']['si']++;
-            }
-
-            $licenseCode = (string) (int) ($item['LicenciaCodigo'] ?? 0);
-            if (!isset($counts['licenses'][$licenseCode])) {
-                $counts['licenses'][$licenseCode] = 0;
-            }
-            $counts['licenses'][$licenseCode]++;
-
-            $users = (int) ($item['UsuariosLicencia'] ?? 0);
-            if ($users === 0) {
-                $counts['users']['0']++;
-            } elseif ($users === 1) {
-                $counts['users']['1']++;
-            } elseif ($users >= 2 && $users <= 5) {
-                $counts['users']['2_5']++;
-            } elseif ($users >= 6 && $users <= 10) {
-                $counts['users']['6_10']++;
-            } elseif ($users >= 11) {
-                $counts['users']['11_plus']++;
             }
 
             $empresaInvoicy = trim((string) ($item['EmpresaInvoicy'] ?? ''));
@@ -3986,12 +4663,27 @@ class NuevasEmpresasController
                 $counts['suspension'][$suspensionKey] = 0;
             }
 
-            $counts['debt'][$debtKey]++;
-            $counts['notif_susp'][$suspNotifKey]++;
-            $counts['suspension'][$suspensionKey]++;
+            if (!$isDemo) {
+                $licenseCode = (string) (int) ($item['LicenciaCodigo'] ?? 0);
+                if (!isset($counts['licenses'][$licenseCode])) {
+                    $counts['licenses'][$licenseCode] = 0;
+                }
+                $counts['licenses'][$licenseCode]++;
+
+                $usersKey = (string) (int) ($item['UsuariosLicencia'] ?? 0);
+                if (!isset($counts['users'][$usersKey])) {
+                    $counts['users'][$usersKey] = 0;
+                }
+                $counts['users'][$usersKey]++;
+
+                $counts['debt'][$debtKey]++;
+                $counts['notif_susp'][$suspNotifKey]++;
+                $counts['suspension'][$suspensionKey]++;
+            }
         }
 
-        ksort($counts['licenses'], SORT_NATURAL);
+        ksort($counts['licenses'], SORT_NUMERIC);
+        ksort($counts['users'], SORT_NUMERIC);
         uksort($counts['debt'], static function (string $left, string $right): int {
             return ((int) $left) <=> ((int) $right);
         });
@@ -4008,21 +4700,55 @@ class NuevasEmpresasController
     private function normalizeClientPanelInput(array $post, array $formOptions, array $context): array
     {
         $item = $context['item'];
+        $displayBaseline = $this->buildClientPanelDisplayBaseline($context);
+        $currentValue = static function (string $field, string $fallback = '') use ($post, $displayBaseline): string {
+            if (array_key_exists($field, $post)) {
+                return (string) $post[$field];
+            }
+
+            return (string) ($displayBaseline[$field] ?? $fallback);
+        };
         $ciudadOption = $this->resolveOptionValueByIdOrLabel(
             $formOptions['ciudades'] ?? [],
             'id',
             'nombre',
-            trim((string) ($post['ciudad_id'] ?? ''))
+            trim($currentValue('ciudad_id', (string) ($displayBaseline['ciudad_nombre'] ?? '')))
         );
         $departamentoOption = $this->resolveOptionValueByIdOrLabel(
             $formOptions['departamentos'] ?? [],
             'id',
             'nombre',
-            trim((string) ($post['departamento_id'] ?? ''))
+            trim($currentValue('departamento_id', (string) ($displayBaseline['departamento_nombre'] ?? '')))
+        );
+        // Vendedor y administrador pueden venir como id interno o como el
+        // texto visible del select. Si se fuerzan a entero terminan cayendo en
+        // 0 y se pisan datos vigentes al guardar una ficha que no tocaba esos
+        // campos.
+        $vendedorOption = $this->resolveOptionValueByIdOrLabel(
+            $formOptions['vendedores'] ?? [],
+            'id',
+            'nombre',
+            trim($currentValue('cliente_id_vendedor', (string) ($displayBaseline['cliente_id_vendedor'] ?? '')))
+        );
+        $adminUserOption = $this->resolveOptionValueByIdOrLabel(
+            $context['admin_users'] ?? [],
+            'id',
+            'nombre',
+            trim($currentValue('id_usuario_ad', (string) ($displayBaseline['id_usuario_ad'] ?? ($item['IdUsuarioAD'] ?? ''))))
         );
         $notificarActual = (string) (int) ($item['Notificar'] ?? 20);
         $notificarSuspensionActual = (string) (int) ($item['NotificarSuspension'] ?? 20);
         $suspensionActual = (string) (int) ($item['Suspension'] ?? 30);
+        $altaExoneradoNormaRaw = mb_substr(
+            trim($currentValue('alta_exonerado_norma', (string) ($displayBaseline['alta_exonerado_norma'] ?? ''))),
+            0,
+            255
+        );
+        if ($altaExoneradoNormaRaw === '') {
+            $altaExoneradoNormaRaw = $this->deriveExoneradoNorma(
+                $currentValue('alta_tributario', (string) ($displayBaseline['alta_tributario'] ?? ''))
+            );
+        }
         $modulePayload = [
             'module_ventas' => $this->normalizeClientModuleValue((string) ($post['module_ventas'] ?? ''), true, (string) ($item['pNoVentas'] ?? '1')),
             'module_compras' => $this->normalizeClientModuleValue((string) ($post['module_compras'] ?? ''), true, (string) ($item['pNoCompras'] ?? '1')),
@@ -4051,39 +4777,99 @@ class NuevasEmpresasController
             'module_sucursales' => $this->normalizeClientModuleValue((string) ($post['module_sucursales'] ?? ''), false, (string) ($item['pSucursales'] ?? '0')),
         ];
 
-        return array_merge([
+        $payload = array_merge([
             'empresa_id' => (int) ($item['IdEmpresa'] ?? 0),
             'cliente_id' => (int) ($item['IdCliente'] ?? 0),
-            'rut' => preg_replace('/\D+/', '', (string) ($post['rut'] ?? ($item['Rut'] ?? ''))),
-            'razon_social' => mb_substr(trim((string) ($post['razon_social'] ?? '')), 0, 120),
-            'nombre_fantasia' => mb_substr(trim((string) ($post['nombre_fantasia'] ?? '')), 0, 120),
-            'domicilio' => mb_substr(trim((string) ($post['domicilio'] ?? '')), 0, 120),
-            'email_principal' => self::normalizeEmails(trim((string) ($post['email_principal'] ?? ''))),
-            'sitio_web' => mb_substr(trim((string) ($post['sitio_web'] ?? '')), 0, 120),
-            'licencia_codigo' => (string) max(0, (int) ($post['licencia_codigo'] ?? ($item['LicenciaCodigo'] ?? 0))),
-            'licencia_texto' => self::licenseLabel((int) ($post['licencia_codigo'] ?? ($item['LicenciaCodigo'] ?? 0))),
-            'email_envio_fe' => self::normalizeEmails(trim((string) ($post['email_envio_fe'] ?? ''))),
-            'telefono' => mb_substr(trim((string) ($post['telefono'] ?? '')), 0, 40),
+            'rut' => preg_replace('/\D+/', '', $currentValue('rut', (string) ($item['Rut'] ?? ''))),
+            'razon_social' => mb_substr(trim($currentValue('razon_social', (string) ($item['RazonSocial'] ?? ''))), 0, 120),
+            'nombre_fantasia' => mb_substr(trim($currentValue('nombre_fantasia', (string) ($item['NombreFantasia'] ?? ''))), 0, 120),
+            'domicilio' => mb_substr(trim($currentValue('domicilio', (string) ($item['Domicilio'] ?? ''))), 0, 120),
+            'email_principal' => self::normalizeEmails(trim($currentValue('email_principal', (string) ($displayBaseline['email_principal'] ?? '')))),
+            'sitio_web' => mb_substr(trim($currentValue('sitio_web', (string) ($item['SitioWeb'] ?? ''))), 0, 120),
+            'licencia_codigo' => (string) max(0, (int) $currentValue('licencia_codigo', (string) ($item['LicenciaCodigo'] ?? 0))),
+            'licencia_texto' => self::licenseLabel((int) $currentValue('licencia_codigo', (string) ($item['LicenciaCodigo'] ?? 0))),
+            'usuarios' => (string) max(0, (int) $currentValue('usuarios', (string) ($displayBaseline['usuarios'] ?? ($item['UsuariosLicencia'] ?? 0)))),
+            'cfe_mensuales' => (string) max(0, (int) $currentValue('cfe_mensuales', (string) ($displayBaseline['cfe_mensuales'] ?? ($item['Plan'] ?? 0)))),
+            'plan' => (string) max(0, (int) $currentValue('cfe_mensuales', (string) ($displayBaseline['cfe_mensuales'] ?? ($item['Plan'] ?? 0)))),
+            'email_envio_fe' => self::normalizeEmails(trim($currentValue('email_envio_fe', (string) ($displayBaseline['email_envio_fe'] ?? '')))),
+            'telefono' => mb_substr(trim($currentValue('telefono', (string) ($displayBaseline['telefono'] ?? ''))), 0, 40),
+            'cliente_abonado' => $this->normalizeClientEnumValue($currentValue('cliente_abonado', (string) ($displayBaseline['cliente_abonado'] ?? 'NO')), ['SI', 'NO'], (string) ($displayBaseline['cliente_abonado'] ?? 'NO')),
+            'cliente_id_giro' => (string) max(0, (int) $currentValue('cliente_id_giro', (string) ($displayBaseline['cliente_id_giro'] ?? '0'))),
+            'cliente_id_fidelizacion' => (string) max(0, (int) $currentValue('cliente_id_fidelizacion', (string) ($displayBaseline['cliente_id_fidelizacion'] ?? '0'))),
+            'cliente_id_vendedor' => mb_substr(
+                trim((string) ($vendedorOption['id'] !== '' ? $vendedorOption['id'] : ($vendedorOption['label'] ?? ''))),
+                0,
+                100
+            ),
+            'cliente_abonado_importe' => (string) max(0, (float) str_replace(',', '.', $currentValue('cliente_abonado_importe', (string) ($displayBaseline['cliente_abonado_importe'] ?? '0')))),
+            'cliente_abonado_moneda' => $this->normalizeClientEnumValue(mb_strtoupper(trim($currentValue('cliente_abonado_moneda', (string) ($displayBaseline['cliente_abonado_moneda'] ?? 'UYU')))), ['UYU', 'USD'], (string) ($displayBaseline['cliente_abonado_moneda'] ?? 'UYU')),
+            'cliente_abonado_periodo' => $this->normalizeClientEnumValue(mb_strtoupper(trim($currentValue('cliente_abonado_periodo', (string) ($displayBaseline['cliente_abonado_periodo'] ?? 'MENSUAL')))), ['MENSUAL', 'ANUAL'], (string) ($displayBaseline['cliente_abonado_periodo'] ?? 'MENSUAL')),
+            'cliente_abonado_descuento' => (string) max(0, (float) str_replace(',', '.', $currentValue('cliente_abonado_descuento', (string) ($displayBaseline['cliente_abonado_descuento'] ?? '0')))),
+            'cliente_adenda' => trim($currentValue('cliente_adenda', (string) ($displayBaseline['cliente_adenda'] ?? ''))),
             'ciudad_id' => $ciudadOption['id'],
             'departamento_id' => $departamentoOption['id'],
             'ciudad_nombre' => $ciudadOption['label'],
             'departamento_nombre' => $departamentoOption['label'],
-            'habilitada' => $this->normalizeClientEnumValue((string) ($post['habilitada'] ?? ''), ['SI', 'NO (En Proc. de Certificacion)', 'SUSPENDIDA (Por no pago)', 'NO', 'DEMO'], (string) ($item['Habilitada'] ?? 'SI')),
-            'literal_e' => $this->normalizeClientEnumValue((string) ($post['literal_e'] ?? ''), ['0', '1'], (string) ((int) ($item['LiteralE'] ?? 0))),
-            'usuario_ef' => mb_substr(trim((string) ($post['usuario_ef'] ?? '')), 0, 20),
-            'clave_usuario_ef' => mb_substr(trim((string) ($post['clave_usuario_ef'] ?? '')), 0, 40),
-            'id_usuario_ad' => mb_substr(trim((string) ($post['id_usuario_ad'] ?? ($item['IdUsuarioAD'] ?? ''))), 0, 40),
-            'fecha_ip' => mb_substr(trim((string) ($post['fecha_ip'] ?? '')), 0, 20),
-            'alta_tipoempresa' => mb_substr(trim((string) ($post['alta_tipoempresa'] ?? '')), 0, 20),
-            'alta_tributario' => mb_substr(trim((string) ($post['alta_tributario'] ?? '')), 0, 30),
-            'alta_exonerado_norma' => $this->deriveExoneradoNorma((string) ($post['alta_tributario'] ?? '')),
+            'habilitada' => $this->normalizeClientPanelHabilitadaValue(
+                $currentValue('habilitada', (string) ($item['Habilitada'] ?? 'SI')),
+                (string) ($item['Habilitada'] ?? 'SI')
+            ),
+            'alta_credito_fiscal' => $this->normalizeClientEnumValue(
+                mb_strtoupper(trim($currentValue(
+                    'alta_credito_fiscal',
+                    (string) ($displayBaseline['alta_credito_fiscal'] ?? $this->resolveAltaCreditoFiscalFromClientPanel($context['onboarding'] ?? null, [
+                        'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
+                    ]))
+                ))),
+                ['NO', 'LITERAL E', 'RESGUARDO'],
+                (string) ($displayBaseline['alta_credito_fiscal'] ?? 'NO')
+            ),
+            'literal_e' => mb_strtoupper(trim($currentValue(
+                'alta_credito_fiscal',
+                (string) ($displayBaseline['alta_credito_fiscal'] ?? $this->resolveAltaCreditoFiscalFromClientPanel($context['onboarding'] ?? null, [
+                    'literal_e' => (string) ((int) ($item['LiteralE'] ?? 0)),
+                ]))
+            ))) === 'LITERAL E' ? '1' : '0',
+            'usuario_ef' => mb_substr(trim($currentValue('usuario_ef', (string) ($displayBaseline['usuario_ef'] ?? ''))), 0, 20),
+            'clave_usuario_ef' => mb_substr(trim($currentValue('clave_usuario_ef', (string) ($displayBaseline['clave_usuario_ef'] ?? ''))), 0, 40),
+            'id_usuario_ad' => mb_substr(
+                trim((string) ($adminUserOption['id'] !== '' ? $adminUserOption['id'] : ($adminUserOption['label'] ?? ''))),
+                0,
+                40
+            ),
+            'fecha_ip' => $this->normalizeClientPanelDateInput(
+                mb_substr(trim($currentValue('fecha_ip', trim((string) ($item['FechaIP'] ?? '')))), 0, 20),
+                trim((string) ($item['FechaIP'] ?? ''))
+            ),
+            'suc_cod_sucursal' => mb_substr(trim($currentValue('suc_cod_sucursal', (string) ($displayBaseline['suc_cod_sucursal'] ?? ''))), 0, 20),
+            'suc_cod_fecha_vigencia' => $this->normalizeClientPanelDateInput(
+                mb_substr(trim($currentValue('suc_cod_fecha_vigencia', (string) ($displayBaseline['suc_cod_fecha_vigencia'] ?? ''))), 0, 20),
+                (string) ($displayBaseline['suc_cod_fecha_vigencia'] ?? '')
+            ),
+            'alta_tipoempresa' => mb_substr(trim($currentValue('alta_tipoempresa', (string) ($displayBaseline['alta_tipoempresa'] ?? ''))), 0, 20),
+            'alta_tributario' => mb_substr(trim($currentValue('alta_tributario', (string) ($displayBaseline['alta_tributario'] ?? ''))), 0, 30),
+            'alta_exonerado_norma' => $altaExoneradoNormaRaw,
+            'alta_es_emisor' => $this->normalizeClientEnumValue(mb_strtoupper(trim($currentValue('alta_es_emisor', (string) ($displayBaseline['alta_es_emisor'] ?? 'NO')))), ['SI', 'NO'], (string) ($displayBaseline['alta_es_emisor'] ?? 'NO')),
+            'alta_certificado_digital' => mb_substr(trim($currentValue('alta_certificado_digital', (string) ($displayBaseline['alta_certificado_digital'] ?? ''))), 0, 30),
+            'certificado_contrasena' => mb_substr(trim($currentValue('certificado_contrasena', (string) ($displayBaseline['certificado_contrasena'] ?? ''))), 0, 255),
             'notificar_deuda' => $this->normalizeClientPanelDayValue((string) ($post['notificar_deuda'] ?? ''), $notificarActual),
             'notificar_suspension' => $this->normalizeClientPanelDayValue((string) ($post['notificar_suspension'] ?? ''), $notificarSuspensionActual),
             'suspension_dias' => $this->normalizeClientPanelDayValue((string) ($post['suspension_dias'] ?? ''), $suspensionActual),
-            'nombre_completo_firmante' => mb_substr(trim((string) ($post['nombre_completo_firmante'] ?? '')), 0, 120),
-            'ci_firmante' => mb_substr(preg_replace('/\D+/', '', (string) ($post['ci_firmante'] ?? '')), 0, 20),
-            'notas_admin' => trim((string) ($post['notas_admin'] ?? '')),
+            'nombre_completo_firmante' => mb_substr(trim($currentValue('nombre_completo_firmante', (string) ($displayBaseline['nombre_completo_firmante'] ?? ''))), 0, 120),
+            'ci_firmante' => mb_substr(preg_replace('/\D+/', '', $currentValue('ci_firmante', (string) ($displayBaseline['ci_firmante'] ?? ''))), 0, 20),
+            'notas_admin' => trim($currentValue('notas_admin', (string) ($displayBaseline['notas_admin'] ?? ''))),
         ], $modulePayload);
+
+        // Estos campos quedaron fuera de la ficha por decision funcional.
+        // Aunque existan valores historicos en onboarding o Empresas, guardar
+        // desde Clientes no debe reescribirlos silenciosamente.
+        unset(
+            $payload['alta_es_emisor'],
+            $payload['alta_certificado_digital'],
+            $payload['certificado_contrasena']
+        );
+
+        return $payload;
     }
 
     private function normalizeClientPanelDayValue(string $value, string $current): string
@@ -4099,6 +4885,32 @@ class NuevasEmpresasController
         }
 
         return (string) min(365, max(0, (int) $digits));
+    }
+
+    private function normalizeClientPanelDateInput(string $value, string $fallback = ''): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            $value = trim($fallback);
+        }
+
+        if ($value === '') {
+            return '';
+        }
+
+        $formats = ['Y-m-d', 'd/m/Y', 'Y/m/d', 'd-m-Y'];
+        foreach ($formats as $format) {
+            $parsed = DateTimeImmutable::createFromFormat($format, $value);
+            if ($parsed instanceof DateTimeImmutable) {
+                return $parsed->format('Y-m-d');
+            }
+        }
+
+        try {
+            return (new DateTimeImmutable($value))->format('Y-m-d');
+        } catch (Throwable $e) {
+            return '';
+        }
     }
 
     private function normalizeClientModuleValue(string $value, bool $inverted, string $current): string
@@ -4127,17 +4939,63 @@ class NuevasEmpresasController
             : ($current !== '' ? $current : (string) ($allowed[0] ?? '0'));
     }
 
+    private function normalizeClientPanelHabilitadaValue(string $value, string $current): string
+    {
+        $value = mb_strtoupper(trim($value));
+        $current = mb_strtoupper(trim($current));
+
+        $map = [
+            'SI' => 'SI',
+            'S' => 'SI',
+            '1' => 'SI',
+            'NO' => 'NO',
+            'NO (EN PROC. DE CERTIFICACION)' => 'NO',
+            'SU' => 'SU',
+            'SUSPENDIDA (POR NO PAGO)' => 'SU',
+            'SUSPENDIDA' => 'SU',
+            'BA' => 'BA',
+            'BAJA LOGICA' => 'BA',
+            'BAJA LÓGICA' => 'BA',
+            'DE' => 'DE',
+            'DEMO' => 'DE',
+        ];
+
+        if (isset($map[$value])) {
+            return $map[$value];
+        }
+
+        return $map[$current] ?? ($current !== '' ? $current : 'SI');
+    }
+
     private function syncClientPanelEdit(array $context, array $payload, string $usuarioLogin, array $logoUpload = []): void
     {
         $item = $context['item'];
         $onboarding = is_array($context['onboarding'] ?? null) ? $context['onboarding'] : null;
         $empresaModel = new EmpresaModel();
         $clienteModel = new ClienteModel();
+        $syncStatus = [];
+        $historyEntries = $this->buildClientPanelHistoryEntries($context, $payload, $usuarioLogin);
 
         $empresaModel->updateClientPanelData((int) $payload['empresa_id'], $payload);
+        $syncStatus[] = [
+            'label' => 'Empresas',
+            'status' => 'ok',
+            'detail' => 'Datos guardados en la tabla Empresas.',
+        ];
 
         if ((int) $payload['cliente_id'] > 0) {
             $clienteModel->updateClientPanelData((int) $payload['cliente_id'], $payload);
+            $syncStatus[] = [
+                'label' => 'Clientes',
+                'status' => 'ok',
+                'detail' => 'Datos guardados en la tabla Clientes.',
+            ];
+        } else {
+            $syncStatus[] = [
+                'label' => 'Clientes',
+                'status' => 'skip',
+                'detail' => 'No hubo cliente relacionado para sincronizar.',
+            ];
         }
 
         $syncItem = $this->buildClientPanelSyncItem($item, $onboarding, $payload);
@@ -4145,6 +5003,21 @@ class NuevasEmpresasController
         if (is_array($onboarding) && (int) ($onboarding['id'] ?? 0) > 0) {
             $tempPayload = $this->buildClientPanelTempPayload($onboarding, $payload);
             $this->model->updateTemp((int) $onboarding['id'], $tempPayload);
+            $syncStatus[] = [
+                'label' => 'Nuevas empresas',
+                'status' => 'ok',
+                'detail' => 'Datos guardados en el caso ligado de onboarding.',
+            ];
+        } else {
+            $syncStatus[] = [
+                'label' => 'Nuevas empresas',
+                'status' => 'skip',
+                'detail' => 'No existe un caso ligado de onboarding para sincronizar.',
+            ];
+        }
+
+        if ($historyEntries !== []) {
+            $this->clientPanelHistoryModel->createBatch($historyEntries);
         }
 
         if (($logoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
@@ -4164,6 +5037,12 @@ class NuevasEmpresasController
         $empresaLocal = $empresaModel->findById((int) $payload['empresa_id']);
         $empresaInvoicy = trim((string) ($empresaLocal['EmpresaInvoicy'] ?? ''));
         if ($empresaInvoicy === '') {
+            $syncStatus[] = [
+                'label' => 'Migrate',
+                'status' => 'skip',
+                'detail' => 'No se envio a Migrate porque la empresa no tiene EmpCodigo.',
+            ];
+            $this->lastClientPanelSyncStatus = $syncStatus;
             if ($folderRelative !== '') {
                 $this->appendRecordLog($folderRelative, 'CLIENT_PANEL_SYNC_LOCAL_ONLY', [
                     'empresa_id' => $payload['empresa_id'],
@@ -4179,7 +5058,29 @@ class NuevasEmpresasController
             'empresa_invoicy' => $empresaInvoicy,
         ]);
 
-        $result = $this->migrateService->updateCompanyData($syncItem, $references);
+        // Si Migrate falla, se conserva el resumen parcial para que la ficha muestre
+        // que Empresas/Clientes/onboarding si alcanzaron a sincronizar antes del error.
+        try {
+            $result = $this->migrateService->updateCompanyData($syncItem, $references);
+        } catch (Throwable $e) {
+            $syncStatus[] = [
+                'label' => 'Migrate',
+                'status' => 'error',
+                'detail' => $e->getMessage(),
+            ];
+            $this->lastClientPanelSyncStatus = $syncStatus;
+
+            if ($folderRelative !== '') {
+                $this->appendRecordLog($folderRelative, 'CLIENT_PANEL_SYNC_MIGRATE_ERROR', [
+                    'empresa_id' => $payload['empresa_id'],
+                    'cliente_id' => $payload['cliente_id'],
+                    'usuario' => $usuarioLogin,
+                    'observacion' => $e->getMessage(),
+                ]);
+            }
+
+            throw $e;
+        }
 
         if ($folderRelative !== '') {
             $this->storeMigrateArtifacts($folderRelative, (string) ($result['request_xml'] ?? ''), (string) ($result['response_xml'] ?? ''));
@@ -4192,9 +5093,45 @@ class NuevasEmpresasController
             ]);
         }
 
+        if (is_array($onboarding) && (int) ($onboarding['id'] ?? 0) > 0) {
+            $this->model->storeMigrateExchange(
+                (int) $onboarding['id'],
+                (string) ($result['request_xml'] ?? ''),
+                (string) ($result['response_xml'] ?? '')
+            );
+        }
+
         if (!$result['success']) {
+            $syncStatus[] = [
+                'label' => 'Migrate',
+                'status' => 'error',
+                'detail' => $this->normalizeMigrateErrors($result),
+            ];
+            $this->lastClientPanelSyncStatus = $syncStatus;
             throw new RuntimeException($this->normalizeMigrateErrors($result));
         }
+
+        $migrateSummary = [];
+        if (trim((string) ($result['empresa_invoicy'] ?? '')) !== '') {
+            $migrateSummary[] = 'EmpCodigo ' . trim((string) $result['empresa_invoicy']);
+        }
+        if (trim((string) ($result['echo_rut'] ?? '')) !== '') {
+            $migrateSummary[] = 'RUT ' . trim((string) $result['echo_rut']);
+        }
+        if (trim((string) ($result['echo_razon_social'] ?? '')) !== '') {
+            $migrateSummary[] = 'Razón social ' . trim((string) $result['echo_razon_social']);
+        }
+        if (trim((string) ($result['echo_nombre_comercial'] ?? '')) !== '') {
+            $migrateSummary[] = 'Nombre comercial ' . trim((string) $result['echo_nombre_comercial']);
+        }
+
+        $syncStatus[] = [
+            'label' => 'Migrate',
+            'status' => 'ok',
+            'detail' => 'Datos sincronizados correctamente en Migrate.',
+            'summary' => $migrateSummary,
+        ];
+        $this->lastClientPanelSyncStatus = $syncStatus;
 
         if ($folderRelative !== '') {
             $this->appendRecordLog($folderRelative, 'CLIENT_PANEL_SYNC_MIGRATE_OK', [
@@ -4211,37 +5148,71 @@ class NuevasEmpresasController
     private function buildClientPanelSyncItem(array $item, ?array $onboarding, array $payload): array
     {
         $base = is_array($onboarding) ? $onboarding : [];
-        $base['rut'] = $payload['rut'];
-        $base['razon_social'] = $payload['razon_social'];
-        $base['nombre_fantasia'] = $payload['nombre_fantasia'];
-        $base['domicilio'] = $payload['domicilio'];
-        $base['email_principal'] = $payload['email_principal'];
-        $base['email_envio_fe'] = $payload['email_envio_fe'];
-        $base['telefono'] = $payload['telefono'];
-        $base['ciudad'] = $payload['ciudad_id'] !== '' ? $payload['ciudad_id'] : ($onboarding['ciudad'] ?? ($item['ClienteIdCiudad'] ?? ''));
-        $base['departamento'] = $payload['departamento_id'] !== '' ? $payload['departamento_id'] : ($onboarding['departamento'] ?? '');
-        $base['usuario_ef'] = $payload['usuario_ef'];
-        $base['clave_usuario_ef'] = $payload['clave_usuario_ef'];
-        $base['id_usuario_ad'] = $payload['id_usuario_ad'];
-        $base['alta_tipoempresa'] = $payload['alta_tipoempresa'];
-        $base['alta_tributario'] = $payload['alta_tributario'];
-        $base['alta_exonerado_norma'] = $payload['alta_exonerado_norma'];
+        $base['rut'] = $payload['rut'] ?? ($base['rut'] ?? ($item['Rut'] ?? ''));
+        $base['razon_social'] = $payload['razon_social'] ?? ($base['razon_social'] ?? ($item['RazonSocial'] ?? ''));
+        $base['nombre_fantasia'] = $payload['nombre_fantasia'] ?? ($base['nombre_fantasia'] ?? ($item['NombreFantasia'] ?? ''));
+        $base['domicilio'] = $payload['domicilio'] ?? ($base['domicilio'] ?? ($item['Domicilio'] ?? ''));
+        $base['email_principal'] = $payload['email_principal'] ?? ($base['email_principal'] ?? ($item['ClienteEmail'] ?? ($item['EmpresaEmail'] ?? '')));
+        $base['email_envio_fe'] = $payload['email_envio_fe'] ?? ($base['email_envio_fe'] ?? ($item['emailEnvioFE'] ?? ($item['cUsuarioEmailInv'] ?? '')));
+        $base['telefono'] = $payload['telefono'] ?? ($base['telefono'] ?? ($item['Tel'] ?? ''));
+        $base['cliente_abonado'] = $payload['cliente_abonado'] ?? ($base['cliente_abonado'] ?? ($item['ClienteAbonado'] ?? 'NO'));
+        $base['cliente_id_giro'] = (int) ($payload['cliente_id_giro'] ?? ($base['cliente_id_giro'] ?? ($item['ClienteIdGiro'] ?? 0)));
+        $base['cliente_id_fidelizacion'] = (int) ($payload['cliente_id_fidelizacion'] ?? ($base['cliente_id_fidelizacion'] ?? ($item['ClienteIdFidelizacion'] ?? 0)));
+        $base['cliente_id_vendedor'] = $payload['cliente_id_vendedor'] ?? ($base['cliente_id_vendedor'] ?? ($item['ClienteIdVendedor'] ?? ''));
+        $base['cliente_abonado_importe'] = (float) ($payload['cliente_abonado_importe'] ?? ($base['cliente_abonado_importe'] ?? ($item['ClienteAbonadoImporte'] ?? 0)));
+        $base['cliente_abonado_moneda'] = $payload['cliente_abonado_moneda'] ?? ($base['cliente_abonado_moneda'] ?? ($item['ClienteAbonadoMoneda'] ?? 'UYU'));
+        $base['cliente_abonado_periodo'] = $payload['cliente_abonado_periodo'] ?? ($base['cliente_abonado_periodo'] ?? ($item['ClienteAbonadoPeriodo'] ?? 'MENSUAL'));
+        $base['cliente_abonado_descuento'] = (float) ($payload['cliente_abonado_descuento'] ?? ($base['cliente_abonado_descuento'] ?? ($item['ClienteAbonadoDescuento'] ?? 0)));
+        $base['cliente_adenda'] = $payload['cliente_adenda'] ?? ($base['cliente_adenda'] ?? ($item['ClienteAdenda'] ?? ''));
+        $base['ciudad'] = array_key_exists('ciudad_id', $payload)
+            ? ($payload['ciudad_id'] !== '' ? $payload['ciudad_id'] : ($onboarding['ciudad'] ?? ($item['ClienteIdCiudad'] ?? '')))
+            : ($base['ciudad'] ?? ($item['ClienteIdCiudad'] ?? ''));
+        $base['departamento'] = array_key_exists('departamento_id', $payload)
+            ? ($payload['departamento_id'] !== '' ? $payload['departamento_id'] : ($onboarding['departamento'] ?? ''))
+            : ($base['departamento'] ?? '');
+        $base['usuario_ef'] = $payload['usuario_ef'] ?? ($base['usuario_ef'] ?? ($item['UsuarioEF'] ?? ''));
+        $base['clave_usuario_ef'] = $payload['clave_usuario_ef'] ?? ($base['clave_usuario_ef'] ?? ($item['ClaveUsuarioEF'] ?? ''));
+        $base['id_usuario_ad'] = $payload['id_usuario_ad'] ?? ($base['id_usuario_ad'] ?? ($item['IdUsuarioAD'] ?? ''));
+        // El codigo de sucursal puede no venir en el POST si la ficha toma el valor
+        // desde onboarding; por eso se recompone con fallback antes de enviar a Migrate.
+        $base['suc_cod_sucursal'] = array_key_exists('suc_cod_sucursal', $payload) && $payload['suc_cod_sucursal'] !== ''
+            ? $payload['suc_cod_sucursal']
+            : (($onboarding['suc_cod_sucursal'] ?? '') !== ''
+                ? (string) $onboarding['suc_cod_sucursal']
+                : (($item['OnboardingSucCodSucursal'] ?? '') !== '' ? (string) $item['OnboardingSucCodSucursal'] : '001'));
+        $base['suc_cod_fecha_vigencia'] = $payload['suc_cod_fecha_vigencia'] ?? ($base['suc_cod_fecha_vigencia'] ?? '');
+        $base['alta_tipoempresa'] = $payload['alta_tipoempresa'] ?? ($base['alta_tipoempresa'] ?? ($item['AltaTipoEmpresa'] ?? ''));
+        $base['alta_tributario'] = $payload['alta_tributario'] ?? ($base['alta_tributario'] ?? ($item['AltaTributario'] ?? ''));
+        $base['alta_exonerado_norma'] = $payload['alta_exonerado_norma'] ?? ($base['alta_exonerado_norma'] ?? ($item['AltaExoneradoNorma'] ?? ''));
+        if (array_key_exists('alta_es_emisor', $payload)) {
+            $base['alta_es_emisor'] = $payload['alta_es_emisor'];
+        }
         $base['alta_credito_fiscal'] = $this->resolveAltaCreditoFiscalFromClientPanel($onboarding, $payload);
-        $base['nombre_completo_firmante'] = $payload['nombre_completo_firmante'];
-        $base['ci_firmante'] = $payload['ci_firmante'];
-        $base['notas_admin'] = $payload['notas_admin'];
-        $base['observaciones'] = $payload['notas_admin'];
+        if (array_key_exists('alta_certificado_digital', $payload)) {
+            $base['alta_certificado_digital'] = $payload['alta_certificado_digital'];
+        }
+        if (array_key_exists('certificado_contrasena', $payload)) {
+            $base['certificado_contrasena'] = $payload['certificado_contrasena'];
+        }
+        $base['nombre_completo_firmante'] = $payload['nombre_completo_firmante'] ?? ($base['nombre_completo_firmante'] ?? ($item['NombreCompletoFirmante'] ?? ''));
+        $base['ci_firmante'] = $payload['ci_firmante'] ?? ($base['ci_firmante'] ?? ($item['CI_Firmante'] ?? ''));
+        $base['notas_admin'] = $payload['notas_admin'] ?? ($base['notas_admin'] ?? ($item['Notas'] ?? ''));
+        $base['observaciones'] = $base['notas_admin'];
         $base['empresa_id_creada'] = (int) ($payload['empresa_id'] ?? 0);
         $base['cliente_id_creado'] = (int) ($payload['cliente_id'] ?? 0);
-        $base['cliente_id_giro'] = $base['cliente_id_giro'] ?? ($item['OnboardingClienteIdGiro'] ?? ($item['ClienteIdGiro'] ?? 0));
-        $base['cliente_id_vendedor'] = $base['cliente_id_vendedor'] ?? ($item['OnboardingClienteIdVendedor'] ?? ($item['ClienteIdVendedor'] ?? 0));
-        $base['licencia'] = $payload['licencia_codigo'] !== ''
+        $base['usuarios'] = array_key_exists('usuarios', $payload) && $payload['usuarios'] !== ''
+            ? (int) $payload['usuarios']
+            : (int) ($base['usuarios'] ?? ($item['UsuariosLicencia'] ?? 0));
+        $base['cfe_mensuales'] = array_key_exists('cfe_mensuales', $payload) && $payload['cfe_mensuales'] !== ''
+            ? (int) $payload['cfe_mensuales']
+            : (int) ($base['cfe_mensuales'] ?? (($item['Plan'] ?? '') !== '' ? ($item['Plan'] ?? 0) : 0));
+        $base['plan'] = (string) ($base['cfe_mensuales'] ?? 0);
+        $base['licencia'] = array_key_exists('licencia_codigo', $payload) && $payload['licencia_codigo'] !== ''
             ? (int) $payload['licencia_codigo']
             : (int) ($base['licencia'] ?? ($item['OnboardingLicencia'] ?? ($item['LicenciaCodigo'] ?? 0)));
-        $base['licencia_texto'] = $payload['licencia_texto'] !== ''
+        $base['licencia_texto'] = array_key_exists('licencia_texto', $payload) && $payload['licencia_texto'] !== ''
             ? $payload['licencia_texto']
             : (string) ($base['licencia_texto'] ?? self::licenseLabel((int) ($item['OnboardingLicencia'] ?? ($item['LicenciaCodigo'] ?? 0))));
-        $base['suc_cod_sucursal'] = $base['suc_cod_sucursal'] ?? ($item['OnboardingSucCodSucursal'] ?? '001');
         $base['carpeta_base'] = $base['carpeta_base'] ?? '';
 
         return $base;
@@ -4249,36 +5220,106 @@ class NuevasEmpresasController
 
     private function buildClientPanelTempPayload(array $onboarding, array $payload): array
     {
-        $merged = array_merge($onboarding, [
-            'razon_social' => $payload['razon_social'],
-            'nombre_fantasia' => $payload['nombre_fantasia'],
-            'domicilio' => $payload['domicilio'],
-            'email_principal' => $payload['email_principal'],
-            'rut' => $payload['rut'],
-            'licencia' => (int) ($payload['licencia_codigo'] ?? 0),
-            'licencia_texto' => $payload['licencia_texto'],
-            'email_envio_fe' => $payload['email_envio_fe'],
-            'telefono' => $payload['telefono'],
-            'ciudad' => $payload['ciudad_id'],
-            'departamento' => $payload['departamento_id'],
-            'usuario_ef' => $payload['usuario_ef'],
-            'clave_usuario_ef' => $payload['clave_usuario_ef'],
-            'idusuarioad' => $payload['id_usuario_ad'],
-            'alta_tipoempresa' => $payload['alta_tipoempresa'],
-            'alta_tributario' => $payload['alta_tributario'],
-            'alta_exonerado_norma' => $payload['alta_exonerado_norma'],
-            'alta_credito_fiscal' => $this->resolveAltaCreditoFiscalFromClientPanel($onboarding, $payload),
-            'nombre_completo_firmante' => $payload['nombre_completo_firmante'],
-            'ci_firmante' => $payload['ci_firmante'],
-            'notas_admin' => $payload['notas_admin'],
-            'observaciones' => $payload['notas_admin'],
-        ]);
+        $merged = $onboarding;
 
-        return self::applyConditionalBusinessRules($merged);
+        $assignments = [
+            'razon_social' => 'razon_social',
+            'nombre_fantasia' => 'nombre_fantasia',
+            'domicilio' => 'domicilio',
+            'email_principal' => 'email_principal',
+            'rut' => 'rut',
+            'email_envio_fe' => 'email_envio_fe',
+            'telefono' => 'telefono',
+            'cliente_abonado' => 'cliente_abonado',
+            'cliente_id_vendedor' => 'cliente_id_vendedor',
+            'cliente_adenda' => 'cliente_adenda',
+            'ciudad' => 'ciudad_id',
+            'departamento' => 'departamento_id',
+            'usuario_ef' => 'usuario_ef',
+            'clave_usuario_ef' => 'clave_usuario_ef',
+            'idusuarioad' => 'id_usuario_ad',
+            'suc_cod_sucursal' => 'suc_cod_sucursal',
+            'suc_cod_fecha_vigencia' => 'suc_cod_fecha_vigencia',
+            'alta_tipoempresa' => 'alta_tipoempresa',
+            'alta_tributario' => 'alta_tributario',
+            'alta_exonerado_norma' => 'alta_exonerado_norma',
+            'nombre_completo_firmante' => 'nombre_completo_firmante',
+            'ci_firmante' => 'ci_firmante',
+            'notas_admin' => 'notas_admin',
+        ];
+
+        foreach ($assignments as $targetKey => $sourceKey) {
+            if (array_key_exists($sourceKey, $payload)) {
+                $merged[$targetKey] = $payload[$sourceKey];
+            }
+        }
+
+        if (array_key_exists('licencia_codigo', $payload)) {
+            $merged['licencia'] = (int) ($payload['licencia_codigo'] ?? 0);
+        }
+        if (array_key_exists('licencia_texto', $payload)) {
+            $merged['licencia_texto'] = $payload['licencia_texto'];
+        }
+        if (array_key_exists('usuarios', $payload)) {
+            $merged['usuarios'] = (int) $payload['usuarios'];
+        }
+        if (array_key_exists('cfe_mensuales', $payload)) {
+            $merged['cfe_mensuales'] = (int) $payload['cfe_mensuales'];
+            $merged['plan'] = (string) ((int) $payload['cfe_mensuales']);
+        }
+        if (array_key_exists('cliente_id_giro', $payload)) {
+            $merged['cliente_id_giro'] = (int) $payload['cliente_id_giro'];
+        }
+        if (array_key_exists('cliente_id_fidelizacion', $payload)) {
+            $merged['cliente_id_fidelizacion'] = (int) $payload['cliente_id_fidelizacion'];
+        }
+        if (array_key_exists('cliente_abonado_importe', $payload)) {
+            $merged['cliente_abonado_importe'] = (float) $payload['cliente_abonado_importe'];
+        }
+        if (array_key_exists('cliente_abonado_moneda', $payload)) {
+            $merged['cliente_abonado_moneda'] = $payload['cliente_abonado_moneda'];
+        }
+        if (array_key_exists('cliente_abonado_periodo', $payload)) {
+            $merged['cliente_abonado_periodo'] = $payload['cliente_abonado_periodo'];
+        }
+        if (array_key_exists('cliente_abonado_descuento', $payload)) {
+            $merged['cliente_abonado_descuento'] = (float) $payload['cliente_abonado_descuento'];
+        }
+        if (array_key_exists('alta_es_emisor', $payload)) {
+            $merged['alta_es_emisor'] = $payload['alta_es_emisor'];
+        }
+        if (array_key_exists('alta_certificado_digital', $payload)) {
+            $merged['alta_certificado_digital'] = $payload['alta_certificado_digital'];
+        }
+        if (array_key_exists('certificado_contrasena', $payload)) {
+            $merged['certificado_contrasena'] = $payload['certificado_contrasena'];
+        }
+
+        $merged['alta_credito_fiscal'] = $this->resolveAltaCreditoFiscalFromClientPanel($onboarding, $payload);
+        if (array_key_exists('notas_admin', $payload)) {
+            $merged['observaciones'] = $payload['notas_admin'];
+        }
+
+        $normalized = self::applyConditionalBusinessRules($merged);
+
+        // En el panel de Clientes la norma es un campo visible/editable y debe
+        // sincronizarse tal cual fue digitada. Las reglas generales del alta
+        // pueden vaciarla para regimenes no especiales, pero en esta ficha eso
+        // provoca desalineacion entre Empresas y onboarding despues de guardar.
+        if (array_key_exists('alta_exonerado_norma', $payload)) {
+            $normalized['alta_exonerado_norma'] = trim((string) $payload['alta_exonerado_norma']);
+        }
+
+        return $normalized;
     }
 
     private function resolveAltaCreditoFiscalFromClientPanel(?array $onboarding, array $payload): string
     {
+        $explicit = strtoupper(trim((string) ($payload['alta_credito_fiscal'] ?? '')));
+        if (in_array($explicit, ['NO', 'LITERAL E', 'RESGUARDO'], true)) {
+            return $explicit;
+        }
+
         $literalE = (string) ($payload['literal_e'] ?? '0');
         if ($literalE === '1') {
             return 'LITERAL E';
@@ -4410,6 +5451,26 @@ class NuevasEmpresasController
         return $value;
     }
 
+    private function preferClientPanelReferenceValue($preferred, $fallback = ''): string
+    {
+        $preferred = trim((string) $preferred);
+        if ($preferred !== '' && $preferred !== '0') {
+            return $preferred;
+        }
+
+        return trim((string) $fallback);
+    }
+
+    private function preferClientPanelEnumValue($preferred, string $fallback = ''): string
+    {
+        $preferred = trim((string) $preferred);
+        if ($preferred !== '') {
+            return $preferred;
+        }
+
+        return trim($fallback);
+    }
+
     private function resolveOptionValueByIdOrLabel(array $options, string $idKey, string $labelKey, string $value): array
     {
         $value = trim($value);
@@ -4436,6 +5497,47 @@ class NuevasEmpresasController
         }
 
         return ['id' => '', 'label' => $value];
+    }
+
+    private function resolveCatalogDisplayLabel(
+        array $options,
+        string $idKey,
+        string $labelKey,
+        string $value,
+        string $table,
+        string $tableIdField,
+        string $tableLabelField
+    ): string {
+        $resolved = $this->resolveOptionValueByIdOrLabel($options, $idKey, $labelKey, $value);
+        $label = trim((string) ($resolved['label'] ?? ''));
+        if ($label !== '' && !ctype_digit($label)) {
+            return $label;
+        }
+
+        $value = trim($value);
+        if ($value === '' || !ctype_digit($value)) {
+            return $label !== '' ? $label : $value;
+        }
+
+        try {
+            $stmt = Db::conn()->prepare(
+                "SELECT {$tableLabelField} AS nombre
+                 FROM {$table}
+                 WHERE {$tableIdField} = ?
+                   AND TRIM(COALESCE({$tableLabelField}, '')) <> ''
+                 ORDER BY IdEmpresa
+                 LIMIT 1"
+            );
+            $stmt->execute([$value]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($row && trim((string) ($row['nombre'] ?? '')) !== '') {
+                return trim((string) ($row['nombre'] ?? ''));
+            }
+        } catch (Throwable $e) {
+            // Si el respaldo global falla, dejamos visible el valor original.
+        }
+
+        return $label !== '' ? $label : $value;
     }
 
     private function normalizeMigrateErrors(array $result): string
