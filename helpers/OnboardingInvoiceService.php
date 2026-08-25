@@ -22,6 +22,7 @@ class OnboardingInvoiceService
         $clienteOriginalId = (int) ($item['cliente_id_creado'] ?? 0);
         $productoOriginalId = (int) ($item['cliente_abonado_id_producto'] ?? 0);
         $importe = round((float) ($item['cliente_abonado_importe'] ?? 0), 2);
+        $descuento = round(max(0, (float) ($item['cliente_abonado_descuento'] ?? 0)), 2);
         $moneda = strtoupper(trim((string) ($item['cliente_abonado_moneda'] ?? 'UYU')));
         $tv = strtoupper(trim((string) ($item['cliente_abonado_tv'] ?? 'CREDITO')));
         $tv = in_array($tv, ['CONTADO', 'CREDITO'], true) ? $tv : 'CREDITO';
@@ -50,7 +51,7 @@ class OnboardingInvoiceService
         $product = $this->resolveProductForBilling($empresaId, $productoOriginalId, $item);
         $productoId = (int) ($product['IdProducto'] ?? 0);
         $taxPercent = $this->resolveEffectiveTaxPercent($product, $item);
-        $breakdown = $this->buildTaxBreakdown($importe, $taxPercent);
+        $breakdown = $this->buildInvoiceBreakdown($importe, $descuento, $taxPercent);
         $today = (new DateTimeImmutable('today'))->format('Y-m-d');
 
         // Se arma el payload de la venta con el formato esperado por la API
@@ -62,7 +63,7 @@ class OnboardingInvoiceService
             'idvendedor' => $idVendedor,
             'idtipodoc' => (int) ONBOARDING_FACTURACION_IDTIPODOC,
             'moneda' => $moneda !== '' ? $moneda : 'UYU',
-            'subtotal' => $breakdown['subtotal'],
+            'subtotal' => $breakdown['header_subtotal'],
             'iva' => $breakdown['iva_total'],
             'totalventa' => $breakdown['total'],
             'totalnetoivabasico' => $breakdown['neto_basico'],
@@ -82,7 +83,7 @@ class OnboardingInvoiceService
                 'cantidad' => 1,
                 'preciounitario' => $breakdown['precio_unitario'],
                 'costo' => 0,
-                'subtotal' => $breakdown['subtotal'],
+                'subtotal' => $breakdown['item_subtotal'],
                 'iva' => $breakdown['iva_total'],
                 'tasaiva' => $taxPercent,
                 'totalitem' => $breakdown['total'],
@@ -91,11 +92,11 @@ class OnboardingInvoiceService
                 'valorivabasico' => $breakdown['iva_basico'],
                 'valorivaminimo' => $breakdown['iva_minimo'],
                 'valorexonerado' => $breakdown['monto_no_gravado'],
-                'valorsubtotaldescuento' => 0,
+                'valorsubtotaldescuento' => $breakdown['item_discount'],
                 'valorivaensuspenso' => 0,
                 'preciounitarioiva' => $breakdown['precio_unitario_iva'],
-                'pordescuento' => 0,
-                'descuento' => 0,
+                'pordescuento' => $breakdown['item_discount_pct'],
+                'descuento' => $breakdown['item_discount'],
             ]],
         ];
 
@@ -162,8 +163,44 @@ class OnboardingInvoiceService
                 'idsucursal' => $idSucursal,
                 'idcaja' => $idCaja,
                 'idmediopago' => $idMedioPago,
+                'descuento_configurado' => $descuento,
             ],
         ];
+    }
+
+    private function buildInvoiceBreakdown(float $finalGrossAmount, float $discountGrossAmount, float $taxPercent): array
+    {
+        $finalGrossAmount = round($finalGrossAmount, 2);
+        $discountGrossAmount = round(max(0, $discountGrossAmount), 2);
+        $finalBreakdown = $this->buildTaxBreakdown($finalGrossAmount, $taxPercent);
+
+        if ($discountGrossAmount <= 0) {
+            return array_merge($finalBreakdown, [
+                'header_subtotal' => $finalBreakdown['subtotal'],
+                'item_subtotal' => $finalBreakdown['subtotal'],
+                'item_discount' => 0.00,
+                'item_discount_pct' => 0.00,
+            ]);
+        }
+
+        $grossBeforeDiscount = round($finalGrossAmount + $discountGrossAmount, 2);
+        $grossBreakdown = $this->buildTaxBreakdown($grossBeforeDiscount, $taxPercent);
+        $discountNetAmount = round(max(0, $grossBreakdown['subtotal'] - $finalBreakdown['subtotal']), 2);
+        $discountPct = $grossBreakdown['subtotal'] > 0
+            ? round(($discountNetAmount / $grossBreakdown['subtotal']) * 100, 4)
+            : 0.00;
+
+        return array_merge($finalBreakdown, [
+            'header_subtotal' => $grossBreakdown['subtotal'],
+            // La API de envio arma el monto del item desde VentasItems.SubTotal.
+            // Debe quedar neto luego del descuento para que el XML no descuadre
+            // contra la cabecera y los tags de descuento del item.
+            'item_subtotal' => $finalBreakdown['subtotal'],
+            'item_discount' => $discountNetAmount,
+            'item_discount_pct' => $discountPct,
+            'precio_unitario' => $grossBreakdown['precio_unitario'],
+            'precio_unitario_iva' => $grossBreakdown['precio_unitario_iva'],
+        ]);
     }
 
     private function buildTaxBreakdown(float $grossAmount, float $taxPercent): array
