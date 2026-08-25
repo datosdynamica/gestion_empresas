@@ -118,6 +118,15 @@ Cuando los pasos anteriores quedan correctos, el sistema marca el cliente como a
 
 ## Ajustes importantes ya incorporados
 
+### Referencias recientes de continuidad
+
+Para retomar el proyecto sin reconstruir todo el contexto manualmente, conviene
+leer primero:
+
+- `docs/handoff_20260825.md`
+- `docs/bitacora_onboarding_factura_descuento_20260825.md`
+- `docs/clientes_panel_dev_inspeccion_20260821.md`
+
 ### Factura de onboarding en eFactura
 
 La factura del onboarding se dejo configurada para usar eFactura, evitando que el flujo genere eTicket cuando no corresponde.
