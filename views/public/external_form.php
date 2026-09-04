@@ -63,13 +63,13 @@ $errorText = static function (string $key) use ($errors): string {
         .step { display:none; }
         .step.active { display:block; }
         .panel { margin-top:18px; padding:16px; border:1px solid var(--line); border-radius:18px; background:#fafbfc; }
-        .terms-box { height:min(480px, 48vh); overflow-y:auto; padding:0; font-size:13px; color:#475569; }
+        .terms-box { height:clamp(220px, 36vh, 360px); overflow-y:auto; padding:0; font-size:13px; color:#475569; }
         .terms-box p + p { margin-top:10px; }
         .terms-contract { padding:18px; }
         .terms-contract h3 { margin:0 0 18px; font-size:14px; line-height:1.45; color:var(--ink); }
         .terms-clause + .terms-clause { margin-top:16px; }
         .terms-clause h4 { margin:0 0 6px; font-size:12px; line-height:1.4; color:var(--ink); }
-        .terms-clause p { margin:0; line-height:1.6; }
+        .terms-clause p { margin:0; line-height:1.6; text-align:justify; text-align-last:auto; }
         .cta-row,.nav-row { display:flex; gap:12px; margin-top:20px; }
         .btn { appearance:none; border:0; border-radius:16px; padding:14px 16px; font-size:15px; font-weight:800; cursor:pointer; transition:transform .15s ease, background .15s ease; }
         .btn:hover { transform:translateY(-1px); }
