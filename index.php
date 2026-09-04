@@ -11,6 +11,13 @@ $authController = new AuthController();
 $controller = new NuevasEmpresasController();
 $action = (string) ($_GET['action'] ?? 'index');
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$rawHost = $_SERVER['HTTP_HOST'] ?? '';
+$requestHost = is_string($rawHost) ? strtolower((string) preg_replace('/:\d+$/', '', $rawHost)) : '';
+$isExternalOnboardingHost = strpos($requestHost, 'onboarding.') === 0;
+
+if ($isExternalOnboardingHost && $route === '' && $action === 'index') {
+    $action = 'external-form';
+}
 
 if ($route !== '') {
     // Alias cortos para rutas amigables del panel.
@@ -30,6 +37,9 @@ if ($route !== '') {
         case 'configuracion':
             $action = 'settings';
             break;
+        case 'volumen-cfe':
+            $action = 'cfe-volume';
+            break;
         case 'clientes':
             $action = 'clients';
             break;
@@ -39,14 +49,34 @@ if ($route !== '') {
         case 'show':
             $action = 'show';
             break;
+        case 'alta-cliente':
+            $action = 'external-form';
+            break;
+        case 'tyc-cliente':
+            $action = 'external-terms-pdf';
+            break;
     }
 }
 
-$publicActions = ['login', 'authenticate', 'logout'];
+$publicActions = ['login', 'authenticate', 'logout', 'external-form', 'store-external', 'external-terms-pdf', 'external-success'];
+$externalActions = ['external-form', 'store-external', 'external-terms-pdf', 'external-success'];
+
+if ($isExternalOnboardingHost && !in_array($action, $externalActions, true)) {
+    http_response_code(404);
+    exit;
+}
 
 // Todo lo demas exige sesion valida.
 if (!in_array($action, $publicActions, true)) {
     Auth::requireLogin();
+}
+
+// Las rutas de aprobacion y configuracion no deben depender solo del menu:
+// usuarios sin ADM.SISTEMA tampoco pueden invocarlas directamente.
+$administrativeActions = ['settings', 'save-settings', 'approve', 'change-hito', 'run-migrate', 'delete'];
+$isApprovalsPanel = $action === 'index' && trim((string) ($_GET['estado'] ?? '')) === 'En Proceso';
+if (in_array($action, $administrativeActions, true) || $isApprovalsPanel) {
+    Auth::requireAdministrativeAdmin();
 }
 
 if (Auth::check() && in_array($action, ['login', 'authenticate'], true)) {
@@ -67,11 +97,33 @@ switch ($action) {
     case 'create':
         $controller->create();
         break;
+    case 'external-form':
+        $controller->externalForm();
+        break;
+    case 'store-external':
+        $controller->storeExternal();
+        break;
+    case 'external-terms-pdf':
+        $controller->externalTermsPdf();
+        break;
+    case 'external-success':
+        $controller->externalSuccess();
+        break;
+    case 'external-invitations':
+        $controller->externalInvitations();
+        break;
+    case 'create-external-invitation':
+        $controller->createExternalInvitation();
+        break;
+    case 'revoke-external-invitation': $controller->revokeExternalInvitation(); break;
     case 'trace':
         $controller->trace();
         break;
     case 'settings':
         $controller->settings();
+        break;
+    case 'cfe-volume':
+        $controller->cfeVolume();
         break;
     case 'clients':
         $controller->clients();
@@ -84,6 +136,18 @@ switch ($action) {
         break;
     case 'client-update':
         $controller->clientUpdate($id);
+        break;
+    case 'client-expediente-upload':
+        $controller->clientExpedienteUpload($id);
+        break;
+    case 'client-expediente-download':
+        $controller->clientExpedienteDownload($id);
+        break;
+    case 'client-expediente-update':
+        $controller->clientExpedienteUpdateDescription($id);
+        break;
+    case 'client-expediente-delete':
+        $controller->clientExpedienteDelete($id);
         break;
     case 'certificates':
         $controller->certificates();

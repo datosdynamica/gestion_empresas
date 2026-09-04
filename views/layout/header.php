@@ -30,6 +30,7 @@ $activeNav = $activeNav ?? 'panel';
 $pageSubtitle = $pageSubtitle ?? 'Aprovisionamiento y seguimiento operativo de nuevas empresas.';
 $embeddedView = !empty($embeddedView);
 $authUser = Auth::check() ? Auth::user() : null;
+$isAdministrativeAdmin = Auth::isAdministrativeAdmin();
 $userDisplayName = 'Usuario';
 if (is_array($authUser)) {
     $userDisplayName = (string) (($authUser['name'] ?? '') !== '' ? $authUser['name'] : ($authUser['login'] ?? 'Usuario'));
@@ -67,7 +68,7 @@ if (is_array($authUser)) {
                 </div>
                 <div class="app-brand__copy">
                     <p class="app-brand__eyebrow">Dynamica</p>
-                    <h1 class="app-brand__title">Altas y Automatizaciones</h1>
+                    <h1 class="app-brand__title">Administrativo</h1>
                     <p class="app-brand__subtitle">Panel de gesti&oacute;n operativa</p>
                 </div>
             </div>
@@ -79,29 +80,26 @@ if (is_array($authUser)) {
                         <i data-lucide="house" class="w-5 h-5"></i>
                         <span class="app-nav__label">Inicio</span>
                     </a>
-                    <?php if (!empty($enableCreateModal)): ?>
-                        <button type="button" class="app-nav__item" data-open-modal="modal-create" title="Nuevo registro cliente">
-                            <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                            <span class="app-nav__label">Nuevo registro cliente</span>
-                        </button>
-                    <?php else: ?>
-                        <a href="<?= htmlspecialchars(app_url('index.php?action=create'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'nuevo' ? ' is-active' : '' ?>" title="Nuevo registro cliente">
-                            <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                            <span class="app-nav__label">Nuevo registro cliente</span>
+                    <?php if ($isAdministrativeAdmin): ?>
+                        <a href="<?= htmlspecialchars(app_url('panel?estado=' . rawurlencode('En Proceso')), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'aprobaciones' ? ' is-active' : '' ?>" title="Aprobaciones">
+                            <i data-lucide="badge-check" class="w-5 h-5"></i>
+                            <span class="app-nav__label">Aprobaciones</span>
                         </a>
                     <?php endif; ?>
-                    <a href="<?= htmlspecialchars(app_url('panel?estado=' . rawurlencode('En Proceso')), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'aprobaciones' ? ' is-active' : '' ?>" title="Aprobaciones">
-                        <i data-lucide="badge-check" class="w-5 h-5"></i>
-                        <span class="app-nav__label">Aprobaciones</span>
-                    </a>
                     <a href="<?= htmlspecialchars(app_url('trazabilidad'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'trazabilidad' ? ' is-active' : '' ?>" title="Trazabilidad">
                         <i data-lucide="history" class="w-5 h-5"></i>
                         <span class="app-nav__label">Trazabilidad</span>
                     </a>
-                    <a href="<?= htmlspecialchars(app_url('configuracion'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'configuracion' ? ' is-active' : '' ?>" title="Configuraci&oacute;n">
-                        <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
-                        <span class="app-nav__label">Configuracion</span>
+                    <a href="<?= htmlspecialchars(app_url('index.php?action=external-invitations'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'enlaces-onboarding' ? ' is-active' : '' ?>" title="Enlaces onboarding">
+                        <i data-lucide="link" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Enlaces onboarding</span>
                     </a>
+                    <?php if ($isAdministrativeAdmin): ?>
+                        <a href="<?= htmlspecialchars(app_url('configuracion'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'configuracion' ? ' is-active' : '' ?>" title="Configuraci&oacute;n">
+                            <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                            <span class="app-nav__label">Configuracion</span>
+                        </a>
+                    <?php endif; ?>
                     <a href="<?= htmlspecialchars(app_url('index.php?route=clientes'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'clientes' ? ' is-active' : '' ?>" title="Clientes">
                         <i data-lucide="building-2" class="w-5 h-5"></i>
                         <span class="app-nav__label">Clientes</span>
@@ -110,36 +108,16 @@ if (is_array($authUser)) {
                         <i data-lucide="shield-check" class="w-5 h-5"></i>
                         <span class="app-nav__label">Certificados Migrate</span>
                     </a>
-                    <button type="button" class="app-nav__item" id="install-app-button" title="Instalar app">
-                        <i data-lucide="download" class="w-5 h-5"></i>
-                        <span class="app-nav__label">Instalar app</span>
-                    </button>
+                    <a href="<?= htmlspecialchars(app_url('volumen-cfe'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item<?= $activeNav === 'volumen-cfe' ? ' is-active' : '' ?>" title="Volumen CFE">
+                        <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Volumen CFE</span>
+                    </a>
+                    <a href="<?= htmlspecialchars(app_url('logout'), ENT_QUOTES, 'UTF-8') ?>" class="app-nav__item" title="Salir" data-confirm-link data-confirm="Desea cerrar la sesi&oacute;n actual?">
+                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                        <span class="app-nav__label">Salir</span>
+                    </a>
                 </nav>
             </div>
-
-            <?php if (Auth::check()): ?>
-                <div class="app-sidebar__footer">
-                    <div class="app-user-card">
-                        <div class="app-user-card__icon">
-                            <i data-lucide="user-round" class="w-5 h-5"></i>
-                        </div>
-                        <div class="app-user-card__copy">
-                            <p class="app-user-card__name"><?= htmlspecialchars($userDisplayName, ENT_QUOTES, 'UTF-8') ?></p>
-                            <p class="app-user-card__meta">Acceso interno autorizado</p>
-                        </div>
-                    </div>
-                    <div class="app-sidebar__actions">
-                        <button type="button" class="app-sidebar__mini-btn" data-app-nav-collapse aria-label="Contraer menu">
-                            <i data-lucide="panel-left-close" class="w-4 h-4"></i>
-                            <span class="app-nav__label">Contraer</span>
-                        </button>
-                        <a href="<?= htmlspecialchars(app_url('logout'), ENT_QUOTES, 'UTF-8') ?>" class="app-sidebar__mini-btn">
-                            <i data-lucide="log-out" class="w-4 h-4"></i>
-                            <span class="app-nav__label">Salir</span>
-                        </a>
-                    </div>
-                </div>
-            <?php endif; ?>
         </div>
     </aside>
 
@@ -182,11 +160,7 @@ if (is_array($authUser)) {
                                 <p class="text-xs text-slate-500">Acceso interno del modulo</p>
                             </div>
                             <div class="app-user-menu__links">
-                                <button type="button" class="app-user-menu__item" id="install-app-button-menu">
-                                    <i data-lucide="download" class="w-4 h-4"></i>
-                                    <span>Instalar aplicacion</span>
-                                </button>
-                                <a href="<?= htmlspecialchars(app_url('logout'), ENT_QUOTES, 'UTF-8') ?>" class="app-user-menu__item">
+                                <a href="<?= htmlspecialchars(app_url('logout'), ENT_QUOTES, 'UTF-8') ?>" class="app-user-menu__item" data-confirm-link data-confirm="Desea cerrar la sesi&oacute;n actual?">
                                     <i data-lucide="log-out" class="w-4 h-4"></i>
                                     <span>Cerrar sesion</span>
                                 </a>
