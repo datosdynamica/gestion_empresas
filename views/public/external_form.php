@@ -63,8 +63,13 @@ $errorText = static function (string $key) use ($errors): string {
         .step { display:none; }
         .step.active { display:block; }
         .panel { margin-top:18px; padding:16px; border:1px solid var(--line); border-radius:18px; background:#fafbfc; }
-        .terms-box { max-height:280px; overflow-y:auto; font-size:13px; color:#475569; }
+        .terms-box { height:min(480px, 48vh); overflow-y:auto; padding:0; font-size:13px; color:#475569; }
         .terms-box p + p { margin-top:10px; }
+        .terms-contract { padding:18px; }
+        .terms-contract h3 { margin:0 0 18px; font-size:14px; line-height:1.45; color:var(--ink); }
+        .terms-clause + .terms-clause { margin-top:16px; }
+        .terms-clause h4 { margin:0 0 6px; font-size:12px; line-height:1.4; color:var(--ink); }
+        .terms-clause p { margin:0; line-height:1.6; }
         .cta-row,.nav-row { display:flex; gap:12px; margin-top:20px; }
         .btn { appearance:none; border:0; border-radius:16px; padding:14px 16px; font-size:15px; font-weight:800; cursor:pointer; transition:transform .15s ease, background .15s ease; }
         .btn:hover { transform:translateY(-1px); }
@@ -111,14 +116,8 @@ $errorText = static function (string $key) use ($errors): string {
                     <section class="step" id="step-1">
                         <h2>Términos y Condiciones</h2>
                         <p class="intro">Lea y acepte las condiciones del servicio para continuar con el alta.</p>
-                        <div class="panel terms-box">
-                            <p><strong>LOGISMICO S.A.S. (DYNAMICA)</strong></p>
-                            <p><strong>1. Aceptación y prevalencia:</strong> estas condiciones regulan la prestación del servicio cuando no exista un contrato o adenda específica firmada entre las partes.</p>
-                            <p><strong>2. Objeto y licencia:</strong> la licencia, el precio, la moneda y el plan de CFE corresponden a la propuesta comercial acordada. La suscripción se perfecciona con el pago de la primera factura.</p>
-                            <p><strong>3. Vigencia:</strong> salvo acuerdo específico, la relación se mantiene mientras el servicio esté activo y cualquiera de las partes podrá cancelarlo con preaviso por correo electrónico.</p>
-                            <p><strong>4. Mora y suspensión:</strong> el vencimiento opera al cierre de cada mes. La mora puede generar suspensión o rescisión según las condiciones comerciales vigentes.</p>
-                            <p><strong>5. Licencia de uso:</strong> la licencia es no exclusiva y limitada a la vigencia del servicio. La propiedad intelectual del software pertenece a DYNAMICA.</p>
-                            <p><strong>6. Protección de datos:</strong> los datos suministrados se usarán para la prestación del servicio, la trazabilidad operativa y las comunicaciones necesarias del onboarding.</p>
+                        <div class="panel terms-box" aria-label="Texto completo de Términos y Condiciones">
+                            <?= require __DIR__ . '/external_terms_content.php' ?>
                         </div>
                         <?php if ($termsPdfAvailable): ?><div class="terms-link"><span>Descargar documento oficial en PDF</span><a href="<?= htmlspecialchars(external_onboarding_url('?action=external-terms-pdf'), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Ver PDF</a></div><?php endif; ?>
                         <label class="check-row"><input type="checkbox" name="tyc_accepted" id="tyc_accepted" value="1" <?= ($values['tyc_accepted'] ?? false) ? 'checked' : '' ?>><span><span class="required-mark" aria-hidden="true">*</span> Acepto íntegramente los Términos y Condiciones del servicio y la licencia de uso.</span></label>

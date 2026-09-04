@@ -20,8 +20,8 @@ consume al confirmar el registro.
 
 El PDF oficial se instala como `docs/contrato-estandar-dynamica.pdf`, con
 permiso de solo lectura para el proceso web. Apache niega el acceso directo al
-archivo. El primer paso del formulario presenta un resumen textual de los
-términos y ofrece la descarga del documento oficial mediante
+archivo. El primer paso del formulario presenta el texto completo de las 25
+cláusulas del contrato y ofrece la descarga del documento oficial mediante
 `?action=external-terms-pdf` bajo HTTPS.
 
 ## Correos
@@ -33,5 +33,5 @@ SMTP se registra en el log y no revierte el expediente ni reactiva el token.
 ## Verificacion pendiente
 
 La prueba funcional final debe generar un enlace desde el Administrativo y
-confirmar: visualizacion del resumen textual y descarga del PDF, validaciones,
+confirmar: visualizacion del texto contractual completo y descarga del PDF, validaciones,
 creacion del expediente, consumo del token y recepcion de ambos correos.
