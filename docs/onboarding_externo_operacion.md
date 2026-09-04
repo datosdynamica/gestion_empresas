@@ -2,8 +2,9 @@
 
 ## Acceso
 
-El enlace se genera desde `Administrativo > Enlaces onboarding`. El dominio
-externo no admite acceso directo sin token y bloquea acciones administrativas.
+Los usuarios internos autenticados pueden generar, copiar y revocar enlaces
+desde `Administrativo > Enlaces onboarding`. El dominio externo no admite
+acceso directo sin token y bloquea acciones administrativas.
 
 - Desarrollo: `https://onboarding.desarrollodynamica.net/?token=...`
 - Produccion: `https://onboarding.datosdynamica.net/?token=...`
